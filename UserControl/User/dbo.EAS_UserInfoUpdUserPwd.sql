@@ -14,7 +14,11 @@ AS
 		
 		Revsisions:
 			- 20130121@Dan: change linked server DB052 to DBEAS, Write log on DBTXN server in case of DBLOG server failure
+<<<<<<< HEAD
 			- 20130513@Lukas: fix bug - admin cannot reset his password because of checking permission   
+=======
+			
+>>>>>>> 297490acacaea82229dd55ee17439491d3e8d862
 		Parameter's Explanation:
 	*/
 SET NOCOUNT ON
@@ -25,6 +29,7 @@ SET NOCOUNT ON
 	
 	SET @startRun=GETDATE()
 	
+<<<<<<< HEAD
 	IF @UserID <> @CustID
 	BEGIN
 		EXEC DBEAS.bodb_EAS.dbo.EAS_UserCheckPermission @UserID = @userID ,@FuncKey = 'ManageUser', @ErrCode = @ErrCode OUTPUT, @ErrMsg = @ErrMsg OUTPUT	
@@ -32,6 +37,13 @@ SET NOCOUNT ON
 			RETURN
 	END
 
+=======
+	EXEC DBEAS.bodb_EAS.dbo.EAS_UserCheckPermission @UserID = @userID ,@FuncKey = 'ManageUser', @ErrCode = @ErrCode OUTPUT, @ErrMsg = @ErrMsg OUTPUT
+	
+	IF @ErrCode > 0
+		RETURN
+	
+>>>>>>> 297490acacaea82229dd55ee17439491d3e8d862
 	DECLARE @db_userpwd NVARCHAR(50)
 	
 	SELECT @db_userpwd = userpwd FROM Customer WITH(NOLOCK) WHERE custid = @custid
