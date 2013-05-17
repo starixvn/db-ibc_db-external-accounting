@@ -16,6 +16,9 @@ DB: DBEAS/bodb_EAS
 Original SP: Acc_CustomerSelByAg
 Revisions:  
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS
+	- 20130517@Lukas: 
+			fix bug - wrong comm rate 
+			add filter to reduce workload
 */  
 SET NOCOUNT ON  
 
@@ -58,7 +61,7 @@ SELECT cu.custid,cu.username,isnull(cu.username2,'') NickName, ci.enabled,ci.clo
 	max(case when cs.bettype = 1 and cs.sporttype=1 then cs.discount else 0 end) as discount,    
 	max(case when cs.bettype = 4 and cs.sporttype=1 then cs.discount else 0 end) as discountcs,    
 	max(case when cs.bettype = 5 and cs.sporttype=1 then cs.discount else 0 end) as discount1x2, 
-	max(case when cs3.bettype = 81 and cs3.sporttype=161 then cs3.adiscount else 0 end) as discountnumber,
+	max(case when cs3.bettype = 81 and cs3.sporttype=161 then cs3.discount else 0 end) as discountnumber,
    	--player commission
 	max(case when cs.bettype = 1 and cs.sporttype=1 then cs.playerdiscount else 0 end) as playerdiscount,    
 	max(case when cs.bettype = 4 and cs.sporttype=1 then cs.playerdiscount else 0 end) as playerdiscountcs,    
@@ -84,7 +87,9 @@ SELECT cu.custid,cu.username,isnull(cu.username2,'') NickName, ci.enabled,ci.clo
 FROM   bodb02.dbo.customer AS cu with (NOLOCK)  
 	INNER JOIN #Custinfo ci with(nolock)	on cu.custid = ci.custid 			  
 	INNER JOIN #CustSetting as cs with (NOLOCK) on cu.custid = cs.custid  
-	INNER JOIN #custsetting3rd cs3 with(nolock) on cu.custid = cs3.custid	
+	INNER JOIN #custsetting3rd cs3 with(nolock) on cu.custid = cs3.custid
+WHERE cs.sporttype IN (1) AND cs.bettype IN (1,5,4)
+	AND cs3.sporttype IN (161) AND cs3.bettype IN (81) 	
 GROUP BY cu.custid,cu.username,cu.username2,cu.ugroup, ci.enabled,ci.closed,ci.reject,cu.roleid,
 		cu.firstname, cu.lastname,
 		cu.creatdate ,cu.iplogin,ci.DoubleCommLosing,ci.DisableOutright,  
@@ -98,6 +103,7 @@ GROUP BY cu.custid,cu.username,cu.username2,cu.ugroup, ci.enabled,ci.closed,ci.r
 		ci.DisableVirtualSports,ci.DoubleCommLosing
 
 drop table #Custinfo,#CustSetting,#custsetting3rd
+
 
 GO
 GRANT EXECUTE ON [dbo].[EAS_CustomerSelByAg] TO [bodbExtAccNet]

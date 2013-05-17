@@ -15,6 +15,7 @@ DB: DBEAS/bodb_EAS
 Original SP: Acc_CustomerSelBySAg
 Revisions:  
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS
+	- 20130517@Lukas: add filter to reduce workload
 */  
 SET NOCOUNT ON  
 
@@ -64,6 +65,8 @@ FROM   bodb02.dbo.customer AS cu with (NOLOCK)
 	INNER JOIN bodb02.dbo.CustSetting as cs with (NOLOCK) on cu.custid = cs.custid  
 	INNER JOIN bodb02.dbo.custsetting3rd cs3 with(nolock) on cu.custid = cs3.custid  
 	INNER JOIN bodb02.dbo.CustMaster cm with(NOLOCK) on cu.custid = cm.custid   
+WHERE cs.sporttype IN (1) AND cs.bettype IN (1,5,4)
+	AND cs3.sporttype IN (161) AND cs3.bettype IN (81)
 group by cu.custid,cu.username, ci.enabled,ci.closed,ci.reject,cu.roleid,
 		cu.firstname, cu.lastname,
 		cu.creatdate ,cu.iplogin,ci.DoubleCommLosing,ci.DisableOutright,  
@@ -75,6 +78,9 @@ group by cu.custid,cu.username, ci.enabled,ci.closed,ci.reject,cu.roleid,
 		ci.isAutoResetP2P, ci.DisableP2P, ci.DisableFunP2P,  
 		ci.DisableLiveCasino, ci.SyncLiveCasino,  
 		ci.DisableVirtualSports,ci.DoubleCommLosing
+		
+		
+		
 GO
 GRANT EXECUTE ON [dbo].[EAS_CustomerSelBySAg] TO [bodbExtAccNet]
 GO
