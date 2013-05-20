@@ -49,7 +49,7 @@ FROM bodb02.dbo.custsetting cs WITH(NOLOCK)
 WHERE bettype in (1,4,5) and sporttype = 1	
 
 --temp custsetting3rd
-SELECT cs3.custid, bettype, sporttype,adiscount,playerdiscount
+SELECT cs3.custid, bettype, sporttype,discount,playerdiscount
 INTO #custsetting3rd
 FROM bodb02.dbo.custsetting3rd cs3 WITH(NOLOCK)
 	inner join #custinfo ci on cs3.custid = ci.custid	
