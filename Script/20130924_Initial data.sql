@@ -100,7 +100,7 @@ DECLARE @user TABLE (userid int)
 INSERT INTO @user (userid)
 SELECT custid
 FROM bodb02.dbo.custinfo WITH(NOLOCK)
-WHERE username IN ('dbaJamie','dbaDan','pgmTerry','pgmLong','pgmKiwi')
+WHERE username IN ('dbaJamie','pgmKiwi','dbaLukas')
 
 INSERT INTO [bodb_EAS].[dbo].[eaUserInfo]
            ([UserID]
@@ -154,32 +154,33 @@ FROM eaFunction
 WHERE [FuncID] NOT IN (4,5,6)
 
 
+/* these groups will not be added in UAT */
 --create external group 
-SET IDENTITY_INSERT eaGroup ON
-GO
+--SET IDENTITY_INSERT eaGroup ON
+--GO
 
-INSERT INTO [bodb_EAS].[dbo].[eaGroup]
-           ( 
-			[GroupID]
-		   ,[GroupName]
-           ,[Description]
-           ,[CreatedDate]
-           ,[Creator])
-SELECT 3,'ACCDDD','External DDD Admins',current_timestamp,5838421
-UNION ALL
-SELECT 4,'ACCINDO','Indo site Admin',current_timestamp,5838421
-UNION ALL
-SELECT 5,'ACCIRR','IRR Currency System',current_timestamp,5838421
-UNION ALL
-SELECT 6,'ACCNTD','NTD Admins',current_timestamp,5838421
-UNION ALL
-SELECT 7,'ACCTHAI','For THAI currency Admins',current_timestamp,5838421
-UNION ALL
-SELECT 8,'ACCYEN','YEN Admins',current_timestamp,5838421
-UNION ALL
-SELECT 9,'ACCYEN789','External YEN Admins',current_timestamp,5838421
-UNION ALL
-SELECT 10,'ACCYEN889','External YEN Admins',current_timestamp,5838421
+--INSERT INTO [bodb_EAS].[dbo].[eaGroup]
+--           ( 
+--			[GroupID]
+--		   ,[GroupName]
+--           ,[Description]
+--           ,[CreatedDate]
+--           ,[Creator])
+--SELECT 3,'ACCDDD','External DDD Admins',current_timestamp,5838421
+--UNION ALL
+--SELECT 4,'ACCINDO','Indo site Admin',current_timestamp,5838421
+--UNION ALL
+--SELECT 5,'ACCIRR','IRR Currency System',current_timestamp,5838421
+--UNION ALL
+--SELECT 6,'ACCNTD','NTD Admins',current_timestamp,5838421
+--UNION ALL
+--SELECT 7,'ACCTHAI','For THAI currency Admins',current_timestamp,5838421
+--UNION ALL
+--SELECT 8,'ACCYEN','YEN Admins',current_timestamp,5838421
+--UNION ALL
+--SELECT 9,'ACCYEN789','External YEN Admins',current_timestamp,5838421
+--UNION ALL
+--SELECT 10,'ACCYEN889','External YEN Admins',current_timestamp,5838421
 
-SET IDENTITY_INSERT [eaGroup] ON
-GO
+--SET IDENTITY_INSERT [eaGroup] ON
+--GO
