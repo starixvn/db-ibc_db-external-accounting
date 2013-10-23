@@ -15,6 +15,7 @@ DB: DBEAS/bodb_EAS
 Original SP: Acc_CustomerSelBySAg
 Revisions:  
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS
+	- 20131023@Elodie: Get more field HideVirtualSports, DisableCasinoBonus, DisableOpusCasino, DisableHRFixedOdds
 */  
 SET NOCOUNT ON  
 
@@ -46,6 +47,11 @@ SELECT cu.custid,cu.username, ci.enabled,ci.closed,isnull(ci.reject,0) as suspen
 	ci.DisableLiveCasino, ci.SyncLiveCasino,  
 	-- For VirtualSports  
 	ci.DisableVirtualSports,ci.DoubleCommLosing,  
+	ci.HideVirtualSports,
+	
+	ci.DisableCasinoBonus,
+	ci.DisableOpusCasino,
+	ci.DisableHRFixedOdds,
 	--transfer condition
 	@TransferOption disableTransfer,
 	ROW_NUMBER() OVER (ORDER BY ci.enabled desc, ci.closed, isnull(ci.reject,0), cu.username) as RowNumber   
@@ -53,7 +59,7 @@ FROM   bodb02.dbo.customer AS cu with (NOLOCK)
 	INNER JOIN (SELECT custinfo.custid, currency, roleid, autosuspend, reject, closed, MatchLimit, VirtualMultiplier, Enabled, DisableHorseRacing,  
 					DisableFinancial, DisableCasino, SyncCasino, DisableOutright, DisableOpenTote, DisableBingo, DisableNumber, SyncBingo,  
 					disable151_au, disable152_uk, disable152_au, disable153_au , isAutoResetP2P, DisableP2P, DisableFunP2P,   
-					DisableLiveCasino,SyncLiveCasino, DisableVirtualSports, DoubleCommLosing      
+					DisableLiveCasino,SyncLiveCasino, DisableVirtualSports, DoubleCommLosing, HideVirtualSports, DisableCasinoBonus, DisableOpusCasino, DisableHRFixedOdds     
 				FROM bodb02.dbo.custinfo with (NOLOCK) 
 				WHERE SRecommend = @SRecommend AND roleid=3 and 
 					(@Custid is null or Custid=@Custid) AND
@@ -74,7 +80,8 @@ group by cu.custid,cu.username, ci.enabled,ci.closed,ci.reject,cu.roleid,
 		ci.syncBingo,ci.DisableBingo, ci.DisableNumber,  
 		ci.isAutoResetP2P, ci.DisableP2P, ci.DisableFunP2P,  
 		ci.DisableLiveCasino, ci.SyncLiveCasino,  
-		ci.DisableVirtualSports,ci.DoubleCommLosing
+		ci.DisableVirtualSports,ci.DoubleCommLosing, ci.HideVirtualSports,	
+		ci.DisableCasinoBonus, ci.DisableOpusCasino, ci.DisableHRFixedOdds
 GO
 GRANT EXECUTE ON [dbo].[EAS_CustomerSelBySAg] TO [bodbExtAccNet]
 GO
