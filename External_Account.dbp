@@ -55,7 +55,8 @@ Begin DataProject = "External_Account"
       End
    End
    Begin Folder = "Script"
-      Script = "20121121_initial data.sql"
+      Script = "20130924_DatabaseStructure.sql"
+      Script = "20130924_Initial data.sql"
    End
    Begin Folder = "UserControl"
       Begin Folder = "Group"

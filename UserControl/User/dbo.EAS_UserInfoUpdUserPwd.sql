@@ -14,7 +14,7 @@ AS
 		
 		Revsisions:
 			- 20130121@Dan: change linked server DB052 to DBEAS, Write log on DBTXN server in case of DBLOG server failure
-			
+			- 20130513@Lukas: fix bug - admin cannot reset his password because of checking permission 
 		Parameter's Explanation:
 	*/
 SET NOCOUNT ON
@@ -25,11 +25,13 @@ SET NOCOUNT ON
 	
 	SET @startRun=GETDATE()
 	
-	EXEC DBEAS.bodb_EAS.dbo.EAS_UserCheckPermission @UserID = @userID ,@FuncKey = 'ManageUser', @ErrCode = @ErrCode OUTPUT, @ErrMsg = @ErrMsg OUTPUT
-	
-	IF @ErrCode > 0
-		RETURN
-	
+	IF @UserID <> @CustID
+	BEGIN
+		EXEC DBEAS.bodb_EAS.dbo.EAS_UserCheckPermission @UserID = @userID ,@FuncKey = 'ManageUser', @ErrCode = @ErrCode OUTPUT, @ErrMsg = @ErrMsg OUTPUT	
+		IF @ErrCode > 0
+			RETURN
+	END
+
 	DECLARE @db_userpwd NVARCHAR(50)
 	
 	SELECT @db_userpwd = userpwd FROM Customer WITH(NOLOCK) WHERE custid = @custid
@@ -100,7 +102,8 @@ SET NOCOUNT ON
 			@TrackingValue	= @LogData, 
 			@duration		= @duration
 	END CATCH			
-GO 
-GRANT VIEW DEFINITION ON [dbo].[EAS_UserInfoUpdUserPwd] TO [vnteam]
-GO 
-GRANT EXECUTE ON [dbo].[EAS_UserInfoUpdUserPwd] TO [bodbExtAccNet]
+
+GO
+GRANT EXECUTE ON [dbo].[EAS_UserInfoUpdUserPwd] TO [bodbExtAccNet] AS [dbo]
+GO
+GRANT VIEW DEFINITION ON [dbo].[EAS_UserInfoUpdUserPwd] TO [vnteam] AS [dbo]

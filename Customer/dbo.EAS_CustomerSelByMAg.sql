@@ -15,7 +15,10 @@ DB: DBEAS/bodb_EAS
 Original SP: Acc_CustomerSelByMAg
 Revisions:  
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS
-	- 20131023@Elodie: Get more field HideVirtualSports, DisableCasinoBonus, DisableOpusCasino, DisableHRFixedOdds
+	- 20130517@Lukas: 
+			fix bug - wrong comm rate 
+			add filter to reduce workload
+	- 20131023@Elodie: Get more field HideVirtualSports, DisableCasinoBonus, DisableOpusCasino, DisableHRFixedOdds			
 */  
 SET NOCOUNT ON  
 
@@ -27,9 +30,9 @@ WHERE custid = @MRecommend
 
 SELECT cu.custid,cu.username, ci.enabled,ci.closed,isnull(ci.reject,0) as suspended,cu.roleid,isnull(cu.firstname, '') as firstname, isnull(cu.lastname, '') as lastname,
 	max(cs.groupa) as groupa, max(cs.groupb) as groupb, max(cs.groupc) as groupc, max(cs.groupd) as groupd, 
-	max(case when cs.bettype = 5 and cs.sporttype=1 then cs.adiscount else 0 end) as discount1x2,   
-	max(case when cs.bettype = 4 and cs.sporttype=1 then cs.adiscount else 0 end) as discountcs,   
-	max(case when cs3.bettype = 81 and cs3.sporttype=161 then cs3.adiscount else 0 end) as discountnumber,
+	max(case when cs.bettype = 5 and cs.sporttype=1 then cs.discount else 0 end) as discount1x2,   
+	max(case when cs.bettype = 4 and cs.sporttype=1 then cs.discount else 0 end) as discountcs,   
+	max(case when cs3.bettype = 81 and cs3.sporttype=161 then cs3.discount else 0 end) as discountnumber,
 	cu.creatdate as createdate,isnull(cu.iplogin, '') as lastloginip,
 	ci.DoubleCommLosing,isnull(ci.DisableOutright,0) as DisableOutright,  
 	isnull( case when ci.disablehorseracing = 0 or ci.disableOpenTote = 0 or ci.disable151_au = 0 or ci.disable152_uk = 0  
@@ -67,7 +70,9 @@ FROM   bodb02.dbo.customer AS cu with (NOLOCK)
 				) ci on cu.custid = ci.custid     
 	INNER JOIN bodb02.dbo.CustSetting as cs with (NOLOCK) on cu.custid = cs.custid  
 	INNER JOIN bodb02.dbo.custsetting3rd cs3 with(nolock) on cu.custid = cs3.custid  
-	INNER JOIN bodb02.dbo.Custagent cm with(NOLOCK) on cu.custid = cm.custid   
+	INNER JOIN bodb02.dbo.Custagent cm with(NOLOCK) on cu.custid = cm.custid  
+WHERE cs.sporttype IN (1) AND cs.bettype IN (1,5,4)
+	AND cs3.sporttype IN (161) AND cs3.bettype IN (81) 
 group by cu.custid,cu.username, ci.enabled,ci.closed,ci.reject,cu.roleid,
 		cu.firstname, cu.lastname,
 		cu.creatdate ,cu.iplogin,ci.DoubleCommLosing,ci.DisableOutright,  
@@ -82,6 +87,6 @@ group by cu.custid,cu.username, ci.enabled,ci.closed,ci.reject,cu.roleid,
 		ci.DisableCasinoBonus, ci.DisableOpusCasino, ci.DisableHRFixedOdds
 
 GO
-GRANT EXECUTE ON [dbo].[EAS_CustomerSelByMAg] TO [bodbExtAccNet]
+GRANT EXECUTE ON [dbo].[EAS_CustomerSelByMAg] TO [bodbExtAccNet] AS [dbo]
 GO
-GRANT VIEW DEFINITION ON [dbo].[EAS_CustomerSelByMAg] TO [vnteam]
+GRANT VIEW DEFINITION ON [dbo].[EAS_CustomerSelByMAg] TO [vnteam] AS [dbo]
