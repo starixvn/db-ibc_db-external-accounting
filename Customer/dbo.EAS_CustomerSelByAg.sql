@@ -18,7 +18,7 @@ Revisions:
 	- 20130517@Lukas: 
 			fix bug - wrong comm rate 
 			add filter to reduce workload
-	- 20131023@Elodie: Get more field HideVirtualSports, DisableCasinoBonus, DisableOpusCasino, DisableHRFixedOdds			
+	- 20131023@Elodie: Get more field HideVirtualSports, DisableCasinoBonus, DisableHRFixedOdds			
 */  
 SET NOCOUNT ON  
 
@@ -32,7 +32,7 @@ WHERE custid = @Recommend
 SELECT custinfo.custid, currency, roleid, autosuspend, reject, closed, MatchLimit, VirtualMultiplier, Enabled, DisableHorseRacing,  
 		DisableFinancial, DisableCasino, SyncCasino, DisableOutright, DisableOpenTote, DisableBingo, DisableNumber, SyncBingo,  
 		disable151_au, disable152_uk, disable152_au, disable153_au , isAutoResetP2P, DisableP2P, DisableFunP2P,   
-		DisableLiveCasino,SyncLiveCasino, DisableVirtualSports, DoubleCommLosing, Recommend, HideVirtualSports, DisableCasinoBonus, DisableOpusCasino, DisableHRFixedOdds     
+		DisableLiveCasino,SyncLiveCasino, DisableVirtualSports, DoubleCommLosing, Recommend, HideVirtualSports, DisableCasinoBonus, DisableHRFixedOdds     
 INTO #custinfo		
 FROM bodb02.dbo.custinfo WITH (NOLOCK) 						
 WHERE Recommend = @Recommend AND roleid=1 and 
@@ -84,7 +84,6 @@ SELECT cu.custid,cu.username,isnull(cu.username2,'') NickName, ci.enabled,ci.clo
 	ci.HideVirtualSports,
 	
 	ci.DisableCasinoBonus,
-	ci.DisableOpusCasino,
 	ci.DisableHRFixedOdds,
 	--transfer condition
 	@TransferOption disableTransfer,	
@@ -106,7 +105,7 @@ GROUP BY cu.custid,cu.username,cu.username2,cu.ugroup, ci.enabled,ci.closed,ci.r
 		ci.isAutoResetP2P, ci.DisableP2P, ci.DisableFunP2P,  
 		ci.DisableLiveCasino, ci.SyncLiveCasino,  
 		ci.DisableVirtualSports,ci.DoubleCommLosing, ci.HideVirtualSports,	
-		ci.DisableCasinoBonus, ci.DisableOpusCasino, ci.DisableHRFixedOdds
+		ci.DisableCasinoBonus, ci.DisableHRFixedOdds
 
 drop table #Custinfo,#CustSetting,#custsetting3rd
 

@@ -18,7 +18,7 @@ Revisions:
 	- 20130517@Lukas: 
 			fix bug - wrong comm rate 
 			add filter to reduce workload
-	- 20131023@Elodie: Get more field HideVirtualSports, DisableCasinoBonus, DisableOpusCasino, DisableHRFixedOdds			
+	- 20131023@Elodie: Get more field HideVirtualSports, DisableCasinoBonus, DisableHRFixedOdds			
 */  
 
 SET NOCOUNT ON
@@ -62,10 +62,8 @@ SELECT cu.custid,cu.username, ci.enabled,ci.closed,isnull(ci.reject,0) as suspen
 	ci.DisableLiveCasino, ci.SyncLiveCasino,  
 	-- For VirtualSports  
 	ci.DisableVirtualSports,
-	ci.HideVirtualSports,
-	
+	ci.HideVirtualSports,	
 	ci.DisableCasinoBonus,
-	ci.DisableOpusCasino,
 	ci.DisableHRFixedOdds,
 	ROW_NUMBER() OVER (ORDER BY ci.enabled desc, ci.closed, isnull(ci.reject,0), cu.username) as RowNumber   
 	
@@ -86,7 +84,7 @@ GROUP BY  cu.custid,cu.username, ci.enabled,ci.closed,ci.reject,cu.roleid,
 	ci.isAutoResetP2P, ci.DisableP2P, ci.DisableFunP2P,  
 	ci.DisableLiveCasino, ci.SyncLiveCasino,  
 	ci.DisableVirtualSports,ci.DoubleCommLosing, ci.HideVirtualSports,	
-	ci.DisableCasinoBonus, ci.DisableOpusCasino, ci.DisableHRFixedOdds
+	ci.DisableCasinoBonus, ci.DisableHRFixedOdds
 
 GO
 GRANT EXECUTE ON [dbo].[EAS_CustomerSelByCom] TO [bodbExtAccNet] AS [dbo]
