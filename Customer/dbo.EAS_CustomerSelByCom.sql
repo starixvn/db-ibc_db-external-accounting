@@ -19,6 +19,7 @@ Revisions:
 			fix bug - wrong comm rate 
 			add filter to reduce workload
 	- 20131023@Elodie: Get more field HideVirtualSports, DisableCasinoBonus, DisableHRFixedOdds			
+	- 20140120@Elodie: Hot fix to get information of disabled customer
 */  
 
 SET NOCOUNT ON
@@ -70,10 +71,10 @@ SELECT cu.custid,cu.username, ci.enabled,ci.closed,isnull(ci.reject,0) as suspen
 FROM bodb02.dbo.customer cu with(nolock)
 	INNER JOIN @tmpSuperList sl on sl.custid = cu.custid
 	INNER JOIN bodb02.dbo.custinfo ci with(nolock) on ci.custid = cu.custid
-	INNER JOIN bodb02.dbo.CustSetting as cs with (NOLOCK) on cu.custid = cs.custid 
-	INNER JOIN bodb02.dbo.custsetting3rd cs3 with(nolock) on cu.custid = cs3.custid  
-WHERE cs.sporttype IN (1) AND cs.bettype IN (1,5,4)
-	AND cs3.sporttype IN (161) AND cs3.bettype IN (81)
+	LEFT JOIN bodb02.dbo.CustSetting as cs with (NOLOCK) on cu.custid = cs.custid 
+	LEFT JOIN bodb02.dbo.custsetting3rd cs3 with(nolock) on cu.custid = cs3.custid  
+WHERE (cs.sporttype IN (1) AND cs.bettype IN (1,5,4) AND cs3.sporttype IN (161) AND cs3.bettype IN (81))
+	OR (cs.sporttype IS NULL AND cs.bettype IS NULL AND cs3.sporttype IS NULL AND cs3.bettype IS NULL)
 GROUP BY  cu.custid,cu.username, ci.enabled,ci.closed,ci.reject,cu.roleid, 
 	cu.firstname, cu.lastname,cu.creatdate ,cu.iplogin,	ci.DisableOutright,  
 	ci.disablehorseracing,ci.disableOpenTote,ci.disable151_au,ci.disable152_uk,ci.disable152_au,

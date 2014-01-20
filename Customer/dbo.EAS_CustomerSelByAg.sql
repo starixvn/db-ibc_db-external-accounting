@@ -19,6 +19,7 @@ Revisions:
 			fix bug - wrong comm rate 
 			add filter to reduce workload
 	- 20131023@Elodie: Get more field HideVirtualSports, DisableCasinoBonus, DisableHRFixedOdds			
+	- 20140120@Elodie: Hot fix to get information of disabled customer
 */  
 SET NOCOUNT ON  
 
@@ -90,10 +91,10 @@ SELECT cu.custid,cu.username,isnull(cu.username2,'') NickName, ci.enabled,ci.clo
 	ROW_NUMBER() OVER (ORDER BY ci.enabled desc, ci.closed, isnull(ci.reject,0), cu.username) as RowNumber   
 FROM   bodb02.dbo.customer AS cu with (NOLOCK)  
 	INNER JOIN #Custinfo ci with(nolock)	on cu.custid = ci.custid 			  
-	INNER JOIN #CustSetting as cs with (NOLOCK) on cu.custid = cs.custid  
-	INNER JOIN #custsetting3rd cs3 with(nolock) on cu.custid = cs3.custid
-WHERE cs.sporttype IN (1) AND cs.bettype IN (1,5,4)
-	AND cs3.sporttype IN (161) AND cs3.bettype IN (81) 	
+	LEFT JOIN #CustSetting as cs with (NOLOCK) on cu.custid = cs.custid  
+	LEFT JOIN #custsetting3rd cs3 with(nolock) on cu.custid = cs3.custid
+WHERE (cs.sporttype IN (1) AND cs.bettype IN (1,5,4) AND cs3.sporttype IN (161) AND cs3.bettype IN (81))
+	OR (cs.sporttype IS NULL AND cs.bettype IS NULL AND cs3.sporttype IS NULL AND cs3.bettype IS NULL)
 GROUP BY cu.custid,cu.username,cu.username2,cu.ugroup, ci.enabled,ci.closed,ci.reject,cu.roleid,
 		cu.firstname, cu.lastname,
 		cu.creatdate ,cu.iplogin,ci.DoubleCommLosing,ci.DisableOutright,  
