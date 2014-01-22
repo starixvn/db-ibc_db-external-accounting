@@ -8,16 +8,17 @@ AS
 		DB: DBEAS/bodb_EAS
 		
 		Revisions:
-		
+			- 20130520@Lukas: get funcKey field
+			- 20140122@Elodie: Get column FuncDesc
 		Parameter's Explanation:
 	*/ 
 SET NOCOUNT ON
 
-	SELECT f.funcid, f.funcname, f.DisplayOrder, f.ParentID, f.ParentName, ISNULL(u.policy,0) UserPolicy, ISNULL(g.policy,0) GroupPolicy
+	SELECT f.funcid, f.funcname, f.DisplayOrder, f.ParentID, f.ParentName, ISNULL(u.policy,0) UserPolicy, ISNULL(g.policy,0) GroupPolicy, f.funcKey, f.FuncDesc
 	FROM eaFunction f WITH(NOLOCK)
 	LEFT JOIN 	
 		(
-			SELECT FuncID, Policy 
+			SELECT FuncID, Policy
 			FROM eaUserPolicy WITH(NOLOCK) 
 			WHERE UserID = @UserID
 		) u ON f.funcid  = u.funcid
@@ -30,6 +31,6 @@ SET NOCOUNT ON
 	ORDER BY f.ParentID ,f.DisplayOrder ASC
 
 GO
-GRANT VIEW DEFINITION ON [dbo].[EAS_UserPolicySel] TO [vnteam]
+GRANT EXECUTE ON [dbo].[EAS_UserPolicySel] TO [bodbExtAccNet] AS [dbo]
 GO
-GRANT EXECUTE ON [dbo].[EAS_UserPolicySel] TO [bodbExtAccNet]
+GRANT VIEW DEFINITION ON [dbo].[EAS_UserPolicySel] TO [vnteam] AS [dbo]
