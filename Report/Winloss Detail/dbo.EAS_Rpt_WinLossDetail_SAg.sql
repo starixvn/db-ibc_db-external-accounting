@@ -1,3 +1,10 @@
+USE [bodb_EAS]
+GO
+/****** Object:  StoredProcedure [dbo].[EAS_Rpt_WinLossDetail_SAg_xtest]    Script Date: 3/11/2014 10:27:56 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_SAg]
 	@custid int,--srecommend
 	@masterid int = NULL,
@@ -11,6 +18,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_SAg]
 	@showBI BIT=0,
 	@showLiveCasino BIT = 0,
 	@showVS BIT = 0,
+	@showKeno BIT = 0,
 	@BalanceUpDay SMALLDATETIME,
 	@PageSize int=0,
 	@PageIndex int=0,
@@ -28,6 +36,7 @@ DB: DBEAS/bodb_EAS
 Original SP: [Age_Rpt_WinLossDetail_SAg]
 Revisions:
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS, add linked server DBSUM for bodb_Summary
+	- 20140305@Patrick: Add more Keno product(sport:202, bettype between 1501 and 1599)
 */
 
 SET NOCOUNT ON
@@ -90,6 +99,13 @@ BEGIN
  INSERT INTO @TmpCondSumWL(Sporttype, Bettype)  
  VALUES(180,0) 
 END
+
+IF @showKeno = 1
+BEGIN
+ --Sum_winloss  
+ INSERT INTO @TmpCondSumWL(Sporttype, Bettype)  
+ VALUES(202,0) 
+END
 	
 IF @Todate >= @BalanceUpDay
 BEGIN 
@@ -125,6 +141,7 @@ BEGIN
 				OR bettype = (CASE WHEN @showBI =1 THEN 73 ELSE 0 END)
 				OR bettype BETWEEN 1101 AND (CASE WHEN @showLiveCasino =1 THEN 1199 ELSE 0 END)  
 				OR bettype BETWEEN 1201 AND (CASE WHEN @showVS=1 THEN 1299 ELSE 0 END)
+				OR bettype BETWEEN 1501 AND (CASE WHEN @showKeno = 1 THEN 1599 ELSE 0 END)
 			) AND 
 		    winlostdate between @FromDate and @todate and
 		    srecommend = @custid and

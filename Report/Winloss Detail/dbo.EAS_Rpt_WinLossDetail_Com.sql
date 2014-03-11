@@ -1,3 +1,10 @@
+USE [bodb_EAS]
+GO
+/****** Object:  StoredProcedure [dbo].[EAS_Rpt_WinLossDetail_Com_xtest]    Script Date: 3/11/2014 10:27:25 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCTHAI',--ACCTHAI or ACCINDO
 	@custid		INT = NULL,	
@@ -11,6 +18,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com]
 	@showBI		BIT=0,
 	@showVS		BIT=0,
 	@showLiveCasino BIT = 0,
+	@showKeno BIT = 0,
 	@BalanceUpDay SMALLDATETIME	
 AS
 
@@ -22,6 +30,7 @@ DB: DBEAS/bodb_EAS
 Original: Acc_Rpt_WinLossDetail_ComEx
 Revisions:
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS, call to bodb_AGE for Acc_CustGroup, add linked server DBSUM for bodb_Summary
+	- 20140305@Patrick: Add more Keno product(sport:202, bettype between 1501 and 1599)
 */
 
 SET NOCOUNT ON
@@ -30,7 +39,7 @@ DECLARE @tmpSuperList TABLE( custID INT)
 
 INSERT INTO @tmpSuperList(CustID)
 SELECT custID 
-FROM bodb_AGE.dbo.Acc_CustGroup (NOLOCK)
+FROM DBAGE.bodb_AGE.dbo.Acc_CustGroup WITH(NOLOCK)
 WHERE (@custid IS NULL OR custid = @custid)
 	AND GroupName = @GroupName
 
@@ -123,6 +132,18 @@ BEGIN
 	--Sum_winloss
 	INSERT INTO @TmpCondSumWL(Sporttype, Bettype)
 	VALUES(180,0)
+END
+
+IF @showKeno = 1
+BEGIN
+	--Bettrans
+	INSERT INTO @TmpCond(Sporttype, Bettype)
+	SELECT 202 AS sporttype, typeid FROM bodb02.dbo.bettype (NOLOCK)
+	WHERE typeid BETWEEN 1501 AND 1599
+	
+	--Sum_winloss
+	INSERT INTO @TmpCondSumWL(Sporttype, Bettype)
+	VALUES(202,0)
 END
 
 IF @Todate >= @BalanceUpDay
