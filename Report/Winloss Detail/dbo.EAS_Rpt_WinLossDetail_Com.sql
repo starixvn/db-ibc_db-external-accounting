@@ -5,6 +5,7 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCTHAI',--ACCTHAI or ACCINDO
 	@custid		INT = NULL,	
@@ -31,6 +32,7 @@ Original: Acc_Rpt_WinLossDetail_ComEx
 Revisions:
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS, call to bodb_AGE for Acc_CustGroup, add linked server DBSUM for bodb_Summary
 	- 20140305@Patrick: Add more Keno product(sport:202, bettype between 1501 and 1599)
+	- 20140321@Lukas: seperate P2P product to enhance performance
 */
 
 SET NOCOUNT ON
@@ -152,6 +154,36 @@ BEGIN
 	    SELECT
 		    SRecommend,			
 			SUM(case when b.liveawayscore = 0 and b.bettype in(33,43) then b.stake/2 else ABS(b.stake) end),	
+		    --sum(case when b.bettype = 1000 THEN oddsspread else case when tpositiontaking=1 then 0 else scomm/(1-tpositiontaking) end end) as GrossComm,
+		    sum(case when tpositiontaking=1 then 0 else scomm/(1-tpositiontaking) end) as GrossComm,
+		    sum(winlost-actual_stake), --MemberWinlost
+		    sum(playercomm), -- PlayerComm
+		    isnull(sum(winlost-actual_stake), 0) + isnull(sum(playercomm), 0), --MemberTotal
+		    sum(awinlost), -- AgWinlost
+		    isnull(sum(comm-playercomm),0), --AgComm
+		    isnull(sum(awinlost+comm-playercomm), 0), --AgTotal			
+		    sum(mwinlost), -- MAgWinlost
+		    sum(acomm)-sum(comm), --MAgComm
+		    isnull(sum(mwinlost), 0) + isnull(sum(acomm), 0)-sum(comm), --MAgTotal
+		    sum(swinlost), -- SAgWinlost
+		    isnull(sum(scomm),0) -isnull(sum(acomm),0), --SAgComm
+		    isnull(sum(swinlost), 0) + isnull(sum(scomm), 0)-sum(acomm), --SAgTotal
+		    -(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost-actual_stake), 0)) --Company				
+	    FROM
+		    bodb02.dbo.bettrans b WITH (NOLOCK) INNER JOIN @TmpCond t ON b.bettype = t.bettype
+	    WHERE
+		    b.winlostdate between @FromDate and @todate and
+		    b.srecommend in (SELECT custID FROM @tmpSuperList) and
+		    b.ruben = 1 and
+		    b.statusID not in (101, 102, 103)   and 
+		    b.bettype <> 1000
+	    GROUP BY SRecommend, b.bettype
+	    
+	-- seperate P2P to improve performance
+	INSERT INTO @ComWinLossDetails
+	    SELECT
+		    SRecommend,			
+			SUM(case when b.liveawayscore = 0 and b.bettype in(33,43) then b.stake/2 else ABS(b.stake) end),	
 		    sum(case when b.bettype = 1000 THEN oddsspread else case when tpositiontaking=1 then 0 else scomm/(1-tpositiontaking) end end) as GrossComm,
 		    sum(winlost-actual_stake), --MemberWinlost
 		    sum(playercomm), -- PlayerComm
@@ -172,9 +204,9 @@ BEGIN
 		    b.winlostdate between @FromDate and @todate and
 		    b.srecommend in (SELECT custID FROM @tmpSuperList) and
 		    b.ruben = 1 and
-		    b.statusID not in (101, 102, 103)   
+		    b.statusID not in (101, 102, 103)  and 
+		    b.bettype = 1000
 	    GROUP BY SRecommend, b.bettype
-		
 	if @BalanceUpDay < @FromDate
 	    select @BalanceUpDay=@FromDate
 		
@@ -259,10 +291,7 @@ SELECT
 FROM @ComWinLossDetails w INNER JOIN bodb02.dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID 
 Group by w.CustID, c.UserName
 order by c.Username
-
-
 GO
-GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDetail_Com]  TO [bodbExtAccNet]
+GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [bodbExtAccNet] AS [dbo]
 GO
-GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDetail_Com]  TO vnteam
-
+GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [vnteam] AS [dbo]
