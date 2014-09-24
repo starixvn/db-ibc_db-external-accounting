@@ -28,9 +28,11 @@ Revisions:
 	- 20130517@Lukas: add filter to reduce workload
 	- 20131023@Elodie: Get more field HideVirtualSports, DisableCasinoBonus, DisableHRFixedOdds
 	- 20140120@Elodie: Hot fix to get information of disabled customer
-	- 20140626@Logan: 1.Add Keno status [Redmine: #18268]
-	                  2.Code aligning
-*/  
+	- 20140626@Logan:   1.Add Keno status [Redmine: #18268]
+	                    2.Code aligning
+    - 20140822@Logan:   Add Esports status [Redmine: #20666]
+*/
+BEGIN
     SET NOCOUNT ON  
 
     DECLARE @TransferOption bit
@@ -100,7 +102,9 @@ Revisions:
 	       ci.DisableVirtualSports,
 	       ci.DoubleCommLosing,
 	       ci.HideVirtualSports,
-	       
+	       -- For Esports
+	       ci.DisableEsports,
+      
 	       ci.DisableCasinoBonus,
 	       ci.DisableHRFixedOdds,
 	       -- For Keno
@@ -123,7 +127,7 @@ INNER JOIN (SELECT custinfo.custid, currency, roleid, autosuspend, reject,
 				   disable152_uk, disable152_au, disable153_au, isAutoResetP2P,
 				   DisableP2P, DisableFunP2P, DisableLiveCasino, SyncLiveCasino,
 				   DisableVirtualSports, DoubleCommLosing, HideVirtualSports,
-				   DisableCasinoBonus, DisableHRFixedOdds, HideKeno
+				   DisableCasinoBonus, DisableHRFixedOdds, HideKeno, DisableEsports
   			  FROM bodb02.dbo.custinfo with(NOLOCK) 
 			 WHERE SRecommend = @SRecommend
 			   AND roleid = 3
@@ -160,9 +164,9 @@ INNER JOIN bodb02.dbo.CustMaster cm with(NOLOCK) on cu.custid = cm.custid
            ci.syncBingo,ci.DisableBingo, ci.DisableNumber, ci.isAutoResetP2P,
            ci.DisableP2P, ci.DisableFunP2P, ci.DisableLiveCasino, ci.SyncLiveCasino,
 		   ci.DisableVirtualSports,ci.DoubleCommLosing, ci.HideVirtualSports,
-		   ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno
+		   ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno, ci.DisableEsports
 
-
+END
 GO
 
 

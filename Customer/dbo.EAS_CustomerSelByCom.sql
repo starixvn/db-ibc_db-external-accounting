@@ -8,7 +8,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-CREATE PROCEDURE [dbo].[EAS_CustomerSelByCom]  
+ALTER PROCEDURE [dbo].[EAS_CustomerSelByCom]  
     @GroupName VARCHAR(50) = 'ACCTHAI',
     @Custid    int = null,
     @Enabled   bit = null,
@@ -30,10 +30,11 @@ Revisions:
 			add filter to reduce workload
 	- 20131023@Elodie: Get more field HideVirtualSports, DisableCasinoBonus, DisableHRFixedOdds			
 	- 20140120@Elodie: Hot fix to get information of disabled customer
-	- 20140626@Logan: 1.Add Keno status [Redmine: #18268]
-	                  2.Code aligning
-*/  
-
+	- 20140626@Logan:   1.Add Keno status [Redmine: #18268]
+	                    2.Code aligning
+    - 20140822@Logan:   Add Esports status [Redmine: #20666]
+*/
+BEGIN
     SET NOCOUNT ON
 
     DECLARE @tmpSuperList TABLE( custID INT, username VARCHAR(30))
@@ -47,60 +48,60 @@ Revisions:
                      )
        AND (@Custid IS NULL OR custid = @Custid)
        AND roleid = 4
-       AND enabled = case
-                       when coalesce(@Closed, @Suspended) is not null then 1
-                       else coalesce(@enabled, enabled)
-                     end
-       AND isnull(closed, 0) = case
-                                 when @suspended = 1 then 0
-                                 else coalesce(@closed, isnull(closed, 0))
-                               end
-       AND isnull(reject, 0) = case
-                                 when @Closed = 0 then 0
-                                 else coalesce(@suspended, isnull(reject, 0))
-                               end
+       AND enabled = CASE
+                       WHEN COALESCE(@Closed, @Suspended) IS NOT NULL THEN 1
+                       ELSE COALESCE(@enabled, enabled)
+                     END
+       AND ISNULL(closed, 0) = CASE
+                                 WHEN @suspended = 1 then 0
+                                 ELSE COALESCE(@closed, ISNULL(closed, 0))
+                               END
+       AND ISNULL(reject, 0) = CASE
+                                 WHEN @Closed = 0 then 0
+                                 ELSE COALESCE(@suspended, ISNULL(reject, 0))
+                               END
 
     --------output
     SELECT cu.custid,
            cu.username,
            ci.enabled,
            ci.closed,
-           isnull(ci.reject, 0) as suspended,
+           ISNULL(ci.reject, 0) as suspended,
            cu.roleid,
-           isnull(cu.firstname, '') as firstname,
-           isnull(cu.lastname, '') as lastname,
-	       max(cs.groupa) as groupa,
-	       max(cs.groupb) as groupb,
-	       max(cs.groupc) as groupc,
-	       max(cs.groupd) as groupd,
-	       max(case
-	             when cs.bettype = 5 and cs.sporttype = 1 then cs.sdiscount
-	             else 0
+           ISNULL(cu.firstname, '') as firstname,
+           ISNULL(cu.lastname, '') as lastname,
+	       MAX(cs.groupa) as groupa,
+	       MAX(cs.groupb) as groupb,
+	       MAX(cs.groupc) as groupc,
+	       MAX(cs.groupd) as groupd,
+	       MAX(case
+	             WHEN cs.bettype = 5 and cs.sporttype = 1 then cs.sdiscount
+	             ELSE 0
 	           end) as discount1x2,
-	       max(case
-	             when cs.bettype = 4 and cs.sporttype = 1 then cs.sdiscount
-	             else 0
+	       MAX(case
+	             WHEN cs.bettype = 4 and cs.sporttype = 1 then cs.sdiscount
+	             ELSE 0
 	           end) as discountcs,
-           max(case
-                 when cs3.bettype = 81 and cs3.sporttype = 161 then cs3.sdiscount
-                 else 0
+           MAX(case
+                 WHEN cs3.bettype = 81 and cs3.sporttype = 161 then cs3.sdiscount
+                 ELSE 0
                end) as discountnumber,
            cu.creatdate as createdate,
-           isnull(cu.iplogin, '') as lastloginip,
+           ISNULL(cu.iplogin, '') as lastloginip,
 	       ci.DoubleCommLosing,
-	       isnull(ci.DisableOutright, 0) as DisableOutright,
-	       isnull(case
-	                when ci.disablehorseracing = 0 or ci.disableOpenTote = 0
+	       ISNULL(ci.DisableOutright, 0) as DisableOutright,
+	       ISNULL(case
+	                WHEN ci.disablehorseracing = 0 or ci.disableOpenTote = 0
 	                  or ci.disable151_au = 0 or ci.disable152_uk = 0
 					  or ci.disable152_au = 0 or ci.disable153_au = 0 then 0
-					else 1
+					ELSE 1
 				  end ,0) as Disable151,
-	       isnull(ci.disablehorseracing, 0) as disable151_31,
-	       isnull(ci.disableOpenTote, 0) as disable151_41,
-	       isnull(ci.disable151_au, 0) as disable151_51,
-	       isnull(ci.disable152_uk, 0) as disable152_41,
-	       isnull(ci.disable152_au, 0) as disable152_51,
-	       isnull(ci.disable153_au, 0) as disable153_51,
+	       ISNULL(ci.disablehorseracing, 0) as disable151_31,
+	       ISNULL(ci.disableOpenTote, 0) as disable151_41,
+	       ISNULL(ci.disable151_au, 0) as disable151_51,
+	       ISNULL(ci.disable152_uk, 0) as disable152_41,
+	       ISNULL(ci.disable152_au, 0) as disable152_51,
+	       ISNULL(ci.disable153_au, 0) as disable153_51,
 	       -- For casino
 	       ci.synccasino,
 	       ci.disablecasino,
@@ -119,6 +120,8 @@ Revisions:
 	       ci.HideVirtualSports,
 	       ci.DisableCasinoBonus,
 	       ci.DisableHRFixedOdds,
+	       -- For Esports
+	       ci.DisableEsports,
 	       -- For Keno
 	       ci.HideKeno,
 	       MIN(CASE
@@ -128,7 +131,7 @@ Revisions:
 	             ELSE 1
 	           END) as DisableKeno,
 	       ROW_NUMBER() OVER(ORDER BY ci.enabled desc, ci.closed,
-	                                  isnull(ci.reject,0), cu.username) as RowNumber
+	                                  ISNULL(ci.reject,0), cu.username) as RowNumber
       FROM bodb02.dbo.customer cu with(nolock)
 INNER JOIN @tmpSuperList sl on sl.custid = cu.custid
 INNER JOIN bodb02.dbo.custinfo ci with(nolock) on ci.custid = cu.custid
@@ -149,9 +152,8 @@ INNER JOIN bodb02.dbo.custinfo ci with(nolock) on ci.custid = cu.custid
 	       ci.synccasino, ci.disablecasino, ci.syncBingo, ci.DisableBingo, ci.DisableNumber,
 	       ci.isAutoResetP2P, ci.DisableP2P, ci.DisableFunP2P, ci.DisableLiveCasino,
 	       ci.SyncLiveCasino, ci.DisableVirtualSports, ci.DoubleCommLosing, ci.HideVirtualSports,
-	       ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno
-
-
+	       ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno, ci.DisableEsports
+END
 GO
 
 

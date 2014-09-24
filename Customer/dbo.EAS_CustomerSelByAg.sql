@@ -32,6 +32,8 @@ Revisions:
 	- 20140120@Elodie: Hot fix to get information of disabled customer
 	- 20140626@Logan: 1.Add Keno status [Redmine: #18268]
 	                  2.Code aligning
+    - 20140822@Logan:   Add Esports status [Redmine: #20666]
+
 */  
     SET NOCOUNT ON  
 
@@ -52,7 +54,8 @@ Revisions:
 		   disable151_au, disable152_uk, disable152_au, disable153_au,
 		   isAutoResetP2P, DisableP2P, DisableFunP2P, DisableLiveCasino,
 		   SyncLiveCasino, DisableVirtualSports, DoubleCommLosing, Recommend,
-		   HideVirtualSports, DisableCasinoBonus, DisableHRFixedOdds, HideKeno
+		   HideVirtualSports, DisableCasinoBonus, DisableHRFixedOdds, HideKeno,
+		   DisableEsports
       INTO #custinfo
       FROM bodb02.dbo.custinfo WITH(NOLOCK)
      WHERE Recommend = @Recommend
@@ -179,6 +182,8 @@ inner join #custinfo ci on cs3.custid = ci.custid
 	       ci.HideVirtualSports,
            ci.DisableCasinoBonus,
 	       ci.DisableHRFixedOdds,
+	       -- For Esports
+	       ci.DisableEsports,
 	       
 	       -- For Keno
 	       ci.HideKeno,
@@ -216,7 +221,7 @@ INNER JOIN #Custinfo ci with(nolock) on cu.custid = ci.custid
 		   ci.isAutoResetP2P, ci.DisableP2P, ci.DisableFunP2P, ci.DisableLiveCasino,
 		   ci.SyncLiveCasino, ci.DisableVirtualSports, ci.DoubleCommLosing,
 		   ci.HideVirtualSports, ci.DisableCasinoBonus, ci.DisableHRFixedOdds,
-		   ci.HideKeno
+		   ci.HideKeno, ci.DisableEsports
 
     drop table #Custinfo,
                #CustSetting,
