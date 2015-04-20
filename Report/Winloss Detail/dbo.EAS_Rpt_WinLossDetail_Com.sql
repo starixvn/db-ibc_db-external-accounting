@@ -1,11 +1,12 @@
 USE [bodb_EAS]
 GO
-/****** Object:  StoredProcedure [dbo].[EAS_Rpt_WinLossDetail_Com_xtest]    Script Date: 3/11/2014 10:27:25 AM ******/
+/****** Object:  StoredProcedure [dbo].[EAS_Rpt_WinLossDetail_Com]    Script Date: 4/20/2015 4:06:25 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-
+/****** Object:  Stored Procedure dbo.EAS_Rpt_WinLossDetail_Com    Script Date: 3/18/2014 12:25:22 AM ******/
+/****** Object:  Stored Procedure dbo.EAS_Rpt_WinLossDetail_Com    Script Date: 3/11/2014 10:33:17 AM ******/
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCTHAI',--ACCTHAI or ACCINDO
 	@custid		INT = NULL,	
@@ -33,6 +34,7 @@ Revisions:
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS, call to bodb_AGE for Acc_CustGroup, add linked server DBSUM for bodb_Summary
 	- 20140305@Patrick: Add more Keno product(sport:202, bettype between 1501 and 1599)
 	- 20140321@Lukas: seperate P2P product to enhance performance
+	- 20140420@Francis: revise SP to use temporary table instead of variable table to improver performance
 */
 
 SET NOCOUNT ON
@@ -45,7 +47,7 @@ FROM DBAGE.bodb_AGE.dbo.Acc_CustGroup WITH(NOLOCK)
 WHERE (@custid IS NULL OR custid = @custid)
 	AND GroupName = @GroupName
 
-DECLARE @ComWinLossDetails TABLE(CustID int, Turnover money, GrossComm money, MemberWinLost money, 
+CREATE TABLE #ComWinLossDetails (CustID int, Turnover money, GrossComm money, MemberWinLost money, 
 	PlayerComm money, MemberTotal money, AgWinLost money, AgComm money, AgTotal money, 
 	MAgWinLost money, MAgComm money, MAgTotal money, SAgWinLost money, SAgComm money, SAgTotal money, Company money)
 
@@ -150,7 +152,7 @@ END
 
 IF @Todate >= @BalanceUpDay
 BEGIN 
-    INSERT INTO @ComWinLossDetails
+    INSERT INTO #ComWinLossDetails
 	    SELECT
 		    SRecommend,			
 			SUM(case when b.liveawayscore = 0 and b.bettype in(33,43) then b.stake/2 else ABS(b.stake) end),	
@@ -180,7 +182,7 @@ BEGIN
 	    GROUP BY SRecommend, b.bettype
 	    
 	-- seperate P2P to improve performance
-	INSERT INTO @ComWinLossDetails
+	INSERT INTO #ComWinLossDetails
 	    SELECT
 		    SRecommend,			
 			SUM(case when b.liveawayscore = 0 and b.bettype in(33,43) then b.stake/2 else ABS(b.stake) end),	
@@ -210,7 +212,7 @@ BEGIN
 	if @BalanceUpDay < @FromDate
 	    select @BalanceUpDay=@FromDate
 		
-    INSERT INTO @ComWinLossDetails
+    INSERT INTO #ComWinLossDetails
 	    SELECT
 		    CustID,			
 		    sum(TurnOver), -- TurnOver
@@ -242,7 +244,7 @@ BEGIN
 	if @ToDate >= DATEADD(dd, -1, @BalanceUpDay)
 		select @ToDate = DATEADD(dd, -1, @BalanceUpDay)
 	
-    INSERT INTO @ComWinLossDetails
+    INSERT INTO #ComWinLossDetails
 	    SELECT
 		    CustID,			
 		    sum(TurnOver), -- TurnOver
@@ -288,9 +290,12 @@ SELECT
 	sum(SAgComm) as SAgComm,
 	sum(SAgTotal) as SAgTotal,
 	sum(Company) as Company	
-FROM @ComWinLossDetails w INNER JOIN bodb02.dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID 
+FROM #ComWinLossDetails w INNER JOIN bodb02.dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID 
 Group by w.CustID, c.UserName
 order by c.Username
+
+DROP TABLE #ComWinLossDetails
+
 GO
 GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [bodbExtAccNet] AS [dbo]
 GO
