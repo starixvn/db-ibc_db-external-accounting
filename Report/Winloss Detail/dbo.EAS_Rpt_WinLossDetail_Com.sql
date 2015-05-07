@@ -5,8 +5,7 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-/****** Object:  Stored Procedure dbo.EAS_Rpt_WinLossDetail_Com    Script Date: 3/18/2014 12:25:22 AM ******/
-/****** Object:  Stored Procedure dbo.EAS_Rpt_WinLossDetail_Com    Script Date: 3/11/2014 10:33:17 AM ******/
+
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCTHAI',--ACCTHAI or ACCINDO
 	@custid		INT = NULL,	
@@ -34,7 +33,8 @@ Revisions:
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS, call to bodb_AGE for Acc_CustGroup, add linked server DBSUM for bodb_Summary
 	- 20140305@Patrick: Add more Keno product(sport:202, bettype between 1501 and 1599)
 	- 20140321@Lukas: seperate P2P product to enhance performance
-	- 20140420@Francis: revise SP to use temporary table instead of variable table to improver performance
+	- 20140420@Francis: revise SP to use temporary table instead of variable table to improve performance
+	- 20150502@Lukas: Revise SP to insert into Temporary table (#Sum_WinLoss_Old) of a remote table (DBSUM.bodb_Summary.dbo.Sum_WinLoss_Old) to enhance performance (HotFix #35279)
 */
 
 SET NOCOUNT ON
@@ -244,6 +244,14 @@ BEGIN
 	if @ToDate >= DATEADD(dd, -1, @BalanceUpDay)
 		select @ToDate = DATEADD(dd, -1, @BalanceUpDay)
 	
+	
+	SELECT custid,  srecommend, turnover, winlost, awinlost, mwinlost, swinlost, playercomm, comm, acomm, scomm, grosscomm, sporttype, bettype 
+		INTO #Sum_WinLoss_Old
+	FROM DBSUM.bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK)
+	WHERE winlostdate BETWEEN @fromdate AND @ToDate			
+		    --and SRecommend IN (SELECT custID FROM @tmpSuperList)
+		    AND RoleID = 4 
+		    
     INSERT INTO #ComWinLossDetails
 	    SELECT
 		    CustID,			
@@ -263,11 +271,11 @@ BEGIN
 		    isnull(sum(swinlost), 0) + isnull(sum(scomm), 0)-sum(acomm), --SAgTotal
 		    -(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost), 0)) --Company								
 	    FROM
-		    DBSUM.bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK) INNER JOIN @TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype
+		    #Sum_WinLoss_Old b WITH(NOLOCK) INNER JOIN @TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype
 	    WHERE
-		    winlostdate between @fromdate and @ToDate			
-		    and SRecommend IN (SELECT custID FROM @tmpSuperList)
-		    and RoleID = 4
+		    --winlostdate between @fromdate and @ToDate			
+		     SRecommend IN (SELECT custID FROM @tmpSuperList)
+		    --and RoleID = 4
 	    GROUP BY CustID
 
 END	
