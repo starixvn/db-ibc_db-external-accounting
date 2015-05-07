@@ -37,6 +37,7 @@ Original SP: [Age_Rpt_WinLossDetail_SAg]
 Revisions:
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS, add linked server DBSUM for bodb_Summary
 	- 20140305@Patrick: Add more Keno product(sport:202, bettype between 1501 and 1599)
+	- 20150507@Lukas: avoid join remoted table by using local temp table
 */
 
 SET NOCOUNT ON
@@ -187,6 +188,17 @@ BEGIN
 	if @ToDate >= DATEADD(dd, -1, @BalanceUpDay)
 		select @ToDate = DATEADD(dd, -1, @BalanceUpDay)
 	
+	
+	
+	SELECT custid,  mrecommend, turnover, winlost, awinlost, mwinlost, swinlost, playercomm, comm, acomm, scomm, grosscomm, sporttype, bettype 
+		INTO #Sum_WinLoss_Old
+	FROM DBSUM.bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK)
+	WHERE winlostdate BETWEEN @fromdate AND @ToDate			
+		    --and SRecommend IN (SELECT custID FROM @tmpSuperList)
+		    and SRecommend = @custid
+		    AND RoleID = 3 
+			and (@masterID is null or b.mrecommend = @masterID)
+			
     INSERT INTO @SAgWinLossDetails
 	    SELECT
 		    CustID,			
@@ -206,12 +218,12 @@ BEGIN
 		    isnull(sum(swinlost), 0) + isnull(sum(scomm), 0)-sum(acomm), --SAgTotal
 		    -(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost), 0)) --Company								
 	    FROM
-		    DBSUM.bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK) INNER JOIN @TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype
-	    WHERE
-		    winlostdate between @fromdate and @ToDate			
-		    and SRecommend = @custid
-		    and (@masterID is null or b.mrecommend = @masterID)
-		    and RoleID = 3
+		    #Sum_WinLoss_Old b WITH(NOLOCK) INNER JOIN @TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype
+	    --WHERE
+		   -- --winlostdate between @fromdate and @ToDate			
+		   -- ----and SRecommend = @custid
+		   -- --and 
+		   -- (@masterID is null or b.mrecommend = @masterID)		   
 	    GROUP BY CustID
 
    	    --Write log to monitor performance on DB06
