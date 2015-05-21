@@ -1,14 +1,13 @@
 USE [bodb_EAS]
 GO
-
-/****** Object:  StoredProcedure [dbo].[EAS_CustomerSelByAg]    Script Date: 06/26/2014 13:45:36 ******/
+/****** Object:  StoredProcedure [dbo].[EAS_CustomerSelByAg]    Script Date: 05/14/2015 09:19:14 ******/
 SET ANSI_NULLS ON
 GO
-
 SET QUOTED_IDENTIFIER ON
 GO
+/****** Object:  Stored Procedure dbo.EAS_CustomerSelByAg    Script Date: 9/11/2014 9:52:04 AM ******/
 
-ALTER PROCEDURE [dbo].[EAS_CustomerSelByAg]
+ALTER PROCEDURE [dbo].[c]
     @Recommend int,  
     @Custid    int = null,  
     @Enabled   bit = null,  
@@ -33,7 +32,7 @@ Revisions:
 	- 20140626@Logan: 1.Add Keno status [Redmine: #18268]
 	                  2.Code aligning
     - 20140822@Logan:   Add Esports status [Redmine: #20666]
-
+	- 20150514@Kathy: Add Gold Deluxe product [Redmine:#34486] 
 */  
     SET NOCOUNT ON  
 
@@ -55,7 +54,7 @@ Revisions:
 		   isAutoResetP2P, DisableP2P, DisableFunP2P, DisableLiveCasino,
 		   SyncLiveCasino, DisableVirtualSports, DoubleCommLosing, Recommend,
 		   HideVirtualSports, DisableCasinoBonus, DisableHRFixedOdds, HideKeno,
-		   DisableEsports
+		   DisableEsports, DisableGoldDeluxe, HideGoldDeluxe
       INTO #custinfo
       FROM bodb02.dbo.custinfo WITH(NOLOCK)
      WHERE Recommend = @Recommend
@@ -193,6 +192,8 @@ inner join #custinfo ci on cs3.custid = ci.custid
 	                                     1509, 1511, 1513) THEN cg.IsDisabled
 	             ELSE 1
 	           END) as DisableKeno,
+	       ci.HideGoldDeluxe,
+	       ci.DisableGoldDeluxe,
 	       --transfer condition
 	       @TransferOption disableTransfer,	
 	       ROW_NUMBER() OVER (ORDER BY ci.enabled desc,
@@ -221,13 +222,12 @@ INNER JOIN #Custinfo ci with(nolock) on cu.custid = ci.custid
 		   ci.isAutoResetP2P, ci.DisableP2P, ci.DisableFunP2P, ci.DisableLiveCasino,
 		   ci.SyncLiveCasino, ci.DisableVirtualSports, ci.DoubleCommLosing,
 		   ci.HideVirtualSports, ci.DisableCasinoBonus, ci.DisableHRFixedOdds,
-		   ci.HideKeno, ci.DisableEsports
+		   ci.HideKeno, ci.DisableEsports, ci.HideGoldDeluxe, ci.DisableGoldDeluxe
 
     drop table #Custinfo,
                #CustSetting,
                #custsetting3rd
-
-
 GO
-
-
+GRANT EXECUTE ON [dbo].[EAS_CustomerSelByAg] TO [bodbExtAccNet] AS [dbo]
+GO
+GRANT VIEW DEFINITION ON [dbo].[EAS_CustomerSelByAg] TO [vnteam] AS [dbo]

@@ -1,12 +1,11 @@
 USE [bodb_EAS]
 GO
-
-/****** Object:  StoredProcedure [dbo].[EAS_CustomerSelBySAg]    Script Date: 06/26/2014 15:22:20 ******/
+/****** Object:  StoredProcedure [dbo].[EAS_CustomerSelBySAg]    Script Date: 05/14/2015 09:37:35 ******/
 SET ANSI_NULLS ON
 GO
-
 SET QUOTED_IDENTIFIER ON
 GO
+/****** Object:  Stored Procedure dbo.EAS_CustomerSelBySAg    Script Date: 9/11/2014 9:52:04 AM ******/
 
 ALTER PROCEDURE [dbo].[EAS_CustomerSelBySAg]  
     @SRecommend int,  
@@ -31,6 +30,7 @@ Revisions:
 	- 20140626@Logan:   1.Add Keno status [Redmine: #18268]
 	                    2.Code aligning
     - 20140822@Logan:   Add Esports status [Redmine: #20666]
+    - 20150514@Kathy: Add Gold Deluxe product [Redmine:#34486] 
 */
 BEGIN
     SET NOCOUNT ON  
@@ -115,6 +115,8 @@ BEGIN
 	                                     1509, 1511, 1513) then cg.IsDisabled
 	             else 1
 	           end) as DisableKeno,
+	        ci.DisableGoldDeluxe,
+	        ci.HideGoldDeluxe,
 	       --transfer condition
 	       @TransferOption disableTransfer,
 	       ROW_NUMBER() OVER(ORDER BY ci.enabled desc, ci.closed,
@@ -127,7 +129,7 @@ INNER JOIN (SELECT custinfo.custid, currency, roleid, autosuspend, reject,
 				   disable152_uk, disable152_au, disable153_au, isAutoResetP2P,
 				   DisableP2P, DisableFunP2P, DisableLiveCasino, SyncLiveCasino,
 				   DisableVirtualSports, DoubleCommLosing, HideVirtualSports,
-				   DisableCasinoBonus, DisableHRFixedOdds, HideKeno, DisableEsports
+				   DisableCasinoBonus, DisableHRFixedOdds, HideKeno, DisableEsports, DisableGoldDeluxe, HideGoldDeluxe
   			  FROM bodb02.dbo.custinfo with(NOLOCK) 
 			 WHERE SRecommend = @SRecommend
 			   AND roleid = 3
@@ -164,9 +166,11 @@ INNER JOIN bodb02.dbo.CustMaster cm with(NOLOCK) on cu.custid = cm.custid
            ci.syncBingo,ci.DisableBingo, ci.DisableNumber, ci.isAutoResetP2P,
            ci.DisableP2P, ci.DisableFunP2P, ci.DisableLiveCasino, ci.SyncLiveCasino,
 		   ci.DisableVirtualSports,ci.DoubleCommLosing, ci.HideVirtualSports,
-		   ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno, ci.DisableEsports
-
+		   ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno, ci.DisableEsports,
+		   ci.DisableGoldDeluxe, ci.HideGoldDeluxe
+	
 END
 GO
-
-
+GRANT EXECUTE ON [dbo].[EAS_CustomerSelBySAg] TO [bodbExtAccNet] AS [dbo]
+GO
+GRANT VIEW DEFINITION ON [dbo].[EAS_CustomerSelBySAg] TO [vnteam] AS [dbo]

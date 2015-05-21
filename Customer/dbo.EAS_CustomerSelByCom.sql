@@ -1,12 +1,11 @@
 USE [bodb_EAS]
 GO
-
-/****** Object:  StoredProcedure [dbo].[EAS_CustomerSelByCom]    Script Date: 06/26/2014 17:06:59 ******/
+/****** Object:  StoredProcedure [dbo].[EAS_CustomerSelByCom]    Script Date: 05/14/2015 09:42:56 ******/
 SET ANSI_NULLS ON
 GO
-
 SET QUOTED_IDENTIFIER ON
 GO
+/****** Object:  Stored Procedure dbo.EAS_CustomerSelByCom    Script Date: 9/11/2014 9:52:04 AM ******/
 
 ALTER PROCEDURE [dbo].[EAS_CustomerSelByCom]  
     @GroupName VARCHAR(50) = 'ACCTHAI',
@@ -33,6 +32,7 @@ Revisions:
 	- 20140626@Logan:   1.Add Keno status [Redmine: #18268]
 	                    2.Code aligning
     - 20140822@Logan:   Add Esports status [Redmine: #20666]
+    - 20150514@Kathy: Add Gold Deluxe product [Redmine:#34486] 
 */
 BEGIN
     SET NOCOUNT ON
@@ -130,6 +130,8 @@ BEGIN
 	                                     1509, 1511, 1513) THEN cg.IsDisabled
 	             ELSE 1
 	           END) as DisableKeno,
+	       ci.DisableGoldDeluxe,
+	       ci.HideGoldDeluxe,
 	       ROW_NUMBER() OVER(ORDER BY ci.enabled desc, ci.closed,
 	                                  ISNULL(ci.reject,0), cu.username) as RowNumber
       FROM bodb02.dbo.customer cu with(nolock)
@@ -152,8 +154,10 @@ INNER JOIN bodb02.dbo.custinfo ci with(nolock) on ci.custid = cu.custid
 	       ci.synccasino, ci.disablecasino, ci.syncBingo, ci.DisableBingo, ci.DisableNumber,
 	       ci.isAutoResetP2P, ci.DisableP2P, ci.DisableFunP2P, ci.DisableLiveCasino,
 	       ci.SyncLiveCasino, ci.DisableVirtualSports, ci.DoubleCommLosing, ci.HideVirtualSports,
-	       ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno, ci.DisableEsports
+	       ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno, ci.DisableEsports,
+	       ci.DisableGoldDeluxe, ci.HideGoldDeluxe
 END
 GO
-
-
+GRANT EXECUTE ON [dbo].[EAS_CustomerSelByCom] TO [bodbExtAccNet] AS [dbo]
+GO
+GRANT VIEW DEFINITION ON [dbo].[EAS_CustomerSelByCom] TO [vnteam] AS [dbo]
