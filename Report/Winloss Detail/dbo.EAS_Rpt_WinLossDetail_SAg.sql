@@ -19,6 +19,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_SAg]
 	@showLiveCasino BIT = 0,
 	@showVS BIT = 0,
 	@showKeno BIT = 0,
+	@showGD BIT = 0,
 	@BalanceUpDay SMALLDATETIME,
 	@PageSize int=0,
 	@PageIndex int=0,
@@ -38,6 +39,8 @@ Revisions:
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS, add linked server DBSUM for bodb_Summary
 	- 20140305@Patrick: Add more Keno product(sport:202, bettype between 1501 and 1599)
 	- 20150507@Lukas: avoid join remoted table by using local temp table
+	- 20150528@Sophia: Apply Gold Deluxe and Sport bettype Matrix [Redmine: #36775]
+	
 */
 
 SET NOCOUNT ON
@@ -107,6 +110,18 @@ BEGIN
  INSERT INTO @TmpCondSumWL(Sporttype, Bettype)  
  VALUES(202,0) 
 END
+
+IF @showGD = 1
+BEGIN 
+	--Sum_winloss  
+	INSERT INTO @TmpCondSumWL(Sporttype, Bettype)  
+	VALUES(255, 0) 
+END
+
+----Get Sport Bettype Matrix------
+DECLARE @SportBettype TABLE(ProductID INT,Bettype INT,EventType INT)
+INSERT INTO @SportBettype
+EXEC bodb02.dbo.Acc_SportBettypeMatrix_Sel @mode = 4
 	
 IF @Todate >= @BalanceUpDay
 BEGIN 
@@ -130,26 +145,39 @@ BEGIN
 		    -(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost-actual_stake), 0)) --Company				
 	    FROM
 		    bodb02.dbo.bettrans b WITH (NOLOCK, index=IX_srecommend)
-	    WHERE
-	    	(
-				bettype < case when @showSB=1 then 31 else 0 end
-				OR bettype between 121 and case when @showSB=1 then 999 else 0 end
-				OR bettype between 1301 and case when @showSB=1 then 1334 else 0 end
-				OR bettype between 31 and case when @ShowRB=1 then 49 else 0 end
-				OR bettype = case when @showCasino=1 then 71 else 0 end
-				OR bettype = case when @showP2P=1 then 1000 else 0 end
-				OR bettype BETWEEN 81 AND (CASE WHEN @showNG=1 THEN 120 ELSE 0 END)
-				OR bettype = (CASE WHEN @showBI =1 THEN 73 ELSE 0 END)
-				OR bettype BETWEEN 1101 AND (CASE WHEN @showLiveCasino =1 THEN 1199 ELSE 0 END)  
-				OR bettype BETWEEN 1201 AND (CASE WHEN @showVS=1 THEN 1299 ELSE 0 END)
-				OR bettype BETWEEN 1501 AND (CASE WHEN @showKeno = 1 THEN 1599 ELSE 0 END)
-			) AND 
-		    winlostdate between @FromDate and @todate and
-		    srecommend = @custid and
-		    (@masterID is null or b.mrecommend = @masterID)  and
+			INNER JOIN @SportBettype s ON b.bettype = s.Bettype
+	    WHERE	
+			(
+				s.ProductID = CASE WHEN @showSB = 1 THEN 1 ELSE 0 END
+				OR s.ProductID = CASE WHEN @ShowRB = 1 THEN 2 ELSE 0 END
+				OR s.ProductID = CASE WHEN @showCasino = 1 THEN 6 ELSE 0 END
+				OR s.ProductID = CASE WHEN @showP2P = 1 THEN 9 ELSE 0 END
+				OR s.ProductID = CASE WHEN @showNG = 1 THEN 3 ELSE 0 END
+				OR s.ProductID = CASE WHEN @showBI = 1 THEN 7 ELSE 0 END
+				OR s.ProductID = CASE WHEN @showLiveCasino = 1 THEN 4 ELSE 0 END
+				OR s.ProductID = CASE WHEN @showVS = 1 THEN 5 ELSE 0 END
+				OR s.ProductID = CASE WHEN @showKeno = 1 THEN 8 ELSE 0 END
+				OR s.ProductID = CASE WHEN @showGD = 1 THEN 12 ELSE 0 END
+			)
+			-- 	(
+			--	bettype < case when @showSB=1 then 31 else 0 end
+			--	OR bettype between 121 and case when @showSB=1 then 999 else 0 end
+			--	OR bettype between 1301 and case when @showSB=1 then 1334 else 0 end
+			--	OR bettype between 31 and case when @ShowRB=1 then 49 else 0 end
+			--	OR bettype = case when @showCasino=1 then 71 else 0 end
+			--	OR bettype = case when @showP2P=1 then 1000 else 0 end
+			--	OR bettype BETWEEN 81 AND (CASE WHEN @showNG=1 THEN 120 ELSE 0 END)
+			--	OR bettype = (CASE WHEN @showBI =1 THEN 73 ELSE 0 END)
+			--	OR bettype BETWEEN 1101 AND (CASE WHEN @showLiveCasino =1 THEN 1199 ELSE 0 END)  
+			--	OR bettype BETWEEN 1201 AND (CASE WHEN @showVS=1 THEN 1299 ELSE 0 END)
+			--	OR bettype BETWEEN 1501 AND (CASE WHEN @showKeno = 1 THEN 1599 ELSE 0 END)
+			--) AND 
+		    AND winlostdate between @FromDate and @todate 
+		    AND srecommend = @custid 
+		    AND (@masterID is null or b.mrecommend = @masterID)  
 		    --ruben = 1 and
 		    --status not in ('running','waiting','VOID', 'REJECT', 'Refund')  and
-		     b.statusID not in (0,1,101, 102, 103) 
+		    AND b.statusID not in (0,1,101, 102, 103) 
 	    GROUP BY MRecommend, b.bettype
 		
 	if @BalanceUpDay < @FromDate
