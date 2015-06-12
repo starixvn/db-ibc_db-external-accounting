@@ -1,6 +1,6 @@
-USE [bodb_EAS]
+USE [CustDB]
 GO
-/****** Object:  StoredProcedure [dbo].[EAS_CustomerSelBySAg]    Script Date: 05/14/2015 09:37:35 ******/
+/****** Object:  StoredProcedure [dbo].[EAS_CustomerSelBySAg]    Script Date: 06/12/2015 11:09:56 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -20,7 +20,7 @@ AS
 Created by: Scott  
 Date: 2012-12-17  
 Task : Customer list by super
-DB: DBEAS/bodb_EAS
+DB: DBCUST.CustDB
 Original SP: Acc_CustomerSelBySAg
 Revisions:  
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS
@@ -31,17 +31,30 @@ Revisions:
 	                    2.Code aligning
     - 20140822@Logan:   Add Esports status [Redmine: #20666]
     - 20150514@Kathy: Add Gold Deluxe product [Redmine:#34486] 
+    - 20150612@Kathy: Move sp from DBEAS.bodb_EAS to DBCUST.CustDB, use temp GameType [Redmine:#36216]
+
 */
 BEGIN
     SET NOCOUNT ON  
 
     DECLARE @TransferOption bit
 
+	 DECLARE @tmp_GameType TABLE (GameTypeID INT, GameTypeName NVARCHAR(50), IsDisabled BIT, IBCBettypeID INT)
+	 
+	 BEGIN TRY		
+		INSERT INTO @tmp_GameType (GameTypeID, GameTypeName, IsDisabled, IBCBettypeID)
+		SELECT GameTypeID, GameTypeName, IsDisabled, IBCBettypeID FROM DBAGE.bodb02.dbo.GameType WITH (NOLOCK)
+	 END TRY
+	 BEGIN CATCH		
+		INSERT INTO @tmp_GameType (GameTypeID, GameTypeName, IsDisabled, IBCBettypeID)
+		SELECT GameTypeID, GameTypeName, IsDisabled, IBCBettypeID FROM DBTXN.bodb02.dbo.GameType WITH (NOLOCK)
+	 END CATCH
+ 
     SELECT @TransferOption = case
                                when TransferOption = 0 then 0
                                else 1
                              end
-      FROM bodb02.dbo.custsuper with(nolock)
+      FROM dbo.custsuper with(nolock)
      WHERE custid = @SRecommend
 
     SELECT cu.custid,
@@ -121,7 +134,7 @@ BEGIN
 	       @TransferOption disableTransfer,
 	       ROW_NUMBER() OVER(ORDER BY ci.enabled desc, ci.closed,
 	                                  isnull(ci.reject, 0), cu.username) as RowNumber
-      FROM bodb02.dbo.customer AS cu with(NOLOCK)
+      FROM dbo.customer AS cu with(NOLOCK)
 INNER JOIN (SELECT custinfo.custid, currency, roleid, autosuspend, reject,
                    closed, MatchLimit, VirtualMultiplier, Enabled, DisableHorseRacing,
 				   DisableFinancial, DisableCasino, SyncCasino, DisableOutright, DisableOpenTote,
@@ -130,7 +143,7 @@ INNER JOIN (SELECT custinfo.custid, currency, roleid, autosuspend, reject,
 				   DisableP2P, DisableFunP2P, DisableLiveCasino, SyncLiveCasino,
 				   DisableVirtualSports, DoubleCommLosing, HideVirtualSports,
 				   DisableCasinoBonus, DisableHRFixedOdds, HideKeno, DisableEsports, DisableGoldDeluxe, HideGoldDeluxe
-  			  FROM bodb02.dbo.custinfo with(NOLOCK) 
+  			  FROM dbo.custinfo with(NOLOCK) 
 			 WHERE SRecommend = @SRecommend
 			   AND roleid = 3
 			   AND (@Custid is null or Custid = @Custid)
@@ -147,14 +160,14 @@ INNER JOIN (SELECT custinfo.custid, currency, roleid, autosuspend, reject,
                                          else coalesce(@suspended, isnull(reject, 0))
                                        end
 		   ) ci on cu.custid = ci.custid
- LEFT JOIN bodb02.dbo.CustSetting as cs with(NOLOCK) on cu.custid = cs.custid
- LEFT JOIN bodb02.dbo.custsetting3rd cs3 with(nolock) on cu.custid = cs3.custid
- LEFT JOIN bodb02.dbo.CustGameType cg WITH(NOLOCK) ON cu.custid = cg.CustID
- LEFT JOIN bodb02.dbo.GameType g WITH(NOLOCK) ON g.GameTypeID = cg.GameTypeID
+ LEFT JOIN dbo.CustSetting as cs with(NOLOCK) on cu.custid = cs.custid
+ LEFT JOIN dbo.custsetting3rd cs3 with(nolock) on cu.custid = cs3.custid
+ LEFT JOIN dbo.CustGameType cg WITH(NOLOCK) ON cu.custid = cg.CustID
+ LEFT JOIN @tmp_GameType g ON g.GameTypeID = cg.GameTypeID
                                              AND g.IBCBetTypeID IN (1501, 1503, 1504,
                                                                     1505, 1507, 1508,
                                                                     1509, 1511, 1513)
-INNER JOIN bodb02.dbo.CustMaster cm with(NOLOCK) on cu.custid = cm.custid
+INNER JOIN dbo.CustMaster cm with(NOLOCK) on cu.custid = cm.custid
      WHERE (cs.sporttype IN (1) AND cs.bettype IN (1, 5, 4) AND cs3.sporttype IN (161) AND cs3.bettype IN (81))
 	    OR (cs.sporttype IS NULL AND cs.bettype IS NULL AND cs3.sporttype IS NULL AND cs3.bettype IS NULL)
   group by cu.custid, cu.username, ci.enabled, ci.closed, ci.reject, cu.roleid,
@@ -170,6 +183,8 @@ INNER JOIN bodb02.dbo.CustMaster cm with(NOLOCK) on cu.custid = cm.custid
 		   ci.DisableGoldDeluxe, ci.HideGoldDeluxe
 	
 END
+
+
 GO
 GRANT EXECUTE ON [dbo].[EAS_CustomerSelBySAg] TO [bodbExtAccNet] AS [dbo]
 GO

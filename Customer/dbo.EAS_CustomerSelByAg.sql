@@ -1,13 +1,4 @@
-USE [bodb_EAS]
-GO
-/****** Object:  StoredProcedure [dbo].[EAS_CustomerSelByAg]    Script Date: 05/14/2015 09:19:14 ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-/****** Object:  Stored Procedure dbo.EAS_CustomerSelByAg    Script Date: 9/11/2014 9:52:04 AM ******/
-
-ALTER PROCEDURE [dbo].[c]
+ALTER PROCEDURE [dbo].[EAS_CustomerSelByAg]
     @Recommend int,  
     @Custid    int = null,  
     @Enabled   bit = null,  
@@ -20,7 +11,7 @@ AS
 Created by: Scott  
 Date: 2012-12-17  
 Task : Customer list by agent
-DB: DBEAS/bodb_EAS
+DB: DBCUST.CustDB
 Original SP: Acc_CustomerSelByAg
 Revisions:  
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS
@@ -33,16 +24,28 @@ Revisions:
 	                  2.Code aligning
     - 20140822@Logan:   Add Esports status [Redmine: #20666]
 	- 20150514@Kathy: Add Gold Deluxe product [Redmine:#34486] 
+	- 20150612@Kathy: Move sp from DBEAS.bodb_EAS to DBCUST.CustDB, use temp GameType [Redmine:#36216]
 */  
     SET NOCOUNT ON  
 
     DECLARE @TransferOption bit
 
+	DECLARE @tmp_GameType TABLE (GameTypeID INT, GameTypeName NVARCHAR(50), IsDisabled BIT, IBCBettypeID INT)
+	 
+	 BEGIN TRY		
+		INSERT INTO @tmp_GameType (GameTypeID, GameTypeName, IsDisabled, IBCBettypeID)
+		SELECT GameTypeID, GameTypeName, IsDisabled, IBCBettypeID FROM DBAGE.bodb02.dbo.GameType WITH (NOLOCK)
+	 END TRY
+	 BEGIN CATCH		
+		INSERT INTO @tmp_GameType (GameTypeID, GameTypeName, IsDisabled, IBCBettypeID)
+		SELECT GameTypeID, GameTypeName, IsDisabled, IBCBettypeID FROM DBTXN.bodb02.dbo.GameType WITH (NOLOCK)
+	 END CATCH
+	 
     SELECT @TransferOption = CASE
                                WHEN TransferOption = 0 THEN 0
                                ELSE 1
                              END
-      FROM bodb02.dbo.custagent WITH(NOLOCK)
+      FROM dbo.custagent WITH(NOLOCK)
      WHERE custid = @Recommend
 
     --temp custinfo
@@ -56,7 +59,7 @@ Revisions:
 		   HideVirtualSports, DisableCasinoBonus, DisableHRFixedOdds, HideKeno,
 		   DisableEsports, DisableGoldDeluxe, HideGoldDeluxe
       INTO #custinfo
-      FROM bodb02.dbo.custinfo WITH(NOLOCK)
+      FROM dbo.custinfo WITH(NOLOCK)
      WHERE Recommend = @Recommend
        AND roleid = 1
        AND (@custid is null or custid = @custid)
@@ -80,7 +83,7 @@ Revisions:
            discount,
            playerdiscount
       INTO #CustSetting
-      FROM bodb02.dbo.custsetting cs WITH(NOLOCK)
+      FROM dbo.custsetting cs WITH(NOLOCK)
 inner join #custinfo ci on cs.custid = ci.custid
      WHERE bettype in (1, 4, 5)
        and sporttype = 1
@@ -92,7 +95,7 @@ inner join #custinfo ci on cs.custid = ci.custid
            discount,
            playerdiscount
       INTO #custsetting3rd
-      FROM bodb02.dbo.custsetting3rd cs3 WITH(NOLOCK)
+      FROM dbo.custsetting3rd cs3 WITH(NOLOCK)
 inner join #custinfo ci on cs3.custid = ci.custid
      WHERE bettype = 81
        and sporttype = 161
@@ -201,12 +204,12 @@ inner join #custinfo ci on cs3.custid = ci.custid
 	                                   isnull(ci.reject, 0),
 	                                   cu.username
 	                         ) as RowNumber
-      FROM bodb02.dbo.customer AS cu with(NOLOCK)
+      FROM dbo.customer AS cu with(NOLOCK)
 INNER JOIN #Custinfo ci with(nolock) on cu.custid = ci.custid
  LEFT JOIN #CustSetting as cs with(NOLOCK) on cu.custid = cs.custid
  LEFT JOIN #custsetting3rd cs3 with(nolock) on cu.custid = cs3.custid
- LEFT JOIN bodb02.dbo.CustGameType cg WITH(NOLOCK) ON cg.CustID = ci.custid
- LEFT JOIN bodb02.dbo.GameType g WITH(NOLOCK) ON cg.GameTypeID = g.GameTypeID
+ LEFT JOIN dbo.CustGameType cg WITH(NOLOCK) ON cg.CustID = ci.custid
+ LEFT JOIN @tmp_GameType g ON cg.GameTypeID = g.GameTypeID
                                              AND g.IBCBetTypeID IN (1501, 1503, 1504,
                                                                     1505, 1507, 1508,
                                                                     1509, 1511, 1513)

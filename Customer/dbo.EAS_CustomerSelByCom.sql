@@ -1,12 +1,3 @@
-USE [bodb_EAS]
-GO
-/****** Object:  StoredProcedure [dbo].[EAS_CustomerSelByCom]    Script Date: 05/14/2015 09:42:56 ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-/****** Object:  Stored Procedure dbo.EAS_CustomerSelByCom    Script Date: 9/11/2014 9:52:04 AM ******/
-
 ALTER PROCEDURE [dbo].[EAS_CustomerSelByCom]  
     @GroupName VARCHAR(50) = 'ACCTHAI',
     @Custid    int = null,
@@ -20,7 +11,7 @@ AS
 Created by: Scott  
 Date: 2012-12-17  
 Task : Customer list by company
-DB: DBEAS/bodb_EAS
+DB: DBCUST.CustDB
 Original SP: Acc_CustomerSelBySAg
 Revisions:  
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS, call to bodb_AGE for Acc_CustGroup
@@ -33,15 +24,27 @@ Revisions:
 	                    2.Code aligning
     - 20140822@Logan:   Add Esports status [Redmine: #20666]
     - 20150514@Kathy: Add Gold Deluxe product [Redmine:#34486] 
+    - 20150612@Kathy: Move sp from DBEAS.bodb_EAS to DBCUST.CustDB, use temp GameType [Redmine:#36216]
 */
 BEGIN
     SET NOCOUNT ON
 
     DECLARE @tmpSuperList TABLE( custID INT, username VARCHAR(30))
 
+	DECLARE @tmp_GameType TABLE (GameTypeID INT, GameTypeName NVARCHAR(50), IsDisabled BIT, IBCBettypeID INT)
+	 
+	 BEGIN TRY		
+		INSERT INTO @tmp_GameType (GameTypeID, GameTypeName, IsDisabled, IBCBettypeID)
+		SELECT GameTypeID, GameTypeName, IsDisabled, IBCBettypeID FROM DBAGE.bodb02.dbo.GameType WITH (NOLOCK)
+	 END TRY
+	 BEGIN CATCH		
+		INSERT INTO @tmp_GameType (GameTypeID, GameTypeName, IsDisabled, IBCBettypeID)
+		SELECT GameTypeID, GameTypeName, IsDisabled, IBCBettypeID FROM DBTXN.bodb02.dbo.GameType WITH (NOLOCK)
+	 END CATCH
+	 
     INSERT INTO @tmpSuperList(CustID, username)
     SELECT custID, username 
-      FROM bodb02.dbo.custinfo WITH(NOLOCK)
+      FROM dbo.custinfo WITH(NOLOCK)
      WHERE custid in (SELECT custid
                         from DBAGE.bodb_AGE.dbo.Acc_CustGroup WITH(nolock)
                        WHERE GroupName = @GroupName
@@ -134,13 +137,13 @@ BEGIN
 	       ci.HideGoldDeluxe,
 	       ROW_NUMBER() OVER(ORDER BY ci.enabled desc, ci.closed,
 	                                  ISNULL(ci.reject,0), cu.username) as RowNumber
-      FROM bodb02.dbo.customer cu with(nolock)
+      FROM dbo.customer cu with(nolock)
 INNER JOIN @tmpSuperList sl on sl.custid = cu.custid
-INNER JOIN bodb02.dbo.custinfo ci with(nolock) on ci.custid = cu.custid
- LEFT JOIN bodb02.dbo.CustSetting as cs with(NOLOCK) on cu.custid = cs.custid
- LEFT JOIN bodb02.dbo.custsetting3rd cs3 with(nolock) on cu.custid = cs3.custid
- LEFT JOIN bodb02.dbo.CustGameType cg WITH(NOLOCK) ON cu.custid = cg.CustID
- LEFT JOIN bodb02.dbo.GameType g WITH(NOLOCK) ON g.GameTypeID = cg.GameTypeID
+INNER JOIN dbo.custinfo ci with(nolock) on ci.custid = cu.custid
+ LEFT JOIN dbo.CustSetting as cs with(NOLOCK) on cu.custid = cs.custid
+ LEFT JOIN dbo.custsetting3rd cs3 with(nolock) on cu.custid = cs3.custid
+ LEFT JOIN dbo.CustGameType cg WITH(NOLOCK) ON cu.custid = cg.CustID
+ LEFT JOIN @tmp_GameType g ON g.GameTypeID = cg.GameTypeID
                                              AND g.IBCBetTypeID IN (1501, 1503, 1504,
                                                                     1505, 1507, 1508,
                                                                     1509, 1511, 1513)
