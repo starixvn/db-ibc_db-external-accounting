@@ -1,11 +1,3 @@
-USE [bodb02]
-GO
-/****** Object:  StoredProcedure [dbo].[Acc_CustomerUpdTransferOption]    Script Date: 04/13/2010 22:51:09 ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-
 ALTER PROCEDURE [dbo].[EAS_CustomerUpdTransferOption]
 	@CustId INT,
 	@TransferOption VARCHAR(8),
@@ -22,6 +14,7 @@ DB: DBTXN/BODB02
 Original: [Acc_CustomerUpdTransferOption]
 
 Revisions:
+	- 20150606@Elodie: Separate CustDB to DBCUST server (Move Acc_CustomerSelCheckEnable to DBCUST.CustDB)
 
 Param's Explanation:
 */
@@ -37,7 +30,7 @@ DECLARE @Old_TransferOption TINYINT
 DECLARE @roleid TINYINT
 --end
 --Check disable user
-EXEC DBAGE.bodb02.dbo.Acc_CustomerSelCheckEnable @custid = @custid, @ErrCode=@ErrCode OUTPUT,@ErrMsg=@ErrMsg OUTPUT
+EXEC Acc_CustomerSelCheckEnable @custid = @custid, @ErrCode=@ErrCode OUTPUT,@ErrMsg=@ErrMsg OUTPUT
 IF @ErrCode <>0 RETURN
 --end
 
@@ -182,7 +175,7 @@ BEGIN CATCH
 		@TrackingValue2 = @TrackingValue2,
 		@duration = @duration
 
-END CATCH	
+END CATCH
 	
 
 GO
