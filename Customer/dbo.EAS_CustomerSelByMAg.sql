@@ -116,8 +116,8 @@ BEGIN
 	                                     1509, 1511, 1513) THEN cg.IsDisabled
 	             ELSE 1
 	           END) DisableKeno,
-	       ci.DisableGoldDeluxe,
-	       ci.HideGoldDeluxe,
+	       ISNULL(ci.DisableGoldDeluxe,1) AS DisableGoldDeluxe,
+		   ISNULL(ci.HideGoldDeluxe,1) AS HideGoldDeluxe,
 	       --transfer condition
 	       @TransferOption disableTransfer,
 	       ROW_NUMBER() OVER(ORDER BY ci.enabled desc, ci.closed,

@@ -1,13 +1,4 @@
-USE [bodb_EAS]
-GO
-/****** Object:  StoredProcedure [dbo].[EAS_CustomerSelByAg]    Script Date: 05/14/2015 09:19:14 ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-/****** Object:  Stored Procedure dbo.EAS_CustomerSelByAg    Script Date: 9/11/2014 9:52:04 AM ******/
-
-ALTER PROCEDURE [dbo].[c]
+ALTER PROCEDURE [dbo].[EAS_CustomerSelByAg]
     @Recommend int,  
     @Custid    int = null,  
     @Enabled   bit = null,  
@@ -192,8 +183,8 @@ inner join #custinfo ci on cs3.custid = ci.custid
 	                                     1509, 1511, 1513) THEN cg.IsDisabled
 	             ELSE 1
 	           END) as DisableKeno,
-	       ci.HideGoldDeluxe,
-	       ci.DisableGoldDeluxe,
+	       ISNULL(ci.DisableGoldDeluxe,1) AS DisableGoldDeluxe,
+		   ISNULL(ci.HideGoldDeluxe,1) AS HideGoldDeluxe,
 	       --transfer condition
 	       @TransferOption disableTransfer,	
 	       ROW_NUMBER() OVER (ORDER BY ci.enabled desc,
