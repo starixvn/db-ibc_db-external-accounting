@@ -32,7 +32,7 @@ Revisions:
     - 20140822@Logan:   Add Esports status [Redmine: #20666]
     - 20150514@Kathy: Add Gold Deluxe product [Redmine:#34486] 
     - 20150612@Kathy: Move sp from DBEAS.bodb_EAS to DBCUST.CustDB, use temp GameType [Redmine:#36216]
-    - 20150825@Helen: Colossus Bet - [Redmine: #42655]
+    - 20150825@Helen: Colossus Bet - [Redmine: #41264]
 
 */
 BEGIN
