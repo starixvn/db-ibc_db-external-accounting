@@ -26,12 +26,15 @@ Revisions:
 	- 20150514@Kathy: Add Gold Deluxe product [Redmine:#34486] 
 	- 20150612@Kathy: Move sp from DBEAS.bodb_EAS to DBCUST.CustDB, use temp GameType [Redmine:#36216]
 	- 20150825@Helen: Colossus Bet - [Redmine: #41264]
+	- 20150904@Helen: commission setting for MO [Redmine #41470]
+	
 */  
 BEGIN    
     SET NOCOUNT ON  
 
     DECLARE @TransferOption bit
-
+	DECLARE @IsMyanmarOdds BIT = 0,@discountMyanmarOdds DECIMAL (9,8) = 0
+	
 	DECLARE @tmp_GameType TABLE (GameTypeID INT, GameTypeName NVARCHAR(50), IsDisabled BIT, IBCBettypeID INT)
 	 
 	 BEGIN TRY		
@@ -43,10 +46,16 @@ BEGIN
 		SELECT GameTypeID, GameTypeName, IsDisabled, IBCBettypeID FROM DBTXN.bodb02.dbo.GameType WITH (NOLOCK)
 	 END CATCH
 	 
+	 SET @IsMyanmarOdds = dbo.fn_IsMyanmarOdds (@Recommend)
+
+	IF @IsMyanmarOdds = 1
+		SET @discountMyanmarOdds = (SELECT commrate FROM AgentCommRate WITH (NOLOCK) WHERE custid = @Recommend AND Sporttype = 1 AND Bettype = 301)
+	 
     SELECT @TransferOption = CASE
                                WHEN TransferOption = 0 THEN 0
                                ELSE 1
                              END
+                             
       FROM dbo.custagent WITH(NOLOCK)
      WHERE custid = @Recommend
 
@@ -209,7 +218,12 @@ BEGIN
 	                                   ci.closed,
 	                                   isnull(ci.reject, 0),
 	                                   cu.username
-	                         ) as RowNumber
+	                         ) as RowNumber,
+			-- Myanmar odds
+			ISNULL(@IsMyanmarOdds,0) AS IsMyanmarOdds,
+			ISNULL(AC.playerdiscount,0) AS playerdiscountMyanmarOdds,
+			ISNULL(@discountMyanmarOdds,0) AS discountMyanmarOdds
+			
       FROM dbo.customer AS cu with(NOLOCK)
 		INNER JOIN #Custinfo ci with(nolock) on cu.custid = ci.custid
 		 LEFT JOIN #CustSetting as cs with(NOLOCK) on cu.custid = cs.custid
@@ -219,6 +233,8 @@ BEGIN
 													 AND g.IBCBetTypeID IN (1501, 1503, 1504,
 																			1505, 1507, 1508,
 																			1509, 1511, 1513)
+		 
+		LEFT JOIN CustCommRate AC WITH (NOLOCK) ON AC.CustId = CI.custid AND AC.Sporttype = 1 AND AC.Bettype = 301 AND @IsMyanmarOdds = 1		 																			
      WHERE (cs.sporttype IN (1) AND cs.bettype IN (1, 5, 4) AND cs3.sporttype IN (161) AND cs3.bettype IN (81))
 	    OR (cs.sporttype IS NULL AND cs.bettype IS NULL AND cs3.sporttype IS NULL AND cs3.bettype IS NULL)
 	 GROUP BY cu.custid, cu.username, cu.username2, cu.ugroup, ci.enabled, ci.closed,
@@ -231,7 +247,8 @@ BEGIN
 			   ci.isAutoResetP2P, ci.DisableP2P, ci.DisableFunP2P, ci.DisableLiveCasino,
 			   ci.SyncLiveCasino, ci.DisableVirtualSports, ci.DoubleCommLosing,
 			   ci.HideVirtualSports, ci.DisableCasinoBonus, ci.DisableHRFixedOdds,
-			   ci.HideKeno, ci.DisableEsports, ci.HideGoldDeluxe, ci.DisableGoldDeluxe,ci.DisableColossusBet,ci.HideColossusBet
+			   ci.HideKeno, ci.DisableEsports, ci.HideGoldDeluxe, ci.DisableGoldDeluxe,ci.DisableColossusBet,ci.HideColossusBet,AC.playerdiscount
+			   
 
     DROP TABLE #Custinfo,
                #CustSetting,
