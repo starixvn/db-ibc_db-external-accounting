@@ -20,6 +20,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Ag]
 	@showVS BIT = 0,
 	@showKeno BIT = 0,
 	@showGD BIT = 0,
+	@showCB BIT = 0,
 	@BalanceUpDay SMALLDATETIME,
 	@PageSize int=0,
 	@PageIndex int=0,
@@ -35,6 +36,7 @@ Revisions:
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS, add linked server DBSUM for bodb_Summary
 	- 20140305@Patrick: Add more Keno product(sport:202, bettype between 1501 and 1599)
 	- 20150528@Sophia: Apply Gold Deluxe and Sport bettype Matrix [Redmine: #36775]
+	- 20150907@Winnie: Add CB [Redmine: #43099]
     
 */
 SET NOCOUNT ON
@@ -108,6 +110,14 @@ BEGIN
 	VALUES(255, 0) 
 END
 
+IF @showCB = 1
+	BEGIN
+		--Sum_winloss
+		INSERT INTO @TmpCondSumWL(sporttype, bettype)
+		VALUES(204, 0)
+END	
+
+
 ----Get Sport Bettype Matrix------
 DECLARE @SportBettype TABLE(ProductID INT,Bettype INT,EventType INT)
 INSERT INTO @SportBettype
@@ -142,6 +152,7 @@ BEGIN
 				OR s.ProductID = CASE WHEN @showVS = 1 THEN 5 ELSE 0 END
 				OR s.ProductID = CASE WHEN @showKeno = 1 THEN 8 ELSE 0 END
 				OR s.ProductID = CASE WHEN @showGD = 1 THEN 12 ELSE 0 END
+				OR s.ProductID = CASE WHEN @showCB = 1 THEN 15 ELSE 0 END
 			)			
 			--(
 			--	bettype < case when @showSB=1 then 31 else 0 end

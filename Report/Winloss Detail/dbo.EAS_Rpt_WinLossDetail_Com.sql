@@ -21,6 +21,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com]
 	@showLiveCasino BIT = 0,
 	@showKeno	BIT = 0,
 	@showGD		BIT = 0,
+	@showCB		BIT = 0,
 	@BalanceUpDay SMALLDATETIME	
 AS
 
@@ -37,6 +38,7 @@ Revisions:
 	- 20140420@Francis: revise SP to use temporary table instead of variable table to improve performance
 	- 20150502@Lukas: Revise SP to insert into Temporary table (#Sum_WinLoss_Old) of a remote table (DBSUM.bodb_Summary.dbo.Sum_WinLoss_Old) to enhance performance (HotFix #35279)
 	- 20150528@Sophia: Apply Gold Deluxe and Sport bettype Matrix [Redmine: #36775]
+	- 20150907@Winnie: Add CB [Redmine: #43099]
 */
 
 SET NOCOUNT ON
@@ -221,6 +223,18 @@ IF @showGD = 1
 		--Sum_winloss
 		INSERT INTO @TmpCondSumWL(sporttype, bettype)
 		VALUES(255, 0)
+END	
+IF @showCB = 1
+	BEGIN
+		-- bettrans
+		INSERT INTO @TmpCond(Sporttype, Bettype) 
+		SELECT	204 AS sporttype, Bettype 
+		FROM	@SportBettype  
+		WHERE	ProductId = 15
+
+		--Sum_winloss
+		INSERT INTO @TmpCondSumWL(sporttype, bettype)
+		VALUES(204, 0)
 END	
 
 IF @Todate >= @BalanceUpDay
