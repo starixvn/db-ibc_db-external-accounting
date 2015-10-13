@@ -7,7 +7,7 @@ SET QUOTED_IDENTIFIER ON
 GO
 /****** Object:  Stored Procedure dbo.EAS_CustomerSelBySAg    Script Date: 9/11/2014 9:52:04 AM ******/
 
-ALTER PROCEDURE [dbo].[EAS_CustomerSelBySAg]  
+alter PROCEDURE [dbo].[EAS_CustomerSelBySAg]  
     @SRecommend int,  
     @Custid     int = null,  
     @Enabled    bit = null,  
@@ -32,13 +32,16 @@ Revisions:
     - 20140822@Logan:   Add Esports status [Redmine: #20666]
     - 20150514@Kathy: Add Gold Deluxe product [Redmine:#34486] 
     - 20150612@Kathy: Move sp from DBEAS.bodb_EAS to DBCUST.CustDB, use temp GameType [Redmine:#36216]
+    - 20150825@Helen: Colossus Bet - [Redmine: #41264]
+    - 20150904@Helen: commission setting for MO [Redmine #41470]
+    
 
 */
 BEGIN
     SET NOCOUNT ON  
 
     DECLARE @TransferOption bit
-
+	DECLARE @IsMyanmarOdds BIT = 0
 	 DECLARE @tmp_GameType TABLE (GameTypeID INT, GameTypeName NVARCHAR(50), IsDisabled BIT, IBCBettypeID INT)
 	 
 	 BEGIN TRY		
@@ -53,10 +56,11 @@ BEGIN
     SELECT @TransferOption = case
                                when TransferOption = 0 then 0
                                else 1
-                             end
-      FROM dbo.custsuper with(nolock)
+                             end,
+           @IsMyanmarOdds = IsMyanmarOdds                  
+     FROM dbo.custsuper WITH(NOLOCK)
      WHERE custid = @SRecommend
-
+	 
     SELECT cu.custid,
            cu.username,
            ci.enabled,
@@ -130,60 +134,68 @@ BEGIN
 	           end) as DisableKeno,
 	       ISNULL(ci.DisableGoldDeluxe,1) AS DisableGoldDeluxe,
 		   ISNULL(ci.HideGoldDeluxe,1) AS HideGoldDeluxe,
+		   
+		   ISNULL(ci.DisableColossusBet,1) AS DisableColossusBet,
+		   ISNULL(ci.HideColossusBet,1) AS HideColossusBet,
+		   
+		   -- For Myanmar Odds
+		   CASE WHEN ac.CustId IS NOT NULL THEN 1 ELSE 0 END AS IsMyanmarOdds,
+		   ISNULL(AC.CommRate,0) AS discountMyanmarOdds,
 	       --transfer condition
 	       @TransferOption disableTransfer,
 	       ROW_NUMBER() OVER(ORDER BY ci.enabled desc, ci.closed,
 	                                  isnull(ci.reject, 0), cu.username) as RowNumber
-      FROM dbo.customer AS cu with(NOLOCK)
-INNER JOIN (SELECT custinfo.custid, currency, roleid, autosuspend, reject,
-                   closed, MatchLimit, VirtualMultiplier, Enabled, DisableHorseRacing,
-				   DisableFinancial, DisableCasino, SyncCasino, DisableOutright, DisableOpenTote,
-				   DisableBingo, DisableNumber, SyncBingo, disable151_au,
-				   disable152_uk, disable152_au, disable153_au, isAutoResetP2P,
-				   DisableP2P, DisableFunP2P, DisableLiveCasino, SyncLiveCasino,
-				   DisableVirtualSports, DoubleCommLosing, HideVirtualSports,
-				   DisableCasinoBonus, DisableHRFixedOdds, HideKeno, DisableEsports, DisableGoldDeluxe, HideGoldDeluxe
-  			  FROM dbo.custinfo with(NOLOCK) 
-			 WHERE SRecommend = @SRecommend
-			   AND roleid = 3
-			   AND (@Custid is null or Custid = @Custid)
-			   AND enabled = case
-			                   when coalesce(@Closed, @Suspended) is not null then 1
-			                   else coalesce(@enabled, enabled)
-			                 end
-               AND isnull(closed, 0) = case
-                                         when @suspended = 1 then 0
-                                         else coalesce(@closed, isnull(closed, 0))
-                                       end
-               AND isnull(reject, 0) = case
-                                         when @Closed = 0 then 0
-                                         else coalesce(@suspended, isnull(reject, 0))
-                                       end
-		   ) ci on cu.custid = ci.custid
- LEFT JOIN dbo.CustSetting as cs with(NOLOCK) on cu.custid = cs.custid
- LEFT JOIN dbo.custsetting3rd cs3 with(nolock) on cu.custid = cs3.custid
- LEFT JOIN dbo.CustGameType cg WITH(NOLOCK) ON cu.custid = cg.CustID
- LEFT JOIN @tmp_GameType g ON g.GameTypeID = cg.GameTypeID
-                                             AND g.IBCBetTypeID IN (1501, 1503, 1504,
-                                                                    1505, 1507, 1508,
-                                                                    1509, 1511, 1513)
-INNER JOIN dbo.CustMaster cm with(NOLOCK) on cu.custid = cm.custid
-     WHERE (cs.sporttype IN (1) AND cs.bettype IN (1, 5, 4) AND cs3.sporttype IN (161) AND cs3.bettype IN (81))
-	    OR (cs.sporttype IS NULL AND cs.bettype IS NULL AND cs3.sporttype IS NULL AND cs3.bettype IS NULL)
-  group by cu.custid, cu.username, ci.enabled, ci.closed, ci.reject, cu.roleid,
-		   cu.firstname, cu.lastname, cu.creatdate, cu.iplogin, ci.DoubleCommLosing,
-		   ci.DisableOutright, cm.DisableAutoMPT,ci.disablehorseracing,ci.disableOpenTote,
-		   ci.disable151_au,ci.disable152_uk,ci.disable152_au, ci.disable153_au,
-		   ci.disablehorseracing, ci.disableOpenTote, ci.disable151_au, ci.disable152_uk,
-		   ci.disable152_au, ci.disable153_au, ci.synccasino, ci.disablecasino,  
-           ci.syncBingo,ci.DisableBingo, ci.DisableNumber, ci.isAutoResetP2P,
-           ci.DisableP2P, ci.DisableFunP2P, ci.DisableLiveCasino, ci.SyncLiveCasino,
-		   ci.DisableVirtualSports,ci.DoubleCommLosing, ci.HideVirtualSports,
-		   ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno, ci.DisableEsports,
-		   ci.DisableGoldDeluxe, ci.HideGoldDeluxe
+				                                  
+	FROM dbo.customer AS cu with(NOLOCK)
+		INNER JOIN (SELECT custinfo.custid, currency, roleid, autosuspend, reject,
+						   closed, MatchLimit, VirtualMultiplier, Enabled, DisableHorseRacing,
+						   DisableFinancial, DisableCasino, SyncCasino, DisableOutright, DisableOpenTote,
+						   DisableBingo, DisableNumber, SyncBingo, disable151_au,
+						   disable152_uk, disable152_au, disable153_au, isAutoResetP2P,
+						   DisableP2P, DisableFunP2P, DisableLiveCasino, SyncLiveCasino,
+						   DisableVirtualSports, DoubleCommLosing, HideVirtualSports,
+						   DisableCasinoBonus, DisableHRFixedOdds, HideKeno, DisableEsports, DisableGoldDeluxe, HideGoldDeluxe,DisableColossusBet,HideColossusBet
+  					  FROM dbo.custinfo with(NOLOCK) 
+					 WHERE SRecommend = @SRecommend
+					   AND roleid = 3
+					   AND (@Custid is null or Custid = @Custid)
+					   AND enabled = case
+									   when coalesce(@Closed, @Suspended) is not null then 1
+									   else coalesce(@enabled, enabled)
+									 end
+					   AND isnull(closed, 0) = case
+												 when @suspended = 1 then 0
+												 else coalesce(@closed, isnull(closed, 0))
+											   end
+					   AND isnull(reject, 0) = case
+												 when @Closed = 0 then 0
+												 else coalesce(@suspended, isnull(reject, 0))
+											   end
+				   ) ci on cu.custid = ci.custid
+		 LEFT JOIN dbo.CustSetting as cs with(NOLOCK) on cu.custid = cs.custid
+		 LEFT JOIN dbo.custsetting3rd cs3 with(nolock) on cu.custid = cs3.custid
+		 LEFT JOIN dbo.CustGameType cg WITH(NOLOCK) ON cu.custid = cg.CustID
+		 LEFT JOIN @tmp_GameType g ON g.GameTypeID = cg.GameTypeID
+													 AND g.IBCBetTypeID IN (1501, 1503, 1504,
+																			1505, 1507, 1508,
+																			1509, 1511, 1513)
+		INNER JOIN dbo.CustMaster cm with(NOLOCK) on cu.custid = cm.custid
+		LEFT JOIN AgentCommRate AC WITH (NOLOCK) ON AC.CustId = CI.custid AND AC.Sporttype = 1 AND AC.Bettype = 301 
+	WHERE (cs.sporttype IN (1) AND cs.bettype IN (1, 5, 4) AND cs3.sporttype IN (161) AND cs3.bettype IN (81))
+			OR (cs.sporttype IS NULL AND cs.bettype IS NULL AND cs3.sporttype IS NULL AND cs3.bettype IS NULL)
+	GROUP BY cu.custid, cu.username, ci.enabled, ci.closed, ci.reject, cu.roleid,
+			   cu.firstname, cu.lastname, cu.creatdate, cu.iplogin, ci.DoubleCommLosing,
+			   ci.DisableOutright, cm.DisableAutoMPT,ci.disablehorseracing,ci.disableOpenTote,
+			   ci.disable151_au,ci.disable152_uk,ci.disable152_au, ci.disable153_au,
+			   ci.disablehorseracing, ci.disableOpenTote, ci.disable151_au, ci.disable152_uk,
+			   ci.disable152_au, ci.disable153_au, ci.synccasino, ci.disablecasino,  
+			   ci.syncBingo,ci.DisableBingo, ci.DisableNumber, ci.isAutoResetP2P,
+			   ci.DisableP2P, ci.DisableFunP2P, ci.DisableLiveCasino, ci.SyncLiveCasino,
+			   ci.DisableVirtualSports,ci.DoubleCommLosing, ci.HideVirtualSports,
+			   ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno, ci.DisableEsports,
+			   ci.DisableGoldDeluxe, ci.HideGoldDeluxe,ci.DisableColossusBet,ci.HideColossusBet,AC.CommRate,ac.CustId
 	
 END
-
 
 GO
 GRANT EXECUTE ON [dbo].[EAS_CustomerSelBySAg] TO [bodbExtAccNet] AS [dbo]

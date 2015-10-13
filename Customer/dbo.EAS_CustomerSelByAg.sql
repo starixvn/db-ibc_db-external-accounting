@@ -25,11 +25,16 @@ Revisions:
     - 20140822@Logan:   Add Esports status [Redmine: #20666]
 	- 20150514@Kathy: Add Gold Deluxe product [Redmine:#34486] 
 	- 20150612@Kathy: Move sp from DBEAS.bodb_EAS to DBCUST.CustDB, use temp GameType [Redmine:#36216]
+	- 20150825@Helen: Colossus Bet - [Redmine: #41264]
+	- 20150904@Helen: commission setting for MO [Redmine #41470]
+	
 */  
+BEGIN    
     SET NOCOUNT ON  
 
     DECLARE @TransferOption bit
-
+	DECLARE @IsMyanmarOdds BIT = 0,@discountMyanmarOdds DECIMAL (9,8) = 0
+	
 	DECLARE @tmp_GameType TABLE (GameTypeID INT, GameTypeName NVARCHAR(50), IsDisabled BIT, IBCBettypeID INT)
 	 
 	 BEGIN TRY		
@@ -41,10 +46,16 @@ Revisions:
 		SELECT GameTypeID, GameTypeName, IsDisabled, IBCBettypeID FROM DBTXN.bodb02.dbo.GameType WITH (NOLOCK)
 	 END CATCH
 	 
+	 SET @IsMyanmarOdds = dbo.fn_IsMyanmarOdds (@Recommend)
+
+	IF @IsMyanmarOdds = 1
+		SET @discountMyanmarOdds = (SELECT commrate FROM AgentCommRate WITH (NOLOCK) WHERE custid = @Recommend AND Sporttype = 1 AND Bettype = 301)
+	 
     SELECT @TransferOption = CASE
                                WHEN TransferOption = 0 THEN 0
                                ELSE 1
                              END
+                             
       FROM dbo.custagent WITH(NOLOCK)
      WHERE custid = @Recommend
 
@@ -57,7 +68,7 @@ Revisions:
 		   isAutoResetP2P, DisableP2P, DisableFunP2P, DisableLiveCasino,
 		   SyncLiveCasino, DisableVirtualSports, DoubleCommLosing, Recommend,
 		   HideVirtualSports, DisableCasinoBonus, DisableHRFixedOdds, HideKeno,
-		   DisableEsports, DisableGoldDeluxe, HideGoldDeluxe
+		   DisableEsports, DisableGoldDeluxe, HideGoldDeluxe,DisableColossusBet, HideColossusBet
       INTO #custinfo
       FROM dbo.custinfo WITH(NOLOCK)
      WHERE Recommend = @Recommend
@@ -84,7 +95,7 @@ Revisions:
            playerdiscount
       INTO #CustSetting
       FROM dbo.custsetting cs WITH(NOLOCK)
-inner join #custinfo ci on cs.custid = ci.custid
+		INNER JOIN #custinfo ci on cs.custid = ci.custid
      WHERE bettype in (1, 4, 5)
        and sporttype = 1
 
@@ -96,7 +107,7 @@ inner join #custinfo ci on cs.custid = ci.custid
            playerdiscount
       INTO #custsetting3rd
       FROM dbo.custsetting3rd cs3 WITH(NOLOCK)
-inner join #custinfo ci on cs3.custid = ci.custid
+		INNER JOIN #custinfo ci on cs3.custid = ci.custid
      WHERE bettype = 81
        and sporttype = 161
        
@@ -197,39 +208,52 @@ inner join #custinfo ci on cs3.custid = ci.custid
 	           END) as DisableKeno,
 	       ISNULL(ci.DisableGoldDeluxe,1) AS DisableGoldDeluxe,
 		   ISNULL(ci.HideGoldDeluxe,1) AS HideGoldDeluxe,
+		   
+		   ISNULL(ci.DisableColossusBet,1) AS DisableColossusBet,
+		   ISNULL(ci.HideColossusBet,1) AS HideColossusBet,
+		   
 	       --transfer condition
 	       @TransferOption disableTransfer,	
 	       ROW_NUMBER() OVER (ORDER BY ci.enabled desc,
 	                                   ci.closed,
 	                                   isnull(ci.reject, 0),
 	                                   cu.username
-	                         ) as RowNumber
+	                         ) as RowNumber,
+			-- Myanmar odds
+			ISNULL(@IsMyanmarOdds,0) AS IsMyanmarOdds,
+			ISNULL(AC.playerdiscount,0) AS playerdiscountMyanmarOdds,
+			ISNULL(@discountMyanmarOdds,0) AS discountMyanmarOdds
+			
       FROM dbo.customer AS cu with(NOLOCK)
-INNER JOIN #Custinfo ci with(nolock) on cu.custid = ci.custid
- LEFT JOIN #CustSetting as cs with(NOLOCK) on cu.custid = cs.custid
- LEFT JOIN #custsetting3rd cs3 with(nolock) on cu.custid = cs3.custid
- LEFT JOIN dbo.CustGameType cg WITH(NOLOCK) ON cg.CustID = ci.custid
- LEFT JOIN @tmp_GameType g ON cg.GameTypeID = g.GameTypeID
-                                             AND g.IBCBetTypeID IN (1501, 1503, 1504,
-                                                                    1505, 1507, 1508,
-                                                                    1509, 1511, 1513)
+		INNER JOIN #Custinfo ci with(nolock) on cu.custid = ci.custid
+		 LEFT JOIN #CustSetting as cs with(NOLOCK) on cu.custid = cs.custid
+		 LEFT JOIN #custsetting3rd cs3 with(nolock) on cu.custid = cs3.custid
+		 LEFT JOIN dbo.CustGameType cg WITH(NOLOCK) ON cg.CustID = ci.custid
+		 LEFT JOIN @tmp_GameType g ON cg.GameTypeID = g.GameTypeID
+													 AND g.IBCBetTypeID IN (1501, 1503, 1504,
+																			1505, 1507, 1508,
+																			1509, 1511, 1513)
+		 
+		LEFT JOIN CustCommRate AC WITH (NOLOCK) ON AC.CustId = CI.custid AND AC.Sporttype = 1 AND AC.Bettype = 301 AND @IsMyanmarOdds = 1		 																			
      WHERE (cs.sporttype IN (1) AND cs.bettype IN (1, 5, 4) AND cs3.sporttype IN (161) AND cs3.bettype IN (81))
 	    OR (cs.sporttype IS NULL AND cs.bettype IS NULL AND cs3.sporttype IS NULL AND cs3.bettype IS NULL)
-  GROUP BY cu.custid, cu.username, cu.username2, cu.ugroup, ci.enabled, ci.closed,
-           ci.reject, cu.roleid, cu.firstname, cu.lastname, cu.creatdate, cu.iplogin,
-           ci.DoubleCommLosing, ci.DisableOutright, ci.disablehorseracing,
-           ci.disableOpenTote, ci.disable151_au, ci.disable152_uk, ci.disable152_au,
-           ci.disable153_au, ci.disablehorseracing, ci.disableOpenTote, ci.disable151_au,
-           ci.disable152_uk, ci.disable152_au, ci.disable153_au, ci.synccasino,
-           ci.disablecasino, ci.syncBingo, ci.DisableBingo, ci.DisableNumber,  
-		   ci.isAutoResetP2P, ci.DisableP2P, ci.DisableFunP2P, ci.DisableLiveCasino,
-		   ci.SyncLiveCasino, ci.DisableVirtualSports, ci.DoubleCommLosing,
-		   ci.HideVirtualSports, ci.DisableCasinoBonus, ci.DisableHRFixedOdds,
-		   ci.HideKeno, ci.DisableEsports, ci.HideGoldDeluxe, ci.DisableGoldDeluxe
+	 GROUP BY cu.custid, cu.username, cu.username2, cu.ugroup, ci.enabled, ci.closed,
+			   ci.reject, cu.roleid, cu.firstname, cu.lastname, cu.creatdate, cu.iplogin,
+			   ci.DoubleCommLosing, ci.DisableOutright, ci.disablehorseracing,
+			   ci.disableOpenTote, ci.disable151_au, ci.disable152_uk, ci.disable152_au,
+			   ci.disable153_au, ci.disablehorseracing, ci.disableOpenTote, ci.disable151_au,
+			   ci.disable152_uk, ci.disable152_au, ci.disable153_au, ci.synccasino,
+			   ci.disablecasino, ci.syncBingo, ci.DisableBingo, ci.DisableNumber,  
+			   ci.isAutoResetP2P, ci.DisableP2P, ci.DisableFunP2P, ci.DisableLiveCasino,
+			   ci.SyncLiveCasino, ci.DisableVirtualSports, ci.DoubleCommLosing,
+			   ci.HideVirtualSports, ci.DisableCasinoBonus, ci.DisableHRFixedOdds,
+			   ci.HideKeno, ci.DisableEsports, ci.HideGoldDeluxe, ci.DisableGoldDeluxe,ci.DisableColossusBet,ci.HideColossusBet,AC.playerdiscount
+			   
 
-    drop table #Custinfo,
+    DROP TABLE #Custinfo,
                #CustSetting,
                #custsetting3rd
+END               
 GO
 GRANT EXECUTE ON [dbo].[EAS_CustomerSelByAg] TO [bodbExtAccNet] AS [dbo]
 GO
