@@ -7,7 +7,7 @@ SET QUOTED_IDENTIFIER ON
 GO
 /****** Object:  Stored Procedure dbo.EAS_CustomerSelBySAg    Script Date: 9/11/2014 9:52:04 AM ******/
 
-alter PROCEDURE [dbo].[EAS_CustomerSelBySAg]  
+ALTER PROCEDURE [dbo].[EAS_CustomerSelBySAg]  
     @SRecommend int,  
     @Custid     int = null,  
     @Enabled    bit = null,  
@@ -34,6 +34,7 @@ Revisions:
     - 20150612@Kathy: Move sp from DBEAS.bodb_EAS to DBCUST.CustDB, use temp GameType [Redmine:#36216]
     - 20150825@Helen: Colossus Bet - [Redmine: #41264]
     - 20150904@Helen: commission setting for MO [Redmine #41470]
+    - 20151019@Helen: Display wrong comm rate of Group A,B,C,D [Redmine: #45851]
     
 
 */
@@ -69,10 +70,12 @@ BEGIN
            cu.roleid,
            isnull(cu.firstname, '') as firstname,
            isnull(cu.lastname, '') as lastname,
-	       max(cs.groupa) as groupa,
-	       max(cs.groupb) as groupb,
-	       max(cs.groupc) as groupc,
-	       max(cs.groupd) as groupd,
+	       
+	       MAX(case when cs.bettype = 1 and cs.sporttype=1 then cs.groupa else 0 end) as groupa,
+		   MAX(case when cs.bettype = 1 and cs.sporttype=1 then cs.groupb else 0 end) as groupb,
+		   MAX(case when cs.bettype = 1 and cs.sporttype=1 then cs.groupc else 0 end) as groupc,
+		   MAX(case when cs.bettype = 1 and cs.sporttype=1 then cs.groupd else 0 end) as groupd,
+	       
 	       max(case
 	             when cs.bettype = 5 and cs.sporttype = 1 then cs.adiscount
 	             else 0

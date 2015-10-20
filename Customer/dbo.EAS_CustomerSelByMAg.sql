@@ -27,6 +27,7 @@ Revisions:
     - 20150612@Kathy: Move sp from DBEAS.bodb_EAS to DBCUST.CustDB, use temp GameType [Redmine:#36216]
     - 20150825@Helen: Colossus Bet - [Redmine: #41264]
     - 20150904@Helen: commission setting for MO [Redmine #41470]
+    - 20151019@Helen: Display wrong comm rate of Group A,B,C,D [Redmine: #45851]
     
 */
 BEGIN
@@ -61,10 +62,12 @@ BEGIN
            cu.roleid,
            ISNULL(cu.firstname, '') firstname,
            ISNULL(cu.lastname, '') lastname,
-	       MAX(cs.groupa) groupa,
-	       MAX(cs.groupb) groupb,
-	       MAX(cs.groupc) groupc,
-	       MAX(cs.groupd) groupd,
+	       
+	       MAX(case when cs.bettype = 1 and cs.sporttype=1 then cs.groupa else 0 end) as groupa,
+		   MAX(case when cs.bettype = 1 and cs.sporttype=1 then cs.groupb else 0 end) as groupb,
+		   MAX(case when cs.bettype = 1 and cs.sporttype=1 then cs.groupc else 0 end) as groupc,
+		   MAX(case when cs.bettype = 1 and cs.sporttype=1 then cs.groupd else 0 end) as groupd,
+	      
 	       MAX(CASE
 	             WHEN cs.bettype = 5 and cs.sporttype = 1 THEN cs.discount
 	             ELSE 0

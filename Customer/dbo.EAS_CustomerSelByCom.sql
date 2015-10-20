@@ -27,6 +27,8 @@ Revisions:
     - 20150612@Kathy: Move sp from DBEAS.bodb_EAS to DBCUST.CustDB, use temp GameType [Redmine:#36216]
     - 20150825@Helen: Colossus Bet - [Redmine: #41264]
     - 20150904@Helen: commission setting for MO [Redmine #41470]
+    - 20151019@Helen: Display wrong comm rate of Group A,B,C,D [Redmine: #45851]
+    
 */
 BEGIN
     SET NOCOUNT ON
@@ -68,6 +70,7 @@ BEGIN
                                  ELSE COALESCE(@suspended, ISNULL(reject, 0))
                                END
 
+
     --------output
     SELECT cu.custid,
            cu.username,
@@ -77,10 +80,12 @@ BEGIN
            cu.roleid,
            ISNULL(cu.firstname, '') as firstname,
            ISNULL(cu.lastname, '') as lastname,
-	       MAX(cs.groupa) as groupa,
-	       MAX(cs.groupb) as groupb,
-	       MAX(cs.groupc) as groupc,
-	       MAX(cs.groupd) as groupd,
+	       
+		   MAX(case when cs.bettype = 1 and cs.sporttype=1 then cs.groupa else 0 end) as groupa,
+		   MAX(case when cs.bettype = 1 and cs.sporttype=1 then cs.groupb else 0 end) as groupb,
+		   MAX(case when cs.bettype = 1 and cs.sporttype=1 then cs.groupc else 0 end) as groupc,
+		   MAX(case when cs.bettype = 1 and cs.sporttype=1 then cs.groupd else 0 end) as groupd,
+
 	       MAX(case
 	             WHEN cs.bettype = 5 and cs.sporttype = 1 then cs.sdiscount
 	             ELSE 0
@@ -158,7 +163,6 @@ BEGIN
 													 AND g.IBCBetTypeID IN (1501, 1503, 1504,
 																			1505, 1507, 1508,
 																			1509, 1511, 1513)
-		
 		LEFT JOIN AgentCommRate AC WITH (NOLOCK) ON AC.CustId = CI.custid AND AC.Sporttype = 1 AND AC.Bettype = 301 																			
      WHERE (cs.sporttype IN (1) AND cs.bettype IN (1,5,4) AND cs3.sporttype IN (161) AND cs3.bettype IN (81))
 	    OR (cs.sporttype IS NULL AND cs.bettype IS NULL AND cs3.sporttype IS NULL AND cs3.bettype IS NULL)
