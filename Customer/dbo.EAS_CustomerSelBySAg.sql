@@ -6,7 +6,6 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 /****** Object:  Stored Procedure dbo.EAS_CustomerSelBySAg    Script Date: 9/11/2014 9:52:04 AM ******/
-
 ALTER PROCEDURE [dbo].[EAS_CustomerSelBySAg]  
     @SRecommend int,  
     @Custid     int = null,  
@@ -35,8 +34,9 @@ Revisions:
     - 20150825@Helen: Colossus Bet - [Redmine: #41264]
     - 20150904@Helen: commission setting for MO [Redmine #41470]
     - 20151019@Helen: Display wrong comm rate of Group A,B,C,D [Redmine: #45851]
+    - 20151028@Helen: Member Information to support Muay Thai  [Redmine: #45496]
     
-
+exec EAS_CustomerSelBySAg @SRecommend=4792246,@Custid=default,@Enabled=default,@Closed=default,@Suspended=default
 */
 BEGIN
     SET NOCOUNT ON  
@@ -62,6 +62,13 @@ BEGIN
      FROM dbo.custsuper WITH(NOLOCK)
      WHERE custid = @SRecommend
 	 
+	 -- For MuayThai
+    DECLARE @bitmapOrder INT 
+    SET @bitmapOrder = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 44 AND Bettype = 3)
+    
+    DECLARE @HideMuayThai INT = 0
+    SET @HideMuayThai = (SELECT TOP 1 SettingStatus FROM ProductSettingDetail WITH (NOLOCK) WHERE sportType =44 AND BetType = 3 AND SettingType = 4)
+    
     SELECT cu.custid,
            cu.username,
            ci.enabled,
@@ -141,6 +148,8 @@ BEGIN
 		   ISNULL(ci.DisableColossusBet,1) AS DisableColossusBet,
 		   ISNULL(ci.HideColossusBet,1) AS HideColossusBet,
 		   
+		   ISNULL(ci.DisableMuayThai,0) AS DisableMuayThai,
+		   ISNULL(ci.HideMuayThai,0) AS HideMuayThai,
 		   -- For Myanmar Odds
 		   CASE WHEN ac.CustId IS NOT NULL THEN 1 ELSE 0 END AS IsMyanmarOdds,
 		   ISNULL(AC.CommRate,0) AS discountMyanmarOdds,
@@ -150,7 +159,7 @@ BEGIN
 	                                  isnull(ci.reject, 0), cu.username) as RowNumber
 				                                  
 	FROM dbo.customer AS cu with(NOLOCK)
-		INNER JOIN (SELECT custinfo.custid, currency, roleid, autosuspend, reject,
+		INNER JOIN (SELECT c.custid, currency, roleid, autosuspend, reject,
 						   closed, MatchLimit, VirtualMultiplier, Enabled, DisableHorseRacing,
 						   DisableFinancial, DisableCasino, SyncCasino, DisableOutright, DisableOpenTote,
 						   DisableBingo, DisableNumber, SyncBingo, disable151_au,
@@ -158,10 +167,15 @@ BEGIN
 						   DisableP2P, DisableFunP2P, DisableLiveCasino, SyncLiveCasino,
 						   DisableVirtualSports, DoubleCommLosing, HideVirtualSports,
 						   DisableCasinoBonus, DisableHRFixedOdds, HideKeno, DisableEsports, DisableGoldDeluxe, HideGoldDeluxe,DisableColossusBet,HideColossusBet
-  					  FROM dbo.custinfo with(NOLOCK) 
+						   -- For MuayThai
+						   ,dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder)  AS DisableMuayThai
+						   ,CASE WHEN @HideMuayThai = 0 AND ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder),1) = 0 THEN 0 ELSE 1 END AS HideMuayThai
+		   
+  					  FROM dbo.custinfo c with(NOLOCK)
+  					  LEFT JOIN CustProductStatus cps WITH (NOLOCK) ON cps.CustID = c.custid  
 					 WHERE SRecommend = @SRecommend
 					   AND roleid = 3
-					   AND (@Custid is null or Custid = @Custid)
+					   AND (@Custid is null or c.Custid = @Custid)
 					   AND enabled = case
 									   when coalesce(@Closed, @Suspended) is not null then 1
 									   else coalesce(@enabled, enabled)
@@ -196,7 +210,7 @@ BEGIN
 			   ci.DisableP2P, ci.DisableFunP2P, ci.DisableLiveCasino, ci.SyncLiveCasino,
 			   ci.DisableVirtualSports,ci.DoubleCommLosing, ci.HideVirtualSports,
 			   ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno, ci.DisableEsports,
-			   ci.DisableGoldDeluxe, ci.HideGoldDeluxe,ci.DisableColossusBet,ci.HideColossusBet,AC.CommRate,ac.CustId
+			   ci.DisableGoldDeluxe, ci.HideGoldDeluxe,ci.DisableColossusBet,ci.HideColossusBet,AC.CommRate,ac.CustId,ci.DisableMuayThai,ci.HideMuayThai
 	
 END
 

@@ -28,6 +28,9 @@ Revisions:
     - 20150825@Helen: Colossus Bet - [Redmine: #41264]
     - 20150904@Helen: commission setting for MO [Redmine #41470]
     - 20151019@Helen: Display wrong comm rate of Group A,B,C,D [Redmine: #45851]
+    - 20151028@Helen: Member Information to support Muay Thai  [Redmine: #45496]
+
+exec EAS_CustomerSelByMAg @MRecommend=4797617,@Custid=default,@Enabled=default,@Closed=default,@Suspended=default    
     
 */
 BEGIN
@@ -54,6 +57,13 @@ BEGIN
     FROM dbo.custmaster WITH(NOLOCK)
     WHERE custid = @MRecommend
 
+	 -- For MuayThai
+    DECLARE @bitmapOrder INT 
+    SET @bitmapOrder = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 44 AND Bettype = 3)
+	
+	DECLARE @HideMuayThai INT = 0
+    SET @HideMuayThai = (SELECT TOP 1 SettingStatus FROM ProductSettingDetail WITH (NOLOCK) WHERE sportType =44 AND BetType = 3 AND SettingType = 4)
+    
     SELECT cu.custid,
            cu.username,
            ci.enabled,
@@ -132,6 +142,9 @@ BEGIN
 		   ISNULL(ci.DisableColossusBet,1) AS DisableColossusBet,
 		   ISNULL(ci.HideColossusBet,1) AS HideColossusBet,
 		   
+		   ISNULL(ci.DisableMuayThai,0) AS DisableMuayThai,
+		   ISNULL(ci.HideMuayThai,0) AS HideMuayThai,
+		   
 		   --For Myanmar Odds
 		   CASE WHEN ac.CustId IS NOT NULL THEN 1 ELSE 0 END AS  IsMyanmarOdds,
 		   ISNULL(AC.CommRate,0) AS discountMyanmarOdds,
@@ -149,10 +162,16 @@ BEGIN
 						   SyncLiveCasino, DisableVirtualSports, DoubleCommLosing,
 						   HideVirtualSports, DisableCasinoBonus, DisableHRFixedOdds,
 						   HideKeno, DisableEsports, DisableGoldDeluxe, HideGoldDeluxe, DisableColossusBet,HideColossusBet
+						   -- For MuayThai
+						   ,dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder)  AS DisableMuayThai
+						   
+						   ,CASE WHEN @HideMuayThai = 0 AND ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder),1) = 0 THEN 0 ELSE 1 END AS HideMuayThai
+						   
 					  FROM dbo.custinfo WITH(NOLOCK) 						
+					  LEFT JOIN CustProductStatus cps WITH (NOLOCK) ON cps.CustID = custinfo.custid  
 					 WHERE mRecommend = @MRecommend
 					   AND roleid = 2
-					   AND (@Custid IS NULL OR Custid = @Custid)
+					   AND (@Custid IS NULL OR custinfo.Custid = @Custid)
 					   AND enabled = CASE
 									   WHEN COALESCE(@Closed, @Suspended) IS NOT NULL THEN 1
 									   ELSE COALESCE(@enabled, enabled)
@@ -189,7 +208,7 @@ BEGIN
 			ci.DisableLiveCasino, ci.SyncLiveCasino,  
 			ci.DisableVirtualSports,ci.DoubleCommLosing, ci.HideVirtualSports,	
 			ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno, ci.DisableEsports,
-			ci.DisableGoldDeluxe, ci.HideGoldDeluxe, ci.DisableColossusBet, ci.HideColossusBet,AC.CommRate,ac.CustId
+			ci.DisableGoldDeluxe, ci.HideGoldDeluxe, ci.DisableColossusBet, ci.HideColossusBet,AC.CommRate,ac.CustId,ci.DisableMuayThai,ci.HideMuayThai
 END
 GO
 GRANT EXECUTE ON [dbo].[EAS_CustomerSelByMAg] TO [bodbExtAccNet] AS [dbo]

@@ -27,7 +27,9 @@ Revisions:
 	- 20150612@Kathy: Move sp from DBEAS.bodb_EAS to DBCUST.CustDB, use temp GameType [Redmine:#36216]
 	- 20150825@Helen: Colossus Bet - [Redmine: #41264]
 	- 20150904@Helen: commission setting for MO [Redmine #41470]
+	- 20151028@Helen: Member Information to support Muay Thai  [Redmine: #45496]
 	
+exec EAS_CustomerSelByAg @Recommend=9367272,@Custid=default,@Enabled=default,@Closed=default,@Suspended=default	
 */  
 BEGIN    
     SET NOCOUNT ON  
@@ -56,10 +58,18 @@ BEGIN
                                ELSE 1
                              END
                              
-      FROM dbo.custagent WITH(NOLOCK)
+     FROM dbo.custagent WITH(NOLOCK)
      WHERE custid = @Recommend
 
+	-- For MuayThai
+    DECLARE @bitmapOrder INT 
+    SET @bitmapOrder = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 44 AND Bettype = 3)
+    
     --temp custinfo
+    DECLARE @HideMuayThai INT = 0
+    
+    SET @HideMuayThai = (SELECT TOP 1 SettingStatus FROM ProductSettingDetail WITH (NOLOCK) WHERE sportType =44 AND BetType = 3 AND SettingType = 4)
+    
     SELECT custinfo.custid, currency, roleid, autosuspend, reject, closed,
            MatchLimit, VirtualMultiplier, Enabled, DisableHorseRacing,
 		   DisableFinancial, DisableCasino, SyncCasino, DisableOutright,
@@ -69,11 +79,17 @@ BEGIN
 		   SyncLiveCasino, DisableVirtualSports, DoubleCommLosing, Recommend,
 		   HideVirtualSports, DisableCasinoBonus, DisableHRFixedOdds, HideKeno,
 		   DisableEsports, DisableGoldDeluxe, HideGoldDeluxe,DisableColossusBet, HideColossusBet
-      INTO #custinfo
-      FROM dbo.custinfo WITH(NOLOCK)
+		   -- For MuayThai
+		   ,dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder)  AS DisableMuayThai
+		   
+		   ,CASE WHEN @HideMuayThai = 0 AND dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder) = 0 THEN 0 ELSE 1 END AS HideMuayThai
+		   
+    INTO #custinfo
+    FROM dbo.custinfo WITH(NOLOCK)
+		LEFT JOIN CustProductStatus cps WITH (NOLOCK) ON cps.CustID = custinfo.custid  
      WHERE Recommend = @Recommend
        AND roleid = 1
-       AND (@custid is null or custid = @custid)
+       AND (@custid is null or custinfo.custid = @custid)
        AND enabled = case
                        when coalesce(@Closed, @Suspended) is not null then 1
                        else coalesce(@enabled, enabled)
@@ -212,6 +228,9 @@ BEGIN
 		   ISNULL(ci.DisableColossusBet,1) AS DisableColossusBet,
 		   ISNULL(ci.HideColossusBet,1) AS HideColossusBet,
 		   
+		   ISNULL(ci.DisableMuayThai,0) AS DisableMuayThai,
+		   ISNULL(ci.HideMuayThai,0) AS HideMuayThai,
+		   
 	       --transfer condition
 	       @TransferOption disableTransfer,	
 	       ROW_NUMBER() OVER (ORDER BY ci.enabled desc,
@@ -226,6 +245,7 @@ BEGIN
 			
       FROM dbo.customer AS cu with(NOLOCK)
 		INNER JOIN #Custinfo ci with(nolock) on cu.custid = ci.custid
+		
 		 LEFT JOIN #CustSetting as cs with(NOLOCK) on cu.custid = cs.custid
 		 LEFT JOIN #custsetting3rd cs3 with(nolock) on cu.custid = cs3.custid
 		 LEFT JOIN dbo.CustGameType cg WITH(NOLOCK) ON cg.CustID = ci.custid
@@ -248,6 +268,7 @@ BEGIN
 			   ci.SyncLiveCasino, ci.DisableVirtualSports, ci.DoubleCommLosing,
 			   ci.HideVirtualSports, ci.DisableCasinoBonus, ci.DisableHRFixedOdds,
 			   ci.HideKeno, ci.DisableEsports, ci.HideGoldDeluxe, ci.DisableGoldDeluxe,ci.DisableColossusBet,ci.HideColossusBet,AC.playerdiscount
+			   , ci.DisableMuayThai, ci.HideMuayThai
 			   
 
     DROP TABLE #Custinfo,
@@ -258,3 +279,5 @@ GO
 GRANT EXECUTE ON [dbo].[EAS_CustomerSelByAg] TO [bodbExtAccNet] AS [dbo]
 GO
 GRANT VIEW DEFINITION ON [dbo].[EAS_CustomerSelByAg] TO [vnteam] AS [dbo]
+
+
