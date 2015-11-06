@@ -82,7 +82,7 @@ BEGIN
 		   -- For MuayThai
 		   ,dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder)  AS DisableMuayThai
 		   
-		   ,CASE WHEN @HideMuayThai = 0 AND dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder) = 0 THEN 0 ELSE 1 END AS HideMuayThai
+		   ,CAST(CASE WHEN @HideMuayThai = 0 AND dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder) = 0 THEN 0 ELSE 1 END AS BIT) AS HideMuayThai
 		   
     INTO #custinfo
     FROM dbo.custinfo WITH(NOLOCK)

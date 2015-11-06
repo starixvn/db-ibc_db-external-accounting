@@ -169,7 +169,7 @@ BEGIN
 						   DisableCasinoBonus, DisableHRFixedOdds, HideKeno, DisableEsports, DisableGoldDeluxe, HideGoldDeluxe,DisableColossusBet,HideColossusBet
 						   -- For MuayThai
 						   ,dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder)  AS DisableMuayThai
-						   ,CASE WHEN @HideMuayThai = 0 AND ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder),1) = 0 THEN 0 ELSE 1 END AS HideMuayThai
+						   ,CAST(CASE WHEN @HideMuayThai = 0 AND ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder),1) = 0 THEN 0 ELSE 1 END AS BIT) AS HideMuayThai
 		   
   					  FROM dbo.custinfo c with(NOLOCK)
   					  LEFT JOIN CustProductStatus cps WITH (NOLOCK) ON cps.CustID = c.custid  
