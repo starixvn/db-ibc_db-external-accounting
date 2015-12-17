@@ -28,6 +28,7 @@ Revisions:
 	- 20150825@Helen: Colossus Bet - [Redmine: #41264]
 	- 20150904@Helen: commission setting for MO [Redmine #41470]
 	- 20151028@Helen: Member Information to support Muay Thai  [Redmine: #45496]
+	- 20151209@Helen: Member information for Cockfighting [Redmine: #48133]
 	
 exec EAS_CustomerSelByAg @Recommend=9367272,@Custid=default,@Enabled=default,@Closed=default,@Suspended=default	
 */  
@@ -61,29 +62,44 @@ BEGIN
      FROM dbo.custagent WITH(NOLOCK)
      WHERE custid = @Recommend
 
-	-- For MuayThai
-    DECLARE @bitmapOrder INT 
-    SET @bitmapOrder = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 44 AND Bettype = 3)
+	-- For DCS
+    DECLARE @bitmapOrder_MuayThai INT , @bitmapOrder_CockFighting INT
     
-    --temp custinfo
-    DECLARE @HideMuayThai INT = 0
+    SET @bitmapOrder_MuayThai = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 44 AND Bettype = 3)
+    SET @bitmapOrder_CockFighting = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 206 AND Bettype = 1003)
     
-    SET @HideMuayThai = (SELECT TOP 1 SettingStatus FROM ProductSettingDetail WITH (NOLOCK) WHERE sportType =44 AND BetType = 3 AND SettingType = 4)
+    DECLARE @IsHidden_MuayThai INT = 1
+    DECLARE @IsHidden_CockFighting INT = 1
     
+    DECLARE @SportBook2 INT = 16
+    DECLARE @CockFighting INT = 19
+    
+	IF EXISTS( SELECT 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@SportBook2,4))
+	BEGIN
+		SET @IsHidden_MuayThai = 0
+	END
+	IF EXISTS( SELECT 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@CockFighting,4))
+	BEGIN
+		SET @IsHidden_CockFighting = 0
+	END
+
     SELECT custinfo.custid, currency, roleid, autosuspend, reject, closed,
-           MatchLimit, VirtualMultiplier, Enabled, DisableHorseRacing,
-		   DisableFinancial, DisableCasino, SyncCasino, DisableOutright,
-		   DisableOpenTote, DisableBingo, DisableNumber, SyncBingo,
-		   disable151_au, disable152_uk, disable152_au, disable153_au,
-		   isAutoResetP2P, DisableP2P, DisableFunP2P, DisableLiveCasino,
-		   SyncLiveCasino, DisableVirtualSports, DoubleCommLosing, Recommend,
-		   HideVirtualSports, DisableCasinoBonus, DisableHRFixedOdds, HideKeno,
-		   DisableEsports, DisableGoldDeluxe, HideGoldDeluxe,DisableColossusBet, HideColossusBet
-		   -- For MuayThai
-		   ,dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder)  AS DisableMuayThai
-		   
-		   ,CAST(CASE WHEN @HideMuayThai = 0 AND dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder) = 0 THEN 0 ELSE 1 END AS BIT) AS HideMuayThai
-		   
+			MatchLimit, VirtualMultiplier, Enabled, DisableHorseRacing,
+			DisableFinancial, DisableCasino, SyncCasino, DisableOutright,
+			DisableOpenTote, DisableBingo, DisableNumber, SyncBingo,
+			disable151_au, disable152_uk, disable152_au, disable153_au,
+			isAutoResetP2P, DisableP2P, DisableFunP2P, DisableLiveCasino,
+			SyncLiveCasino, DisableVirtualSports, DoubleCommLosing, Recommend,
+			HideVirtualSports, DisableCasinoBonus, DisableHRFixedOdds, HideKeno,
+			DisableEsports, DisableGoldDeluxe, HideGoldDeluxe,DisableColossusBet, HideColossusBet,
+
+			-- For MuayThai
+			ISNULL(dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder_MuayThai),1) AS DisableMuayThai,
+			CAST(CASE WHEN @IsHidden_MuayThai = 0 AND ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder_MuayThai),1) = 0 THEN 0 ELSE 1 END AS BIT) AS HideMuayThai,
+			-- For CockFighting
+			ISNULL(dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder_CockFighting),1) AS DisableCockFighting,
+			CAST(CASE WHEN @IsHidden_CockFighting = 0 AND ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder_CockFighting),1) = 0 THEN 0 ELSE 1 END AS BIT) AS HideCockFighting
+			
     INTO #custinfo
     FROM dbo.custinfo WITH(NOLOCK)
 		LEFT JOIN CustProductStatus cps WITH (NOLOCK) ON cps.CustID = custinfo.custid  
@@ -228,9 +244,11 @@ BEGIN
 		   ISNULL(ci.DisableColossusBet,1) AS DisableColossusBet,
 		   ISNULL(ci.HideColossusBet,1) AS HideColossusBet,
 		   
-		   ISNULL(ci.DisableMuayThai,0) AS DisableMuayThai,
-		   ISNULL(ci.HideMuayThai,0) AS HideMuayThai,
+		   ISNULL(ci.DisableMuayThai,1) AS DisableMuayThai,
+		   ISNULL(ci.HideMuayThai,1) AS HideMuayThai,
 		   
+		   ISNULL(ci.DisableCockFighting,1) AS DisableCockFighting,
+		   ISNULL(ci.HideCockFighting,1) AS HideCockFighting,
 	       --transfer condition
 	       @TransferOption disableTransfer,	
 	       ROW_NUMBER() OVER (ORDER BY ci.enabled desc,
@@ -268,7 +286,7 @@ BEGIN
 			   ci.SyncLiveCasino, ci.DisableVirtualSports, ci.DoubleCommLosing,
 			   ci.HideVirtualSports, ci.DisableCasinoBonus, ci.DisableHRFixedOdds,
 			   ci.HideKeno, ci.DisableEsports, ci.HideGoldDeluxe, ci.DisableGoldDeluxe,ci.DisableColossusBet,ci.HideColossusBet,AC.playerdiscount
-			   , ci.DisableMuayThai, ci.HideMuayThai
+			   , ci.DisableMuayThai, ci.HideMuayThai,ci.DisableCockFighting,ci.HideCockFighting
 			   
 
     DROP TABLE #Custinfo,
