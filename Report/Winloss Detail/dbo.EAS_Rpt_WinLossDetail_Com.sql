@@ -22,6 +22,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com]
 	@showKeno	BIT = 0,
 	@showGD		BIT = 0,
 	@showCB		BIT = 0,
+	@showCF     BIT = 0,
 	@BalanceUpDay SMALLDATETIME	
 AS
 
@@ -235,7 +236,19 @@ IF @showCB = 1
 		--Sum_winloss
 		INSERT INTO @TmpCondSumWL(sporttype, bettype)
 		VALUES(204, 0)
-END	
+END
+IF @showCF = 1
+	BEGIN
+		-- bettrans
+		INSERT INTO @TmpCond(Sporttype, Bettype) 
+		SELECT	206 AS sporttype, Bettype 
+		FROM	@SportBettype  
+		WHERE	ProductId = 19
+
+		--Sum_winloss
+		INSERT INTO @TmpCondSumWL(sporttype, bettype)
+		VALUES(206, 1003)
+END
 
 IF @Todate >= @BalanceUpDay
 BEGIN 
@@ -395,3 +408,4 @@ GO
 GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [bodbExtAccNet] AS [dbo]
 GO
 GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [vnteam] AS [dbo]
+GO
