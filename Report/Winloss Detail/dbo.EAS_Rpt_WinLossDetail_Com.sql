@@ -40,6 +40,7 @@ Revisions:
 	- 20150502@Lukas: Revise SP to insert into Temporary table (#Sum_WinLoss_Old) of a remote table (DBSUM.bodb_Summary.dbo.Sum_WinLoss_Old) to enhance performance (HotFix #35279)
 	- 20150528@Sophia: Apply Gold Deluxe and Sport bettype Matrix [Redmine: #36775]
 	- 20150907@Winnie: Add CB [Redmine: #43099]
+	- 20151217@Percy: Add Cockfighting [Redmine: #48836]
 */
 
 SET NOCOUNT ON
