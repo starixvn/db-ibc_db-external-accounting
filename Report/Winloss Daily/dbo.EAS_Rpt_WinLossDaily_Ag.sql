@@ -50,7 +50,7 @@ BEGIN
 			EXEC bodb02.dbo.Acc_SportBettypeMatrix_Sel @mode = 4
 		
 		DELETE @SportBettype WHERE ProductID NOT IN (6, 11, 17) -- bettransRNG
-		DELETE @SportBettype WHERE Bettype = 71
+		DELETE @SportBettype WHERE Bettype = 71 -- old bettype RNG
 		
 		SELECT  custID, username,
 				SUM(totalTO) AS totalTO,
