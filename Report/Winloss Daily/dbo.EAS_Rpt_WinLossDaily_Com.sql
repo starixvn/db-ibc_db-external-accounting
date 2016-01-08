@@ -56,7 +56,7 @@ BEGIN
 					AND b.bettype < 19999
 					AND b.statusID NOT IN (101,102,103,121)
 			GROUP BY b.SRecommend, t.username
-			ORDER BY b.username
+			ORDER BY t.username
 	END
 	ELSE
 	BEGIN

@@ -103,7 +103,7 @@ BEGIN
 					SUM(b.mwinlost + b.acomm - b.comm) MAgWinlost,
 					SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
 
-			FROM	bodb02.dbo.Bettrans b WITH (NOLOCK)
+			FROM	bodb02.dbo.BettransRNG b WITH (NOLOCK)
 					INNER JOIN bodb02.dbo.custinfo ci WITH (NOLOCK) ON b.Mrecommend = ci.custID 
 			WHERE	b.winlostdate = @winlostdate
 					AND b.srecommend = @CustID 

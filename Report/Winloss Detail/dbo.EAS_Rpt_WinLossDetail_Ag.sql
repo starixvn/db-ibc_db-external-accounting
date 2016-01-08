@@ -175,7 +175,7 @@ BEGIN
 		    and Recommend=@CustID
 		    and ruben=1 
 		    and (@memberID is null or b.custid = @memberID)
-	    GROUP BY CustID, CASE WHEN b.bettype IN (SELECT bettype FROM @SportBettype WHERE ProductID = 6) THEN 71 ELSE b.bettype END
+	    GROUP BY CustID, CASE WHEN b.bettype = 71 OR b.bettype BETWEEN 2101 AND 2399 THEN 71 ELSE b.bettype END
 
 	if @BalanceUpDay < @FromDate
 	    select @BalanceUpDay=@FromDate

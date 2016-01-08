@@ -273,7 +273,7 @@ BEGIN
 		    b.ruben = 1 and
 		    b.statusID not in (101, 102, 103)   and 
 		    b.bettype <> 1000
-	    GROUP BY SRecommend, CASE WHEN b.bettype IN (SELECT bettype FROM @SportBettype WHERE ProductID = 6) THEN 71 ELSE b.bettype END
+	    GROUP BY SRecommend, CASE WHEN b.bettype = 71 OR b.bettype BETWEEN 2101 AND 2399 THEN 71 ELSE b.bettype END
 	    
 	-- seperate P2P to improve performance
 	INSERT INTO #ComWinLossDetails
