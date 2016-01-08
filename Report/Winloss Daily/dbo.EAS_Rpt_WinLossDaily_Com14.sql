@@ -31,7 +31,7 @@ BEGIN
 	SELECT custID,username 
 	FROM bodb02.dbo.custinfo (NOLOCK)
 	WHERE 
-		custid in (SELECT custid from bodb_AGE.dbo.Acc_CustGroup WITH(nolock) WHERE GroupName = @GroupName)
+		custid in (SELECT custid from DBAGE.bodb_AGE.dbo.Acc_CustGroup WITH(nolock) WHERE GroupName = @GroupName)
 		AND (@custid IS NULL OR custid=@custid)	
 
 	SELECT	b.SRecommend CustID,

@@ -51,7 +51,7 @@ BEGIN
 		INSERT INTO @SportBettype
 			EXEC bodb02.dbo.Acc_SportBettypeMatrix_Sel @mode = 4
 		
-		DELETE @SportBettype WHERE ProductID NOT IN (6, 11, 17) -- bettransRNG
+		DELETE @SportBettype WHERE ProductID NOT IN (6, 11, 17) -- 17: bettransRNG, 11: bettransLC
 		DELETE @SportBettype WHERE Bettype = 71 -- old bettype RNG
 		 
 		SELECT  CustID, username,
@@ -104,6 +104,30 @@ BEGIN
 					SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
 
 			FROM	bodb02.dbo.BettransRNG b WITH (NOLOCK)
+					INNER JOIN bodb02.dbo.custinfo ci WITH (NOLOCK) ON b.Mrecommend = ci.custID 
+			WHERE	b.winlostdate = @winlostdate
+					AND b.srecommend = @CustID 
+					AND (@masterID is null or b.mrecommend = @masterID)
+					AND b.gameID < 19999
+					AND b.statusID NOT IN (0,1,101,102,103,121)
+			GROUP BY b.MRecommend, ci.username
+			
+			UNION ALL -- bettransLC
+			
+			SELECT	b.MRecommend CustID,
+					ci.username,
+					SUM(ABS(b.stake)) totalTO,
+					SUM(ABS(b.stake)*(1 - b.tpositiontaking)) ComTO,
+					SUM(ABS(b.stake)*b.spositiontaking) SAgTO,
+					SUM(ABS(b.stake)*b.mpositiontaking) MAgTO,
+					SUM(ABS(b.stake)*b.apositiontaking) AgTO,
+					
+					-SUM(b.winlost - b.actual_stake + b.awinlost + b.mwinlost + b.swinlost + b.scomm) ComWinlost,
+					SUM(b.swinlost + b.scomm - b.acomm) SAgWinlost,
+					SUM(b.mwinlost + b.acomm - b.comm) MAgWinlost,
+					SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
+
+			FROM	bodb02.dbo.BettransLC b WITH (NOLOCK)
 					INNER JOIN bodb02.dbo.custinfo ci WITH (NOLOCK) ON b.Mrecommend = ci.custID 
 			WHERE	b.winlostdate = @winlostdate
 					AND b.srecommend = @CustID 
