@@ -1,10 +1,3 @@
-USE [bodb_EAS]
-GO
-/****** Object:  StoredProcedure [dbo].[EAS_Rpt_WinLossDetail_MAg_xtest]    Script Date: 3/11/2014 10:27:40 AM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_MAg]
 	@custid int ,--mrecommend
 	@Agentid int =  Null,
@@ -39,6 +32,7 @@ Revisions:
 	- 20150528@Sophia: Apply Gold Deluxe and Sport bettype Matrix [Redmine: #36775]
 	- 20150907@Winnie: Add CB [Redmine: #43099]
 	- 20151217@Percy: Add Cockfighting [Redmine: #48836]
+	- 20160107@Percy: Include new bettype range of the new RNG Casino [Redmine: #48286]
 */
 
 SET NOCOUNT ON
@@ -63,7 +57,7 @@ IF @ShowCasino = 1
 BEGIN
 	--Sum_winloss
 	INSERT INTO @TmpCondSumWL(sporttype, Bettype)
-	VALUES(251,71)
+	VALUES(251,71), (208,0), (209,0), (210,0)
 END
 IF @ShowP2P = 1
 BEGIN
@@ -190,7 +184,7 @@ BEGIN
 		    AND ruben=1 
 		    AND mrecommend=@custid
 		    AND (@Agentid IS NULL OR b.recommend = @Agentid)
-	    GROUP BY Recommend,b.bettype
+	    GROUP BY Recommend, CASE WHEN b.bettype = 71 OR b.bettype BETWEEN 2101 AND 2399 THEN 71 ELSE b.bettype END
 	    
 	    		
 	if @BalanceUpDay < @FromDate

@@ -1,11 +1,3 @@
-USE [bodb_EAS]
-GO
-/****** Object:  StoredProcedure [dbo].[EAS_Rpt_WinLossDetail_Com]    Script Date: 4/20/2015 4:06:25 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCTHAI',--ACCTHAI or ACCINDO
 	@custid		INT = NULL,	
@@ -41,6 +33,7 @@ Revisions:
 	- 20150528@Sophia: Apply Gold Deluxe and Sport bettype Matrix [Redmine: #36775]
 	- 20150907@Winnie: Add CB [Redmine: #43099]
 	- 20151217@Percy: Add Cockfighting [Redmine: #48836]
+	- 20160107@Percy: Include new bettype range of the new RNG Casino [Redmine: #48286]
 */
 
 SET NOCOUNT ON
@@ -94,7 +87,7 @@ BEGIN
 
 	--Sum_winloss
 	INSERT INTO @TmpCondSumWL(sporttype, Bettype)
-	VALUES(251,71)
+	VALUES(251,71), (208,0), (209,0), (210,0)
 END
 IF @ShowP2P = 1
 BEGIN
@@ -280,7 +273,7 @@ BEGIN
 		    b.ruben = 1 and
 		    b.statusID not in (101, 102, 103)   and 
 		    b.bettype <> 1000
-	    GROUP BY SRecommend, b.bettype
+	    GROUP BY SRecommend, CASE WHEN b.bettype = 71 OR b.bettype BETWEEN 2101 AND 2399 THEN 71 ELSE b.bettype END
 	    
 	-- seperate P2P to improve performance
 	INSERT INTO #ComWinLossDetails
