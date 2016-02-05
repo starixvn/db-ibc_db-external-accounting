@@ -7,22 +7,23 @@ GO
 /****** Object:  Stored Procedure dbo.EAS_Rpt_WinLossDetail_Com    Script Date: 3/7/2016 2:06:05 PM ******/
 CREATE PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCTHAI',--ACCTHAI or ACCINDO
-	@custid		INT = NULL,	
-	@FromDate	SMALLDATETIME,
-	@ToDate		SMALLDATETIME,
-	@showSB		BIT=1,
-	@showCasino BIT=0,
-	@showP2P	BIT=0,
-	@showRB		BIT=0,	
-	@showNG		BIT=0,
-	@showBI		BIT=0,
-	@showVS		BIT=0,
+	@custid			INT = NULL,	
+	@FromDate		SMALLDATETIME,
+	@ToDate			SMALLDATETIME,
+	@showSB			BIT = 1,
+	@showCasino		BIT = 0,
+	@showP2P		BIT = 0,
+	@showRB			BIT = 0,	
+	@showNG			BIT = 0,
+	@showBI			BIT = 0,
 	@showLiveCasino BIT = 0,
-	@showKeno	BIT = 0,
-	@showGD		BIT = 0,
-	@showCB		BIT = 0,
-	@showCF     BIT = 0,
-	@BalanceUpDay SMALLDATETIME	
+	@showVS			BIT = 0,
+	@showKeno		BIT = 0,
+	@showGD			BIT = 0,
+	@showCB			BIT = 0,
+	@showCF			BIT = 0,
+	@showAB			BIT = 0,
+	@BalanceUpDay	SMALLDATETIME	
 AS
 
 /*
@@ -41,6 +42,7 @@ Revisions:
 	- 20150907@Winnie: Add CB [Redmine: #43099]
 	- 20151217@Percy: Add Cockfighting [Redmine: #48836]
 	- 20160107@Percy: Include new bettype range of the new RNG Casino [Redmine: #48286]
+	- 20160215@Percy: Support new product AllBet [Redmine: #50922]
 	- 20160225@Sophia: Add new column TurnoverNoDraw [Redmine: #51427]
 */
 
@@ -216,40 +218,52 @@ BEGIN
 END
 
 IF @showGD = 1
-	BEGIN
-		-- bettrans
-		INSERT INTO @TmpCond(Sporttype, Bettype) 
-		SELECT	255 AS sporttype, Bettype 
-		FROM	@SportBettype  
-		WHERE	ProductId = 12
+BEGIN
+	-- bettrans
+	INSERT INTO @TmpCond(Sporttype, Bettype) 
+	SELECT	255 AS sporttype, Bettype 
+	FROM	@SportBettype  
+	WHERE	ProductId = 12
 
-		--Sum_winloss
-		INSERT INTO @TmpCondSumWL(sporttype, bettype)
-		VALUES(255, 0)
+	--Sum_winloss
+	INSERT INTO @TmpCondSumWL(sporttype, bettype)
+	VALUES(255, 0)
 END	
 IF @showCB = 1
-	BEGIN
-		-- bettrans
-		INSERT INTO @TmpCond(Sporttype, Bettype) 
-		SELECT	204 AS sporttype, Bettype 
-		FROM	@SportBettype  
-		WHERE	ProductId = 15
+BEGIN
+	-- bettrans
+	INSERT INTO @TmpCond(Sporttype, Bettype) 
+	SELECT	204 AS sporttype, Bettype 
+	FROM	@SportBettype  
+	WHERE	ProductId = 15
 
-		--Sum_winloss
-		INSERT INTO @TmpCondSumWL(sporttype, bettype)
-		VALUES(204, 0)
+	--Sum_winloss
+	INSERT INTO @TmpCondSumWL(sporttype, bettype)
+	VALUES(204, 0)
 END
 IF @showCF = 1
-	BEGIN
-		-- bettrans
-		INSERT INTO @TmpCond(Sporttype, Bettype) 
-		SELECT	206 AS sporttype, Bettype 
-		FROM	@SportBettype  
-		WHERE	ProductId = 19
+BEGIN
+	-- bettrans
+	INSERT INTO @TmpCond(Sporttype, Bettype) 
+	SELECT	206 AS sporttype, Bettype 
+	FROM	@SportBettype  
+	WHERE	ProductId = 19
 
-		--Sum_winloss
-		INSERT INTO @TmpCondSumWL(sporttype, bettype)
-		VALUES(206, 1003)
+	--Sum_winloss
+	INSERT INTO @TmpCondSumWL(sporttype, bettype)
+	VALUES(206, 1003)
+END
+IF @showAB = 1
+BEGIN
+	-- bettrans
+	INSERT INTO @TmpCond(Sporttype, Bettype) 
+	SELECT	211 AS sporttype, Bettype 
+	FROM	@SportBettype  
+	WHERE	ProductId = 21
+
+	--Sum_winloss
+	INSERT INTO @TmpCondSumWL(sporttype, bettype)
+	VALUES(211, 0)
 END
 
 IF @Todate >= @BalanceUpDay
