@@ -248,7 +248,7 @@ BEGIN
 			   ci.SyncLiveCasino, ci.DisableVirtualSports, ci.DoubleCommLosing, ci.HideVirtualSports,
 			   ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno, ci.DisableEsports,
 			   ci.DisableGoldDeluxe, ci.HideGoldDeluxe, ci.DisableColossusBet, ci.HideColossusBet,AC.CommRate,ac.CustId,
-			   cps.bitmapIsDisabled,cps.bitmapIsHidden, cps.bitmapHasSynced
+			   cps.bitmapIsDisabled,cps.bitmapIsHidden, cps.bitmapHasSynced,cdm.Discount,cu.[site]
 			   
 END
 GO
