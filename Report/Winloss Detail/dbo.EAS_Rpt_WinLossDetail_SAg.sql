@@ -235,7 +235,7 @@ BEGIN
 	
 	
 	
-	SELECT custid,  mrecommend, turnover, winlost, awinlost, mwinlost, swinlost, playercomm, comm, acomm, scomm, grosscomm, sporttype, bettype 
+	SELECT custid,  mrecommend, turnover, TurnoverNoDraw, winlost, awinlost, mwinlost, swinlost, playercomm, comm, acomm, scomm, grosscomm, sporttype, bettype 
 		INTO #Sum_WinLoss_Old
 	FROM DBSUM.bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK)
 	WHERE winlostdate BETWEEN @fromdate AND @ToDate			
