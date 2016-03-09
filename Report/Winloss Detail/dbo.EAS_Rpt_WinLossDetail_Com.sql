@@ -1,4 +1,11 @@
-ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com] 	
+
+SET QUOTED_IDENTIFIER ON 
+GO
+SET ANSI_NULLS ON 
+GO
+
+/****** Object:  Stored Procedure dbo.EAS_Rpt_WinLossDetail_Com    Script Date: 3/7/2016 2:06:05 PM ******/
+CREATE PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCTHAI',--ACCTHAI or ACCINDO
 	@custid		INT = NULL,	
 	@FromDate	SMALLDATETIME,
@@ -319,7 +326,7 @@ BEGIN
 	    SELECT
 		    CustID,			
 		    sum(TurnOver), -- TurnOver
-			SUM(TurnoverNoDraw) as TurnoverNoDraw,
+			SUM(TunroverNoDraw) as TurnoverNoDraw,
 		    sum(grosscomm) as GrossComm,
 		    sum(winlost), --MemberWinlost
 		    sum(playercomm), -- PlayerComm
@@ -349,7 +356,7 @@ BEGIN
 		select @ToDate = DATEADD(dd, -1, @BalanceUpDay)
 	
 	
-	SELECT custid,  srecommend, turnover, TurnoverNoDraw, winlost, awinlost, mwinlost, swinlost, playercomm, comm, acomm, scomm, grosscomm, sporttype, bettype 
+	SELECT custid,  srecommend, turnover, TunroverNoDraw as TurnoverNoDraw, winlost, awinlost, mwinlost, swinlost, playercomm, comm, acomm, scomm, grosscomm, sporttype, bettype 
 		INTO #Sum_WinLoss_Old
 	FROM DBSUM.bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK)
 	WHERE winlostdate BETWEEN @fromdate AND @ToDate			
@@ -410,8 +417,17 @@ order by c.Username
 
 DROP TABLE #ComWinLossDetails
 
+
 GO
-GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [bodbExtAccNet] AS [dbo]
+
+SET QUOTED_IDENTIFIER OFF 
 GO
-GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [vnteam] AS [dbo]
+SET ANSI_NULLS ON 
 GO
+
+
+GO 
+ GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [bodbExtAccNet]
+GO 
+ GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [vnteam]
+GO 

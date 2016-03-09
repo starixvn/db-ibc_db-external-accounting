@@ -1,4 +1,11 @@
-ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_MAg]
+
+SET QUOTED_IDENTIFIER ON 
+GO
+SET ANSI_NULLS ON 
+GO
+
+/****** Object:  Stored Procedure dbo.EAS_Rpt_WinLossDetail_MAg    Script Date: 3/7/2016 2:06:05 PM ******/
+CREATE PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_MAg]
 	@custid int ,--mrecommend
 	@Agentid int =  Null,
 	@FromDate smalldatetime,
@@ -199,7 +206,7 @@ BEGIN
 	    SELECT
 		    CustID,			
 		    sum(ABS(TurnOver)) as TurnOver,
-			SUM(ABS(TurnoverNoDraw)) as TurnoverNoDraw,
+			SUM(ABS(TunroverNoDraw)) as TurnoverNoDraw,
 		    sum(grosscomm) as GrossComm,
 		    sum(winlost), --MemberWinlost
 		    sum(playercomm), -- PlayerComm
@@ -230,7 +237,7 @@ BEGIN
 	    SELECT
 		    CustID,			
 		    sum(ABS(TurnOver)) as TurnOver,
-			SUM(ABS(TurnoverNoDraw)) as TurnoverNoDraw,
+			SUM(ABS(TunroverNoDraw)) as TurnoverNoDraw,
 		    sum(grosscomm) as GrossComm,
 		    sum(winlost), --MemberWinlost
 		    sum(playercomm), -- PlayerComm
@@ -319,8 +326,17 @@ FROM
     
 WHERE wl.RowNum between @RowStart and @RowEnd
 
+
 GO
-GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDetail_MAg] TO [bodbExtAccNet]
+
+SET QUOTED_IDENTIFIER OFF 
 GO
-GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDetail_MAg] TO [vnteam]
+SET ANSI_NULLS ON 
 GO
+
+
+GO 
+ GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDetail_MAg] TO [bodbExtAccNet]
+GO 
+ GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDetail_MAg] TO [vnteam]
+GO 
