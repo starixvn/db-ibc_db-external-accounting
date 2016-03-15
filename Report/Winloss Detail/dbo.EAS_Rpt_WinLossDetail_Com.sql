@@ -1,11 +1,4 @@
-
-SET QUOTED_IDENTIFIER ON 
-GO
-SET ANSI_NULLS ON 
-GO
-
-/****** Object:  Stored Procedure dbo.EAS_Rpt_WinLossDetail_Com    Script Date: 3/7/2016 2:06:05 PM ******/
-CREATE PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com] 	
+ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCTHAI',--ACCTHAI or ACCINDO
 	@custid			INT = NULL,	
 	@FromDate		SMALLDATETIME,

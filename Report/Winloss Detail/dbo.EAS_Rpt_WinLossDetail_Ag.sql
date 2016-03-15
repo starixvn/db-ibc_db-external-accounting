@@ -1,4 +1,4 @@
-
+ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Ag]
 	@CustID			INT,--recommend
 	@memberID		INT = NULL,
 	@FromDate		SMALLDATETIME,
