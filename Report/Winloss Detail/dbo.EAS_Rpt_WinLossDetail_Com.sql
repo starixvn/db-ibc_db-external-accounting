@@ -1,4 +1,11 @@
-ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com] 	
+
+SET QUOTED_IDENTIFIER ON 
+GO
+SET ANSI_NULLS ON 
+GO
+
+/****** Object:  Stored Procedure dbo.EAS_Rpt_WinLossDetail_Com    Script Date: 3/7/2016 2:06:05 PM ******/
+CREATE PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCTHAI',--ACCTHAI or ACCINDO
 	@custid		INT = NULL,	
 	@FromDate	SMALLDATETIME,
@@ -34,6 +41,7 @@ Revisions:
 	- 20150907@Winnie: Add CB [Redmine: #43099]
 	- 20151217@Percy: Add Cockfighting [Redmine: #48836]
 	- 20160107@Percy: Include new bettype range of the new RNG Casino [Redmine: #48286]
+	- 20160225@Sophia: Add new column TurnoverNoDraw [Redmine: #51427]
 */
 
 SET NOCOUNT ON
@@ -46,7 +54,7 @@ FROM DBAGE.bodb_AGE.dbo.Acc_CustGroup WITH(NOLOCK)
 WHERE (@custid IS NULL OR custid = @custid)
 	AND GroupName = @GroupName
 
-CREATE TABLE #ComWinLossDetails (CustID int, Turnover money, GrossComm money, MemberWinLost money, 
+CREATE TABLE #ComWinLossDetails (CustID int, Turnover money, TurnoverNoDraw MONEY, GrossComm money, MemberWinLost money, 
 	PlayerComm money, MemberTotal money, AgWinLost money, AgComm money, AgTotal money, 
 	MAgWinLost money, MAgComm money, MAgTotal money, SAgWinLost money, SAgComm money, SAgTotal money, Company money)
 
@@ -250,6 +258,11 @@ BEGIN
 	    SELECT
 		    SRecommend,			
 			SUM(case when b.liveawayscore = 0 and b.bettype in(33,43) then b.stake/2 else ABS(b.stake) end),	
+			 SUM(CASE WHEN b.liveawayscore = 0 and b.bettype in(33,43) THEN ABS(b.stake)/2 
+					WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
+					WHEN b.StatusID = 111 AND s.ProductId = 1 THEN 0 
+					ELSE ABS(b.stake) 
+					END) AS TurnoverNoDraw,
 		    --sum(case when b.bettype = 1000 THEN oddsspread else case when tpositiontaking=1 then 0 else scomm/(1-tpositiontaking) end end) as GrossComm,
 		    sum(case when tpositiontaking=1 then 0 else scomm/(1-tpositiontaking) end) as GrossComm,
 		    sum(winlost-actual_stake), --MemberWinlost
@@ -266,7 +279,9 @@ BEGIN
 		    isnull(sum(swinlost), 0) + isnull(sum(scomm), 0)-sum(acomm), --SAgTotal
 		    -(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost-actual_stake), 0)) --Company				
 	    FROM
-		    bodb02.dbo.bettrans b WITH (NOLOCK) INNER JOIN @TmpCond t ON b.bettype = t.bettype
+		    bodb02.dbo.bettrans b WITH (NOLOCK) 
+			INNER JOIN @TmpCond t ON b.bettype = t.bettype
+			LEFT JOIN @SportBettype s ON b.bettype = s.Bettype
 	    WHERE
 		    b.winlostdate between @FromDate and @todate and
 		    b.srecommend in (SELECT custID FROM @tmpSuperList) and
@@ -279,7 +294,8 @@ BEGIN
 	INSERT INTO #ComWinLossDetails
 	    SELECT
 		    SRecommend,			
-			SUM(case when b.liveawayscore = 0 and b.bettype in(33,43) then b.stake/2 else ABS(b.stake) end),	
+			SUM(ABS(b.stake)) as TurnOver,
+			SUM(ABS(b.stake)) as TurnoverNoDraw,	
 		    sum(case when b.bettype = 1000 THEN oddsspread else case when tpositiontaking=1 then 0 else scomm/(1-tpositiontaking) end end) as GrossComm,
 		    sum(winlost-actual_stake), --MemberWinlost
 		    sum(playercomm), -- PlayerComm
@@ -310,6 +326,7 @@ BEGIN
 	    SELECT
 		    CustID,			
 		    sum(TurnOver), -- TurnOver
+			SUM(TunroverNoDraw) as TurnoverNoDraw,
 		    sum(grosscomm) as GrossComm,
 		    sum(winlost), --MemberWinlost
 		    sum(playercomm), -- PlayerComm
@@ -339,7 +356,7 @@ BEGIN
 		select @ToDate = DATEADD(dd, -1, @BalanceUpDay)
 	
 	
-	SELECT custid,  srecommend, turnover, winlost, awinlost, mwinlost, swinlost, playercomm, comm, acomm, scomm, grosscomm, sporttype, bettype 
+	SELECT custid,  srecommend, turnover, TunroverNoDraw as TurnoverNoDraw, winlost, awinlost, mwinlost, swinlost, playercomm, comm, acomm, scomm, grosscomm, sporttype, bettype 
 		INTO #Sum_WinLoss_Old
 	FROM DBSUM.bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK)
 	WHERE winlostdate BETWEEN @fromdate AND @ToDate			
@@ -350,6 +367,7 @@ BEGIN
 	    SELECT
 		    CustID,			
 		    sum(TurnOver), -- TurnOver
+			SUM(TurnoverNoDraw) as TurnoverNoDraw,
 		    sum(grosscomm) as GrossComm,
 		    sum(winlost), --MemberWinlost
 		    sum(playercomm), -- PlayerComm
@@ -378,6 +396,7 @@ SELECT
 	w.CustID, 
 	c.UserName, 
 	sum(TurnOver) as Turnover,
+	SUM(TurnoverNoDraw) as TurnoverNoDraw,
 	sum(GrossComm) as GrossComm,
 	sum(MemberWinLost) as MemberWinlost,
 	sum(PlayerComm) as PlayerComm,
@@ -398,8 +417,17 @@ order by c.Username
 
 DROP TABLE #ComWinLossDetails
 
+
 GO
-GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [bodbExtAccNet] AS [dbo]
+
+SET QUOTED_IDENTIFIER OFF 
 GO
-GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [vnteam] AS [dbo]
+SET ANSI_NULLS ON 
 GO
+
+
+GO 
+ GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [bodbExtAccNet]
+GO 
+ GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [vnteam]
+GO 
