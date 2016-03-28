@@ -214,7 +214,7 @@ BEGIN
 	                                  isnull(ci.reject, 0), cu.username) as RowNumber
 				                                  
 	FROM dbo.customer AS cu with(NOLOCK)
-		INNER JOIN (SELECT c.custid, currency, roleid, autosuspend, reject,
+		INNER JOIN (SELECT c.custid, c.currency, roleid, autosuspend, reject,
 						   closed, MatchLimit, VirtualMultiplier, Enabled, DisableHorseRacing,
 						   DisableFinancial, DisableCasino, SyncCasino, DisableOutright, DisableOpenTote,
 						   DisableBingo, DisableNumber, SyncBingo, disable151_au,
@@ -230,7 +230,12 @@ BEGIN
 							CAST(CASE WHEN @IsHidden_CockFighting = 0 AND ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder_CockFighting),1) = 0 THEN 0 ELSE 1 END AS BIT) AS HideCockFighting,
 							-- For AllBet
 							ISNULL(dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder_AllBet), 1) AS DisableAllBet,
-							CAST(CASE WHEN @IsHidden_AllBet = 0 AND ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder_AllBet), 1) = 0 THEN 0 ELSE 1 END AS BIT) AS HideAllBet,
+							CAST(	CASE	WHEN	@IsHidden_AllBet = 0 
+												AND	sbhsc.IsHidden = 0
+												AND	ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder_AllBet), 1) = 0 
+												THEN 0
+											ELSE 1 
+									END AS BIT) AS HideAllBet,
 							ISNULL(dbo.f_GetProductStatus(cps.bitmapHasSynced, @bitmapOrder_AllBet), 0) AS SyncedAllBet,
 
 						-- For Cricket
@@ -239,6 +244,10 @@ BEGIN
 
   					  FROM dbo.custinfo c with(NOLOCK)
   					  LEFT JOIN CustProductStatus cps WITH (NOLOCK) ON cps.CustID = c.custid  
+
+						-- Check isHidden AllBet
+						OUTER APPLY	dbo.f_CustSetting_SportBetTypeHiddenBySiteCurrency(c.custid, @AllBet) AS sbhsc
+		   
 					 WHERE SRecommend = @SRecommend
 					   AND roleid = 3
 					   AND (@Custid is null or c.Custid = @Custid)
