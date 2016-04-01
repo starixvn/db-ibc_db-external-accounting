@@ -198,6 +198,8 @@ BEGIN
 		   ISNULL(ci.DisableAllBet,1) AS DisableAllBet,
 		   ISNULL(ci.HideAllBet,1) AS HideAllBet,
 		   ISNULL(ci.SyncedAllBet,1) AS SyncedAllBet,
+		   ISNULL(ci.SyncedAllBetUpline,1) AS SyncedAllBetUpline,
+		   ISNULL(ci.SyncedAllBetDownline,1) AS SyncedAllBetDownline,
 		   
 		   -- For Myanmar Odds
 		   CASE WHEN ac.CustId IS NOT NULL THEN 1 ELSE 0 END AS IsMyanmarOdds,
@@ -237,6 +239,16 @@ BEGIN
 											ELSE 1 
 									END AS BIT) AS HideAllBet,
 							ISNULL(dbo.f_GetProductStatus(cps.bitmapHasSynced, @bitmapOrder_AllBet), 0) AS SyncedAllBet,
+							ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapHasSynced, @bitmapOrder_AllBet), 0) AS SyncedAllBetUpline,
+							CASE	WHEN EXISTS	(	SELECT	1
+													FROM		dbo.CustProductStatus AS cpsDownline WITH (NOLOCK)
+													INNER JOIN	dbo.custInfo AS ciDownline WITH (NOLOCK)
+															ON	ciDownline.custid = cpsDownline.CustID
+													WHERE	ciDownline.mrecommend = c.custid
+														AND	dbo.f_GetProductStatus(cpsDownline.bitmapHasSynced, @bitmapOrder_AllBet) = 0)
+										THEN 0
+									ELSE 1
+							END AS SyncedAllBetDownline,
 
 						-- For Cricket
 						ISNULL(dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder_Cricket),1) AS DisableCricket,
@@ -247,6 +259,13 @@ BEGIN
 
 						-- Check isHidden AllBet
 						OUTER APPLY	dbo.f_CustSetting_SportBetTypeHiddenBySiteCurrency(c.custid, @AllBet) AS sbhsc
+		
+						-- Upline Status
+						INNER JOIN	dbo.CustProductStatus AS cpsUpline WITH (NOLOCK)
+								ON	cpsUpline.CustID =	CASE	WHEN c.roleid = 1 THEN c.recommend
+																WHEN c.roleid = 2 THEN c.mrecommend
+																ELSE c.srecommend
+														END
 		   
 					 WHERE SRecommend = @SRecommend
 					   AND roleid = 3
@@ -287,7 +306,8 @@ BEGIN
 			   ci.DisableP2P, ci.DisableFunP2P, ci.DisableLiveCasino, ci.SyncLiveCasino,
 			   ci.DisableVirtualSports,ci.DoubleCommLosing, ci.HideVirtualSports,
 			   ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno, ci.DisableEsports,
-			   ci.DisableGoldDeluxe, ci.HideGoldDeluxe,ci.DisableColossusBet,ci.HideColossusBet,AC.CommRate,ac.CustId,ci.DisableMuayThai,ci.HideMuayThai,ci.DisableCockFighting,ci.HideCockFighting, ci.DisableAllBet, ci.HideAllBet, ci.SyncedAllBet,
+			   ci.DisableGoldDeluxe, ci.HideGoldDeluxe,ci.DisableColossusBet,ci.HideColossusBet,AC.CommRate,ac.CustId,ci.DisableMuayThai,ci.HideMuayThai,ci.DisableCockFighting,ci.HideCockFighting,
+			   ci.DisableAllBet, ci.HideAllBet, ci.SyncedAllBet, ci.SyncedAllBetUpline, ci.SyncedAllBetDownline,
 			   ci.DisableCricket, ci.HideCricket, cdm.Discount
 	
 END

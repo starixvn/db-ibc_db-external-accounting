@@ -197,6 +197,8 @@ BEGIN
 		   ISNULL(ci.DisableAllBet,1) AS DisableAllBet,
 		   ISNULL(ci.HideAllBet,1) AS HideAllBet,
 		   ISNULL(ci.SyncedAllBet,1) AS SyncedAllBet,
+		   ISNULL(ci.SyncedAllBetUpline,1) AS SyncedAllBetUpline,
+		   ISNULL(ci.SyncedAllBetDownline,1) AS SyncedAllBetDownline,
 
 		   --For Myanmar Odds
 		   CASE WHEN ac.CustId IS NOT NULL THEN 1 ELSE 0 END AS  IsMyanmarOdds,
@@ -237,6 +239,16 @@ BEGIN
 											ELSE 1 
 									END AS BIT) AS HideAllBet,
 							ISNULL(dbo.f_GetProductStatus(cps.bitmapHasSynced, @bitmapOrder_AllBet), 0) AS SyncedAllBet,
+							ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapHasSynced, @bitmapOrder_AllBet), 0) AS SyncedAllBetUpline,
+							CASE	WHEN EXISTS	(	SELECT	1
+													FROM		dbo.CustProductStatus AS cpsDownline WITH (NOLOCK)
+													INNER JOIN	dbo.custInfo AS ciDownline WITH (NOLOCK)
+															ON	ciDownline.custid = cpsDownline.CustID
+													WHERE	ciDownline.recommend = custInfo.custid
+														AND	dbo.f_GetProductStatus(cpsDownline.bitmapHasSynced, @bitmapOrder_AllBet) = 0)
+										THEN 0
+									ELSE 1
+							END AS SyncedAllBetDownline,
 
 							-- For Cricket
 							ISNULL(dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder_Cricket),1) AS DisableCricket,
@@ -245,8 +257,15 @@ BEGIN
 					  FROM dbo.custinfo WITH(NOLOCK) 						
 					  LEFT JOIN CustProductStatus cps WITH (NOLOCK) ON cps.CustID = custinfo.custid  
 
-					   -- Check isHidden AllBet
-					   OUTER APPLY	dbo.f_CustSetting_SportBetTypeHiddenBySiteCurrency(custInfo.custid, @AllBet) AS sbhsc
+						-- Check isHidden AllBet
+						OUTER APPLY	dbo.f_CustSetting_SportBetTypeHiddenBySiteCurrency(custInfo.custid, @AllBet) AS sbhsc
+		
+						-- Upline Status
+						INNER JOIN	dbo.CustProductStatus AS cpsUpline WITH (NOLOCK)
+								ON	cpsUpline.CustID =	CASE	WHEN custInfo.roleid = 1 THEN custInfo.recommend
+																WHEN custInfo.roleid = 2 THEN custInfo.mrecommend
+																ELSE custInfo.srecommend
+														END
 		   
 					 WHERE mRecommend = @MRecommend
 					   AND roleid = 2
@@ -290,7 +309,8 @@ BEGIN
 			ci.DisableLiveCasino, ci.SyncLiveCasino,  
 			ci.DisableVirtualSports,ci.DoubleCommLosing, ci.HideVirtualSports,	
 			ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno, ci.DisableEsports,
-			ci.DisableGoldDeluxe, ci.HideGoldDeluxe, ci.DisableColossusBet, ci.HideColossusBet,AC.CommRate,ac.CustId,ci.DisableMuayThai,ci.HideMuayThai,ci.DisableCockFighting,ci.HideCockFighting, ci.DisableAllBet, ci.HideAllBet, ci.SyncedAllBet,
+			ci.DisableGoldDeluxe, ci.HideGoldDeluxe, ci.DisableColossusBet, ci.HideColossusBet,AC.CommRate,ac.CustId,ci.DisableMuayThai,ci.HideMuayThai,ci.DisableCockFighting,ci.HideCockFighting,
+			ci.DisableAllBet, ci.HideAllBet, ci.SyncedAllBet, ci.SyncedAllBetUpline, ci.SyncedAllBetDownline,
 			ci.HideCricket,ci.DisableCricket,cdm.Discount
 END
 GO

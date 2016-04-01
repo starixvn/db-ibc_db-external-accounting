@@ -139,6 +139,8 @@ BEGIN
 							ELSE 1 
 					END AS BIT) AS HideAllBet,
 			ISNULL(dbo.f_GetProductStatus(cps.bitmapHasSynced, @bitmapOrder_AllBet), 1) AS SyncedAllBet,
+			ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapHasSynced, @bitmapOrder_AllBet), 0) AS SyncedAllBetUpline,
+			1 AS SyncedAllBetDownline,
 			
 			-- For Cricket
 			ISNULL(dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder_Cricket),1) AS DisableCricket,
@@ -150,6 +152,13 @@ BEGIN
 
 		-- Check isHidden AllBet
 		OUTER APPLY	dbo.f_CustSetting_SportBetTypeHiddenBySiteCurrency(custInfo.custid, @AllBet) AS sbhsc
+		
+		-- Upline Status
+		INNER JOIN	dbo.CustProductStatus AS cpsUpline WITH (NOLOCK)
+				ON	cpsUpline.CustID =	CASE	WHEN custInfo.roleid = 1 THEN custInfo.recommend
+												WHEN custInfo.roleid = 2 THEN custInfo.mrecommend
+												ELSE custInfo.srecommend
+										END
 		   
      WHERE Recommend = @Recommend
        AND roleid = 1
@@ -301,6 +310,8 @@ BEGIN
 		   ISNULL(ci.DisableAllBet,1) AS DisableAllBet,
 		   ISNULL(ci.HideAllBet,1) AS HideAllBet,
 		   ISNULL(ci.SyncedAllBet,1) AS SyncedAllBet,
+		   ISNULL(ci.SyncedAllBetUpline,1) AS SyncedAllBetUpline,
+		   ISNULL(ci.SyncedAllBetDownline,1) AS SyncedAllBetDownline,
 	       --transfer condition
 	       @TransferOption disableTransfer,	
 	       ROW_NUMBER() OVER (ORDER BY ci.enabled desc,
@@ -346,7 +357,7 @@ BEGIN
 			   ci.SyncLiveCasino, ci.DisableVirtualSports, ci.DoubleCommLosing,
 			   ci.HideVirtualSports, ci.DisableCasinoBonus, ci.DisableHRFixedOdds,
 			   ci.HideKeno, ci.DisableEsports, ci.HideGoldDeluxe, ci.DisableGoldDeluxe,ci.DisableColossusBet,ci.HideColossusBet,AC.playerdiscount
-			   , ci.DisableMuayThai, ci.HideMuayThai,ci.DisableCockFighting,ci.HideCockFighting, ci.DisableAllBet, ci.HideAllBet, ci.SyncedAllBet
+			   , ci.DisableMuayThai, ci.HideMuayThai,ci.DisableCockFighting,ci.HideCockFighting, ci.DisableAllBet, ci.HideAllBet, ci.SyncedAllBet, ci.SyncedAllBetUpline, ci.SyncedAllBetDownline
 			   , ci.HideCricket, ci.DisableCricket, cdm.AgentDiscount, cdm.PlayerDiscount
 
     DROP TABLE #Custinfo,
