@@ -31,6 +31,7 @@ Revisions:
     - 20151028@Helen: Member Information to support Muay Thai  [Redmine: #45496]
 	- 20151209@Helen: Member information for Cockfighting [Redmine: #48133]
 	- 20160114@Helen: Cricket - [Redmine: #50027]
+	- 20160127@Billy: Member information for AllBet - [Redmine: #51713]
 	
 exec EAS_CustomerSelByMAg @MRecommend=4797617,@Custid=default,@Enabled=default,@Closed=default,@Suspended=default    
     
@@ -60,19 +61,32 @@ BEGIN
     WHERE custid = @MRecommend
 
 	-- For DCS
-    DECLARE @bitmapOrder_MuayThai INT , @bitmapOrder_CockFighting INT, @bitmapOrder_Cricket INT, @IsIMBC BIT = 0
+    DECLARE	@bitmapOrder_MuayThai		INT 
+		,	@bitmapOrder_CockFighting	INT
+		,	@bitmapOrder_Cricket		INT
+		,	@IsIMBC						BIT = 0
+		,	@bitmapOrder_AllBet			INT
     
     SET @bitmapOrder_MuayThai = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 44 AND Bettype = 3)
     SET @bitmapOrder_CockFighting = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 206 AND Bettype = 1003)
     SET @bitmapOrder_Cricket = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 50 AND Bettype = 501)
     
-    DECLARE @IsHidden_MuayThai INT = 1
-    DECLARE @IsHidden_CockFighting INT = 1
-    DECLARE @IsHidden_Cricket INT = 1
+	SELECT	@bitmapOrder_AllBet =	(
+										SELECT	psp.bitmapOrder
+										FROM	dbo.ProductStatusProfile AS psp WITH(NOLOCK)
+										WHERE	psp.Sporttype = 211
+											AND	psp.Bettype = 2401
+									)
     
-    DECLARE @SportBook2 INT = 16
-    DECLARE @CockFighting INT = 19
-    DECLARE @Cricket INT = 20
+    DECLARE	@IsHidden_MuayThai		INT = 1
+		,	@IsHidden_CockFighting	INT = 1
+		,	@IsHidden_Cricket		INT = 1
+		,	@IsHidden_AllBet		INT = 1	
+    
+    DECLARE	@SportBook2				INT = 16
+		,	@CockFighting			INT = 19
+		,	@Cricket				INT = 20
+		,	@AllBet					INT = 21
     
 	IF EXISTS( SELECT 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@SportBook2,4))
 	BEGIN
@@ -85,6 +99,11 @@ BEGIN
 	IF EXISTS( SELECT 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@Cricket,4))
 	BEGIN
 		SET @IsHidden_Cricket = 0
+	END
+	
+	IF EXISTS (SELECT TOP(1) 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@AllBet, 4))
+	BEGIN
+	    SET	@IsHidden_AllBet = 0
 	END
 	
 	IF EXISTS (SELECT 1 FROM Customer WITH (NOLOCK) WHERE custid = @MRecommend AND [Site] = 'IMBC')
@@ -175,6 +194,12 @@ BEGIN
 		   ISNULL(ci.DisableCockFighting,1) AS DisableCockFighting,
 		   ISNULL(ci.HideCockFighting,1) AS HideCockFighting,
 		   
+		   ISNULL(ci.DisableAllBet,1) AS DisableAllBet,
+		   ISNULL(ci.HideAllBet,1) AS HideAllBet,
+		   ISNULL(ci.SyncedAllBet,1) AS SyncedAllBet,
+		   ISNULL(ci.SyncedAllBetUpline,1) AS SyncedAllBetUpline,
+		   ISNULL(ci.SyncedAllBetDownline,1) AS SyncedAllBetDownline,
+
 		   --For Myanmar Odds
 		   CASE WHEN ac.CustId IS NOT NULL THEN 1 ELSE 0 END AS  IsMyanmarOdds,
 		   ISNULL(AC.CommRate,0) AS discountMyanmarOdds,
@@ -190,44 +215,73 @@ BEGIN
 	       ROW_NUMBER() OVER(ORDER BY ci.enabled desc, ci.closed,
 	                                  ISNULL(ci.reject, 0), cu.username) RowNumber
       FROM dbo.customer cu WITH(NOLOCK)
-		INNER JOIN (SELECT custinfo.custid, currency, roleid, autosuspend, reject, closed,
-							MatchLimit, VirtualMultiplier, Enabled, DisableHorseRacing,
-							DisableFinancial, DisableCasino, SyncCasino, DisableOutright,
-							DisableOpenTote, DisableBingo, DisableNumber, SyncBingo,
-							disable151_au, disable152_uk, disable152_au, disable153_au,
-							isAutoResetP2P, DisableP2P, DisableFunP2P, DisableLiveCasino,
-							SyncLiveCasino, DisableVirtualSports, DoubleCommLosing,
-							HideVirtualSports, DisableCasinoBonus, DisableHRFixedOdds,
-							HideKeno, DisableEsports, DisableGoldDeluxe, HideGoldDeluxe, DisableColossusBet,HideColossusBet,
-							-- For MuayThai
+		INNER JOIN (SELECT custinfo.custid, custInfo.currency, roleid, autosuspend, reject, closed,
+						   MatchLimit, VirtualMultiplier, Enabled, DisableHorseRacing,
+						   DisableFinancial, DisableCasino, SyncCasino, DisableOutright,
+						   DisableOpenTote, DisableBingo, DisableNumber, SyncBingo,
+						   disable151_au, disable152_uk, disable152_au, disable153_au,
+						   isAutoResetP2P, DisableP2P, DisableFunP2P, DisableLiveCasino,
+						   SyncLiveCasino, DisableVirtualSports, DoubleCommLosing,
+						   HideVirtualSports, DisableCasinoBonus, DisableHRFixedOdds,
+						   HideKeno, DisableEsports, DisableGoldDeluxe, HideGoldDeluxe, DisableColossusBet,HideColossusBet,
+						  -- For MuayThai
 							ISNULL(dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder_MuayThai),1) AS DisableMuayThai,
 							CAST(CASE WHEN @IsHidden_MuayThai = 0 AND ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder_MuayThai),1) = 0 THEN 0 ELSE 1 END AS BIT) AS HideMuayThai,
 							-- For CockFighting
 							ISNULL(dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder_CockFighting),1) AS DisableCockFighting,
 							CAST(CASE WHEN @IsHidden_CockFighting = 0 AND ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder_CockFighting),1) = 0 THEN 0 ELSE 1 END AS BIT) AS HideCockFighting,
+							-- For AllBet
+							ISNULL(dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder_AllBet), 1) AS DisableAllBet,
+							CAST(	CASE	WHEN	@IsHidden_AllBet = 0 
+												AND	sbhsc.IsHidden = 0
+												AND	ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder_AllBet), 1) = 0 
+												THEN 0
+											ELSE 1 
+									END AS BIT) AS HideAllBet,
+							ISNULL(dbo.f_GetProductStatus(cps.bitmapHasSynced, @bitmapOrder_AllBet), 0) AS SyncedAllBet,
+							ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapHasSynced, @bitmapOrder_AllBet), 0) AS SyncedAllBetUpline,
+							CASE	WHEN EXISTS	(	SELECT	1
+													FROM		dbo.CustProductStatus AS cpsDownline WITH (NOLOCK)
+													INNER JOIN	dbo.custInfo AS ciDownline WITH (NOLOCK)
+															ON	ciDownline.custid = cpsDownline.CustID
+													WHERE	ciDownline.recommend = custInfo.custid
+														AND	dbo.f_GetProductStatus(cpsDownline.bitmapHasSynced, @bitmapOrder_AllBet) = 0)
+										THEN 0
+									ELSE 1
+							END AS SyncedAllBetDownline,
 
 							-- For Cricket
 							ISNULL(dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder_Cricket),1) AS DisableCricket,
 							CAST( CASE WHEN @IsIMBC = 1 AND @IsHidden_Cricket = 0 AND ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder_Cricket),1) = 0 THEN 0 ELSE 1 END AS BIT) AS HideCricket
 			
 					  FROM dbo.custinfo WITH(NOLOCK) 						
-						  LEFT JOIN CustProductStatus cps WITH (NOLOCK) ON cps.CustID = custinfo.custid  
-						  
+					  LEFT JOIN CustProductStatus cps WITH (NOLOCK) ON cps.CustID = custinfo.custid  
+
+						-- Check isHidden AllBet
+						OUTER APPLY	dbo.f_CustSetting_SportBetTypeHiddenBySiteCurrency(custInfo.custid, @AllBet) AS sbhsc
+		
+						-- Upline Status
+						INNER JOIN	dbo.CustProductStatus AS cpsUpline WITH (NOLOCK)
+								ON	cpsUpline.CustID =	CASE	WHEN custInfo.roleid = 1 THEN custInfo.recommend
+																WHEN custInfo.roleid = 2 THEN custInfo.mrecommend
+																ELSE custInfo.srecommend
+														END
+		   
 					 WHERE mRecommend = @MRecommend
-						   AND roleid = 2
-						   AND (@Custid IS NULL OR custinfo.Custid = @Custid)
-						   AND enabled = CASE
-										   WHEN COALESCE(@Closed, @Suspended) IS NOT NULL THEN 1
-										   ELSE COALESCE(@enabled, enabled)
-										 END
-						   AND ISNULL(closed, 0) = CASE
-													 WHEN @suspended = 1 THEN 0
-													 ELSE COALESCE(@closed, ISNULL(closed, 0))
-												   END
-						   AND ISNULL(reject, 0) = CASE
-													 WHEN @Closed = 0 THEN 0
-													 ELSE COALESCE(@suspended, ISNULL(reject, 0))
-												   END
+					   AND roleid = 2
+					   AND (@Custid IS NULL OR custinfo.Custid = @Custid)
+					   AND enabled = CASE
+									   WHEN COALESCE(@Closed, @Suspended) IS NOT NULL THEN 1
+									   ELSE COALESCE(@enabled, enabled)
+									 END
+					   AND ISNULL(closed, 0) = CASE
+												 WHEN @suspended = 1 THEN 0
+												 ELSE COALESCE(@closed, ISNULL(closed, 0))
+											   END
+					   AND ISNULL(reject, 0) = CASE
+												 WHEN @Closed = 0 THEN 0
+												 ELSE COALESCE(@suspended, ISNULL(reject, 0))
+											   END
 				   ) ci ON cu.custid = ci.custid
 		 LEFT JOIN dbo.CustSetting cs WITH(NOLOCK) ON cu.custid = cs.custid
 		 LEFT JOIN dbo.custsetting3rd cs3 WITH(NOLOCK) ON cu.custid = cs3.custid
@@ -256,6 +310,7 @@ BEGIN
 			ci.DisableVirtualSports,ci.DoubleCommLosing, ci.HideVirtualSports,	
 			ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno, ci.DisableEsports,
 			ci.DisableGoldDeluxe, ci.HideGoldDeluxe, ci.DisableColossusBet, ci.HideColossusBet,AC.CommRate,ac.CustId,ci.DisableMuayThai,ci.HideMuayThai,ci.DisableCockFighting,ci.HideCockFighting,
+			ci.DisableAllBet, ci.HideAllBet, ci.SyncedAllBet, ci.SyncedAllBetUpline, ci.SyncedAllBetDownline,
 			ci.HideCricket,ci.DisableCricket,cdm.Discount
 END
 GO
