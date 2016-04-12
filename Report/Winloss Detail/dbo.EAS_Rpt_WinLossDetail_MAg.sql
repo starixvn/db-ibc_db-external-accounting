@@ -1,31 +1,25 @@
-
-SET QUOTED_IDENTIFIER ON 
-GO
-SET ANSI_NULLS ON 
-GO
-
-/****** Object:  Stored Procedure dbo.EAS_Rpt_WinLossDetail_MAg    Script Date: 3/7/2016 2:06:05 PM ******/
-CREATE PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_MAg]
-	@custid int ,--mrecommend
-	@Agentid int =  Null,
-	@FromDate smalldatetime,
-	@ToDate smalldatetime,
-	@showSB bit=1,
-	@showCasino bit=0,
-	@showP2P bit=0,
-	@showRB bit=0,
-	@showNG BIT=0,
-	@showBI BIT=0,
+ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_MAg]
+	@custid			INT,--mrecommend
+	@Agentid		INT = NULL,
+	@FromDate		SMALLDATETIME,
+	@ToDate			SMALLDATETIME,
+	@showSB			BIT = 1,
+	@showCasino		BIT = 0,
+	@showP2P		BIT = 0,
+	@showRB			BIT = 0,	
+	@showNG			BIT = 0,
+	@showBI			BIT = 0,
 	@showLiveCasino BIT = 0,
-	@showVS BIT = 0,
-	@showKeno BIT = 0,
-	@showGD BIT = 0,
-	@showCB BIT = 0,
-	@showCF BIT = 0,
-	@BalanceUpDay SMALLDATETIME,
-	@PageSize int=0,
-	@PageIndex int=0,
-	@TotalRows int=0 output
+	@showVS			BIT = 0,
+	@showKeno		BIT = 0,
+	@showGD			BIT = 0,
+	@showCB			BIT = 0,
+	@showCF			BIT = 0,
+	@showAB			BIT = 0,
+	@BalanceUpDay	SMALLDATETIME,
+	@PageSize		INT = 0,
+	@PageIndex		INT = 0,
+	@TotalRows		INT = 0 OUTPUT
 AS
 /*
 Created by: Scott
@@ -40,6 +34,7 @@ Revisions:
 	- 20150907@Winnie: Add CB [Redmine: #43099]
 	- 20151217@Percy: Add Cockfighting [Redmine: #48836]
 	- 20160107@Percy: Include new bettype range of the new RNG Casino [Redmine: #48286]
+	- 20160215@Percy: Support new product AllBet [Redmine: #50922]
 	- 20160225@Sophia: Add new column TurnoverNoDraw [Redmine: #51427]
 */
 
@@ -93,15 +88,15 @@ BEGIN
 END
 IF @showLiveCasino = 1
 BEGIN
- --Sum_winloss  
- INSERT INTO @TmpCondSumWL(Sporttype, Bettype)  
- VALUES(162,0) 
+	--Sum_winloss  
+	INSERT INTO @TmpCondSumWL(Sporttype, Bettype)  
+	VALUES(162,0) 
 END
 IF @showVS = 1
 BEGIN
- --Sum_winloss  
- INSERT INTO @TmpCondSumWL(Sporttype, Bettype)  
- VALUES(180,0) 
+	--Sum_winloss  
+	INSERT INTO @TmpCondSumWL(Sporttype, Bettype)  
+	VALUES(180,0) 
 END
 
 IF @showKeno = 1
@@ -117,16 +112,22 @@ BEGIN
 	VALUES(255, 0) 
 END
 IF @showCB = 1
-	BEGIN
-		--Sum_winloss
-		INSERT INTO @TmpCondSumWL(sporttype, bettype)
-		VALUES(204, 0)
+BEGIN
+	--Sum_winloss
+	INSERT INTO @TmpCondSumWL(sporttype, bettype)
+	VALUES(204, 0)
 END
 IF @showCF = 1
-	BEGIN
-		--Sum_winloss
-		INSERT INTO @TmpCondSumWL(sporttype, bettype)
-		VALUES(206, 1003)
+BEGIN
+	--Sum_winloss
+	INSERT INTO @TmpCondSumWL(sporttype, bettype)
+	VALUES(206, 1003)
+END
+IF @showAB = 1
+BEGIN
+	--Sum_winloss
+	INSERT INTO @TmpCondSumWL(sporttype, bettype)
+	VALUES(211, 0)
 END
 
 ----Get Sport Bettype Matrix------
@@ -161,35 +162,22 @@ BEGIN
 	    FROM
 		    bodb02.dbo.bettrans b WITH (NOLOCK)
 			INNER JOIN @SportBettype s ON b.bettype = s.Bettype
-	    WHERE
+	    WHERE	
 			(
-				s.ProductID = CASE WHEN @showSB = 1 THEN 1 ELSE 0 END
-				OR s.ProductID = CASE WHEN @ShowRB = 1 THEN 2 ELSE 0 END
-				OR s.ProductID = CASE WHEN @showCasino = 1 THEN 6 ELSE 0 END
-				OR s.ProductID = CASE WHEN @showP2P = 1 THEN 9 ELSE 0 END
-				OR s.ProductID = CASE WHEN @showNG = 1 THEN 3 ELSE 0 END
-				OR s.ProductID = CASE WHEN @showBI = 1 THEN 7 ELSE 0 END
-				OR s.ProductID = CASE WHEN @showLiveCasino = 1 THEN 4 ELSE 0 END
-				OR s.ProductID = CASE WHEN @showVS = 1 THEN 5 ELSE 0 END
-				OR s.ProductID = CASE WHEN @showKeno = 1 THEN 8 ELSE 0 END
-				OR s.ProductID = CASE WHEN @showGD = 1 THEN 12 ELSE 0 END
-				OR s.ProductID = CASE WHEN @showCB = 1 THEN 15 ELSE 0 END
-				OR s.ProductID = CASE WHEN @showCF = 1 THEN 19 ELSE 0 END
-			)		
-
-			--(
-			--	bettype < case when @showSB=1 then 31 else 0 end
-			--	OR bettype between 121 and case when @showSB=1 then 999 else 0 end
-			--	OR bettype between 1301 and case when @showSB=1 then 1334 else 0 end
-			--	OR bettype between 31 and case when @ShowRB=1 then 49 else 0 end
-			--	OR bettype = case when @showCasino=1 then 71 else 0 end
-			--	OR bettype = case when @showP2P=1 then 1000 else 0 end
-			--	OR bettype BETWEEN 81 AND (CASE WHEN @showNG=1 THEN 120 ELSE 0 END)
-			--	OR bettype = (CASE WHEN @showBI =1 THEN 73 ELSE 0 END)
-			--	OR bettype BETWEEN 1101 AND (CASE WHEN @showLiveCasino =1 THEN 1199 ELSE 0 END) 
-			--	OR bettype BETWEEN 1201 AND (CASE WHEN @showVS=1 THEN 1299 ELSE 0 END)
-			--	OR bettype BETWEEN 1501 AND (CASE WHEN @showKeno = 1 THEN 1599 ELSE 0 END) 
-			--) AND 
+				   s.ProductID = CASE WHEN @showSB			= 1 THEN 1  ELSE 0 END
+				OR s.ProductID = CASE WHEN @ShowRB			= 1 THEN 2  ELSE 0 END
+				OR s.ProductID = CASE WHEN @showCasino		= 1 THEN 6  ELSE 0 END
+				OR s.ProductID = CASE WHEN @showP2P			= 1 THEN 9  ELSE 0 END
+				OR s.ProductID = CASE WHEN @showNG			= 1 THEN 3  ELSE 0 END
+				OR s.ProductID = CASE WHEN @showBI			= 1 THEN 7  ELSE 0 END
+				OR s.ProductID = CASE WHEN @showLiveCasino	= 1 THEN 4  ELSE 0 END
+				OR s.ProductID = CASE WHEN @showVS			= 1 THEN 5  ELSE 0 END
+				OR s.ProductID = CASE WHEN @showKeno		= 1 THEN 8  ELSE 0 END
+				OR s.ProductID = CASE WHEN @showGD			= 1 THEN 12 ELSE 0 END
+				OR s.ProductID = CASE WHEN @showCB			= 1 THEN 15 ELSE 0 END
+				OR s.ProductID = CASE WHEN @showCF			= 1 THEN 19 ELSE 0 END
+				OR s.ProductID = CASE WHEN @showAB			= 1 THEN 21 ELSE 0 END
+			)
 			AND winlostdate BETWEEN @FromDate AND @todate
 		    --status not in ('running','waiting','VOID', 'REJECT', 'Refund') and
 			AND statusID NOT IN (101, 102, 103) 

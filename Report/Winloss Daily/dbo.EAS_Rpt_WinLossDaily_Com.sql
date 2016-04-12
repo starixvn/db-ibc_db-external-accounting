@@ -13,7 +13,8 @@ AS
 		
 	Param's Explanation:
 		- 20130121@Dan: Move sp from DB06/bodb02 to DBEAS/bodb_EAS, call to bodb_AGE for Acc_CustGroup
-		- 20160107@Percy: Get data both bettransRNG and bettrans table [Redmine: #48286]
+		- 20160107@Percy: Get data from bettransRNG, bettransLC and bettrans table [Redmine: #48286]
+		- 20160215@Percy: Support new product AllBet [Redmine: #50922]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -64,7 +65,7 @@ BEGIN
 		INSERT INTO @SportBettype
 			EXEC bodb02.dbo.Acc_SportBettypeMatrix_Sel @mode = 4
 		
-		DELETE @SportBettype WHERE ProductID NOT IN (6, 11, 17) -- 17: bettransRNG, 11: bettransLC
+		DELETE @SportBettype WHERE ProductID NOT IN (6, 11, 17, 21) -- 6, 17: bettransRNG, 11, 21: bettransLC
 		DELETE @SportBettype WHERE Bettype = 71 -- old bettype RNG
 		
 		SELECT  CustID, username,
