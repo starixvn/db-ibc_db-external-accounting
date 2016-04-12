@@ -217,7 +217,7 @@ BEGIN
 			-- For AllBet
 			ISNULL(dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder_AllBet), 1) AS DisableAllBet,
 			CAST(	CASE	WHEN	@IsHidden_AllBet = 0 
-								AND	MAX(sbhsc.IsHidden) = 0
+								--AND	MAX(sbhsc.IsHidden) = 0
 								AND	ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder_AllBet), 1) = 0 
 								THEN 0
 							ELSE 1 
@@ -276,7 +276,7 @@ BEGIN
 		LEFT JOIN CustDiscount3rd_Agent cdm WITH (NOLOCK) ON cdm.CustID = ci.custid AND cdm.SportType = 50 AND cdm.BetType = 501 AND cu.[site] = 'IMBC' AND @IsHidden_Cricket = 0
 
 		-- Check isHidden AllBet
-		OUTER APPLY	dbo.f_CustSetting_SportBetTypeHiddenBySiteCurrency(cu.custid, @AllBet) AS sbhsc
+		--OUTER APPLY	dbo.f_CustSetting_SportBetTypeHiddenBySiteCurrency(cu.custid, @AllBet) AS sbhsc
 		   
 		
      WHERE (cs.sporttype IN (1) AND cs.bettype IN (1,5,4) AND cs3.sporttype IN (161) AND cs3.bettype IN (81))
