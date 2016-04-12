@@ -268,6 +268,7 @@ BEGIN
 			   ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno, ci.DisableEsports,
 			   ci.DisableGoldDeluxe, ci.HideGoldDeluxe, ci.DisableColossusBet, ci.HideColossusBet,AC.CommRate,ac.CustId,
 			   cps.bitmapIsDisabled,cps.bitmapIsHidden, cps.bitmapHasSynced,cdm.Discount,cu.[site]
+	ORDER BY RowNumber
 			   
 END
 GO
