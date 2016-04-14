@@ -16,6 +16,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Ag]
 	@showCB			BIT = 0,
 	@showCF			BIT = 0,
 	@showAB			BIT = 0,
+	@showVB			BIT = 0,
 	@BalanceUpDay	SMALLDATETIME,
 	@PageSize		INT = 0,
 	@PageIndex		INT = 0,
@@ -36,6 +37,7 @@ Revisions:
 	- 20160107@Percy: Include new bettype range of the new RNG Casino [Redmine: #48286]
 	- 20160215@Percy: Support new product AllBet [Redmine: #50922]
 	- 20160225@Sophia: Add new column TurnoverNoDraw [Redmine: #51427]
+	- 20160414@Victor: Support new product Voidbridge [Redmine: #55468]
 */
 SET NOCOUNT ON
 
@@ -127,6 +129,12 @@ BEGIN
 	INSERT INTO @TmpCondSumWL(sporttype, bettype)
 	VALUES(211, 0)
 END
+IF @showVB = 1
+BEGIN
+	--Sum_winloss
+	INSERT INTO @TmpCondSumWL(sporttype, bettype)
+	VALUES(212, 0)
+END
 
 ----Get Sport Bettype Matrix------
 DECLARE @SportBettype TABLE(ProductID INT,Bettype INT,EventType INT)
@@ -169,6 +177,7 @@ BEGIN
 				OR s.ProductID = CASE WHEN @showCB			= 1 THEN 15 ELSE 0 END
 				OR s.ProductID = CASE WHEN @showCF			= 1 THEN 19 ELSE 0 END
 				OR s.ProductID = CASE WHEN @showAB			= 1 THEN 21 ELSE 0 END
+				OR s.ProductID = CASE WHEN @showVB			= 1 THEN 22 ELSE 0 END
 			)
 		    AND winlostdate between @FromDate and @todate
 		    --and status not in ('VOID', 'REJECT', 'Refund')
