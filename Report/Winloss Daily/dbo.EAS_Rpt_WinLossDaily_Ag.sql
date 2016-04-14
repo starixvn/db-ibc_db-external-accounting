@@ -13,7 +13,7 @@ AS
 		- 20130121@Dan: Move sp from DB06/bodb02 to DBEAS/bodb_EAS
 		- 20160107@Percy: Get data from bettransRNG, bettransLC and bettrans table [Redmine: #48286]
 		- 20160215@Percy: Support new product AllBet [Redmine: #50922]
-		
+		- 20160414@Victor: Support new product Voidbridge [Redmine: #55468]
 	Param's Explanation:		
 		@custID: Agent ID 
 */
@@ -50,7 +50,7 @@ BEGIN
 		INSERT INTO @SportBettype
 			EXEC bodb02.dbo.Acc_SportBettypeMatrix_Sel @mode = 4
 		
-		DELETE @SportBettype WHERE ProductID NOT IN (6, 11, 17, 21) -- 6, 17: bettransRNG, 11, 21: bettransLC
+		DELETE @SportBettype WHERE ProductID NOT IN (6, 11, 17, 21, 22) -- 6, 17, 22: bettransRNG, 11, 21: bettransLC
 		DELETE @SportBettype WHERE Bettype = 71 -- old bettype RNG
 		
 		SELECT  custID, username,
