@@ -49,9 +49,12 @@ BEGIN
 	END
 	ELSE
 	BEGIN
-		DECLARE @SportBettype TABLE(ProductID INT, Bettype INT,EventType INT)
-		INSERT INTO @SportBettype
-			EXEC bodb02.dbo.Acc_SportBettypeMatrix_Sel @mode = 4
+		DECLARE @isTest BIT = 0
+		SELECT  @isTest = bodb02.dbo.f_CheckSPVersion(@@PROCID)
+
+		DECLARE @SportBettype TABLE(ProductID INT, Bettype INT)
+		INSERT INTO @SportBettype (ProductID, Bettype)
+		SELECT ProductID, Bettype FROM bodb02.dbo.f_SportBettypeMatrix_Sel(0, 0, 0, 2, '', '', @isTest)
 		
 		DELETE @SportBettype WHERE ProductID NOT IN (6, 11, 17, 21, 22) -- 6, 17, 22: bettransRNG, 11, 21: bettransLC
 		DELETE @SportBettype WHERE Bettype = 71 -- old bettype RNG
