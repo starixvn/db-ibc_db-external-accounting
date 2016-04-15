@@ -59,9 +59,12 @@ DECLARE @TmpCond TABLE(sporttype INT, bettype INT)
 DECLARE @TmpCondSumWL TABLE(sporttype INT, bettype INT)
 
 ----Get Sport Bettype Matrix------
-DECLARE @SportBettype TABLE(ProductID INT,  Bettype INT, EventType INT)	
-INSERT INTO @SportBettype
-EXEC bodb02.dbo.Acc_SportBettypeMatrix_Sel @mode = 4
+DECLARE @isTest BIT = 0
+SELECT  @isTest = bodb02.dbo.f_CheckSPVersion(@@PROCID)
+
+DECLARE @SportBettype TABLE(ProductID INT, Bettype INT)
+INSERT INTO @SportBettype (ProductID, Bettype)
+SELECT ProductID, Bettype FROM bodb02.dbo.f_SportBettypeMatrix_Sel(0, 0, 0, 2, '', '', @isTest)
 
 
 IF @ShowSB = 1
