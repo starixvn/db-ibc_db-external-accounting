@@ -138,7 +138,7 @@ END
 
 ----Get Sport Bettype Matrix------
 DECLARE @isTest BIT = 0
-SELECT  @isTest = bodb02.dbo.f_CheckSPVersion(@@PROCID)
+SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
 
 DECLARE @SportBettype TABLE(ProductID INT, Bettype INT)
 INSERT INTO @SportBettype (ProductID, Bettype)
