@@ -205,12 +205,15 @@ BEGIN
 
 		   ISNULL(ci.DisableAllBet,1) AS DisableAllBet,
 		   ISNULL(ci.HideAllBet,1) AS HideAllBet,
+		   ISNULL(ci.HideAllBetUpline,1) AS HideAllBetUpline,
 		   ISNULL(ci.SyncedAllBet,1) AS SyncedAllBet,
 		   ISNULL(ci.SyncedAllBetUpline,1) AS SyncedAllBetUpline,
 		   ISNULL(ci.SyncedAllBetDownline,1) AS SyncedAllBetDownline,
 
 		   ISNULL(ci.DisableVoidBridge,1) AS DisableVoidBridge,
+		   ISNULL(ci.DisableVoidBridgeUpline,1) AS DisableVoidBridgeUpline,
 		   ISNULL(ci.HideVoidBridge,1) AS HideVoidBridge,
+		   ISNULL(ci.HideVoidBridgeUpline,1) AS HideVoidBridgeUpline,
 		   ISNULL(ci.SyncedVoidBridge,1) AS SyncedVoidBridge,
 		   ISNULL(ci.SyncedVoidBridgeUpline,1) AS SyncedVoidBridgeUpline,
 		   ISNULL(ci.SyncedVoidBridgeDownline,1) AS SyncedVoidBridgeDownline,
@@ -253,6 +256,7 @@ BEGIN
 												THEN 0
 											ELSE 1 
 									END AS BIT) AS HideAllBet,
+							ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapIsHidden, @bitmapOrder_AllBet), 1) AS HideAllBetUpline,
 							ISNULL(dbo.f_GetProductStatus(cps.bitmapHasSynced, @bitmapOrder_AllBet), 0) AS SyncedAllBet,
 							ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapHasSynced, @bitmapOrder_AllBet), 0) AS SyncedAllBetUpline,
 							CASE	WHEN EXISTS	(	SELECT	1
@@ -267,7 +271,9 @@ BEGIN
 
 								-- For VoidBridge
 							ISNULL(dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder_VoidBridge), 1) AS DisableVoidBridge,
+							ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapIsDisabled, @bitmapOrder_VoidBridge), 1) AS DisableVoidBridgeUpline,
 							CAST(CASE WHEN @IsHidden_VoidBridge = 0 AND ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder_VoidBridge), 1) = 0 THEN 0 ELSE 1 END AS BIT) AS HideVoidBridge,
+							ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapIsHidden, @bitmapOrder_VoidBridge), 1) AS HideVoidBridgeUpline,
 							ISNULL(dbo.f_GetProductStatus(cps.bitmapHasSynced, @bitmapOrder_VoidBridge), 0) AS SyncedVoidBridge,
 							ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapHasSynced, @bitmapOrder_VoidBridge), 0) AS SyncedVoidBridgeUpline,
 							CASE	WHEN EXISTS	(	SELECT	1
@@ -339,9 +345,9 @@ BEGIN
 			ci.DisableVirtualSports,ci.DoubleCommLosing, ci.HideVirtualSports,	
 			ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno, ci.DisableEsports,
 			ci.DisableGoldDeluxe, ci.HideGoldDeluxe, ci.DisableColossusBet, ci.HideColossusBet,AC.CommRate,ac.CustId,ci.DisableMuayThai,ci.HideMuayThai,ci.DisableCockFighting,ci.HideCockFighting,
-			ci.DisableAllBet, ci.HideAllBet, ci.SyncedAllBet, ci.SyncedAllBetUpline, ci.SyncedAllBetDownline,
+			ci.DisableAllBet, ci.HideAllBet,ci.HideAllBetUpline, ci.SyncedAllBet, ci.SyncedAllBetUpline, ci.SyncedAllBetDownline,
 			ci.HideCricket,ci.DisableCricket,cdm.Discount,
-			ci.DisableVoidBridge, ci.HideVoidBridge, ci.SyncedVoidBridge, ci.SyncedVoidBridgeUpline, ci.SyncedVoidBridgeDownline
+			ci.DisableVoidBridge,ci.DisableVoidBridgeUpline, ci.HideVoidBridge, ci.HideVoidBridgeUpline, ci.SyncedVoidBridge, ci.SyncedVoidBridgeUpline, ci.SyncedVoidBridgeDownline
 
 END
 GO

@@ -222,6 +222,7 @@ BEGIN
 								THEN 0
 							ELSE 1 
 					END AS BIT) AS HideAllBet,
+			1 AS HideAllBetUpline,
 			ISNULL(dbo.f_GetProductStatus(cps.bitmapHasSynced, @bitmapOrder_AllBet), 0) AS SyncedAllBet,
 			1 AS SyncedAllBetUpline,
 			CASE	WHEN EXISTS	(	SELECT	1
@@ -245,7 +246,9 @@ BEGIN
 		   ISNULL(cdm.Discount,0) AS discountCricket,	
 		   -- For VoidBridge
 			ISNULL(dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder_VoidBridge), 1) AS DisableVoidBridge,
+			1 AS DisableVoidBridgeUpline,
 			CAST(CASE WHEN @IsHidden_VoidBridge = 0 AND ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder_VoidBridge), 1) = 0 THEN 0 ELSE 1 END AS BIT) AS HideVoidBridge,
+			1 AS HideVoidBridgeUpline,
 			ISNULL(dbo.f_GetProductStatus(cps.bitmapHasSynced, @bitmapOrder_VoidBridge), 0) AS SyncedVoidBridge,
 		   1 AS SyncedVoidBridgeUpline,
 			CASE	WHEN EXISTS	(	SELECT	1
