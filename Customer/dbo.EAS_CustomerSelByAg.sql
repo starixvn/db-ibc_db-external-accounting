@@ -148,7 +148,12 @@ BEGIN
 								THEN 0
 							ELSE 1 
 					END AS BIT) AS HideAllBet,
-			ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapIsHidden, @bitmapOrder_AllBet), 1) AS HideAllBetUpline,
+			CAST(	CASE	WHEN	@IsHidden_AllBet = 0 
+										--AND	sbhsc.IsHidden = 0
+										AND	ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapIsHidden, @bitmapOrder_AllBet), 1) = 0 
+										THEN 0
+									ELSE 1 
+							END AS BIT) AS HideAllBetUpline,
 			ISNULL(dbo.f_GetProductStatus(cps.bitmapHasSynced, @bitmapOrder_AllBet), 1) AS SyncedAllBet,
 			ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapHasSynced, @bitmapOrder_AllBet), 0) AS SyncedAllBetUpline,
 			1 AS SyncedAllBetDownline,
@@ -159,7 +164,7 @@ BEGIN
 
 			-- For VoidBridge
 			ISNULL(dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder_VoidBridge), 1) AS DisableVoidBridge,
-			ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapIsHidden, @bitmapOrder_VoidBridge), 1) AS HideVoidBridgeUpline,
+			CAST(CASE WHEN @IsHidden_VoidBridge = 0 AND ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapIsHidden, @bitmapOrder_VoidBridge), 1) = 0 THEN 0 ELSE 1 END AS BIT) AS HideVoidBridgeUpline,	
 			ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapIsDisabled, @bitmapOrder_VoidBridge), 1) AS DisableVoidBridgeUpline,
 			CAST(CASE WHEN @IsHidden_VoidBridge = 0 AND ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder_VoidBridge), 1) = 0 THEN 0 ELSE 1 END AS BIT) AS HideVoidBridge,
 			ISNULL(dbo.f_GetProductStatus(cps.bitmapHasSynced, @bitmapOrder_VoidBridge), 1) AS SyncedVoidBridge,
@@ -396,6 +401,7 @@ BEGIN
                #CustSetting,
                #custsetting3rd
 END               
+
 GO
 GRANT EXECUTE ON [dbo].[EAS_CustomerSelByAg] TO [bodbExtAccNet] AS [dbo]
 GO
