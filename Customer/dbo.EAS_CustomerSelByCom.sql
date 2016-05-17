@@ -32,6 +32,7 @@ Revisions:
     - 20151209@Helen: Member information for Cockfighting [Redmine: #48133]
     - 20160114@Helen: Cricket - [Redmine: #50027]
 	- 20160127@Billy: Member information for AllBet - [Redmine: #51713]
+	- 20160411@Winnie: VoidBridge - [Redmine: #55546]
 
 
 exec EAS_CustomerSelByCom @GroupName='ACCDDD',@Custid=default,@Enabled=default,@Closed=default,@Suspended=default    
@@ -83,10 +84,12 @@ BEGIN
 		,	@bitmapOrder_CockFighting	INT
 		,	@bitmapOrder_Cricket		INT
 		,	@bitmapOrder_AllBet			INT
-    
+		,	@bitmapOrder_VoidBridge		INT
+
     SET @bitmapOrder_MuayThai = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 44 AND Bettype = 3)
     SET @bitmapOrder_CockFighting = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 206 AND Bettype = 1003)
     SET @bitmapOrder_Cricket = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 50 AND Bettype = 501)
+	SET @bitmapOrder_VoidBridge = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 212 AND Bettype = 4001)
     
 	SELECT	@bitmapOrder_AllBet =	(
 										SELECT	psp.bitmapOrder
@@ -98,12 +101,14 @@ BEGIN
     DECLARE	@IsHidden_MuayThai		INT = 1
 		,	@IsHidden_CockFighting	INT = 1
 		,	@IsHidden_Cricket		INT = 1
-		,	@IsHidden_AllBet		INT = 1	
+		,	@IsHidden_AllBet		INT = 1
+		,	@IsHidden_VoidBridge	INT = 1
     
     DECLARE	@SportBook2				INT = 16
 		,	@CockFighting			INT = 19
 		,	@Cricket				INT = 20
 		,	@AllBet					INT = 21
+		,	@VoidBridge				INT = 22
     
 	IF EXISTS( SELECT 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@SportBook2,4))
 	BEGIN
@@ -121,6 +126,11 @@ BEGIN
 	IF EXISTS( SELECT 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@Cricket,4))
 	BEGIN
 		SET @IsHidden_Cricket = 0
+	END
+
+	IF EXISTS( SELECT TOP 1 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@VoidBridge,4))
+	BEGIN
+		SET @IsHidden_VoidBridge = 0
 	END
 			
     SELECT cu.custid,
@@ -207,11 +217,12 @@ BEGIN
 			-- For AllBet
 			ISNULL(dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder_AllBet), 1) AS DisableAllBet,
 			CAST(	CASE	WHEN	@IsHidden_AllBet = 0 
-								AND	MAX(sbhsc.IsHidden) = 0
+								--AND	MAX(sbhsc.IsHidden) = 0
 								AND	ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder_AllBet), 1) = 0 
 								THEN 0
 							ELSE 1 
 					END AS BIT) AS HideAllBet,
+			1 AS HideAllBetUpline,
 			ISNULL(dbo.f_GetProductStatus(cps.bitmapHasSynced, @bitmapOrder_AllBet), 0) AS SyncedAllBet,
 			1 AS SyncedAllBetUpline,
 			CASE	WHEN EXISTS	(	SELECT	1
@@ -233,7 +244,23 @@ BEGIN
 		   ISNULL(dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder_Cricket),1) AS DisableCricket,
 		   CAST( CASE WHEN cu.[site] = 'IMBC' AND @IsHidden_Cricket = 0 AND ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder_Cricket),1) = 0 THEN 0 ELSE 1 END AS BIT) AS HideCricket,
 		   ISNULL(cdm.Discount,0) AS discountCricket,	
-		   
+		   -- For VoidBridge
+			ISNULL(dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder_VoidBridge), 1) AS DisableVoidBridge,
+			1 AS DisableVoidBridgeUpline,
+			CAST(CASE WHEN @IsHidden_VoidBridge = 0 AND ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder_VoidBridge), 1) = 0 THEN 0 ELSE 1 END AS BIT) AS HideVoidBridge,
+			1 AS HideVoidBridgeUpline,
+			ISNULL(dbo.f_GetProductStatus(cps.bitmapHasSynced, @bitmapOrder_VoidBridge), 0) AS SyncedVoidBridge,
+		   1 AS SyncedVoidBridgeUpline,
+			CASE	WHEN EXISTS	(	SELECT	1
+									FROM		dbo.CustProductStatus AS cpsDownline WITH (NOLOCK)
+									INNER JOIN	dbo.custInfo AS ciDownline WITH (NOLOCK)
+											ON	ciDownline.custid = cpsDownline.CustID
+									WHERE	ciDownline.srecommend = cu.custid
+										AND	dbo.f_GetProductStatus(cpsDownline.bitmapHasSynced, @bitmapOrder_VoidBridge) = 0)
+						THEN 0
+					ELSE 1
+			END AS SyncedVoidBridgeDownline,
+
 	       ROW_NUMBER() OVER(ORDER BY ci.enabled desc, ci.closed,
 	                                  ISNULL(ci.reject,0), cu.username) as RowNumber
       FROM dbo.customer cu with(nolock)
@@ -252,7 +279,7 @@ BEGIN
 		LEFT JOIN CustDiscount3rd_Agent cdm WITH (NOLOCK) ON cdm.CustID = ci.custid AND cdm.SportType = 50 AND cdm.BetType = 501 AND cu.[site] = 'IMBC' AND @IsHidden_Cricket = 0
 
 		-- Check isHidden AllBet
-		OUTER APPLY	dbo.f_CustSetting_SportBetTypeHiddenBySiteCurrency(cu.custid, @AllBet) AS sbhsc
+		--OUTER APPLY	dbo.f_CustSetting_SportBetTypeHiddenBySiteCurrency(cu.custid, @AllBet) AS sbhsc
 		   
 		
      WHERE (cs.sporttype IN (1) AND cs.bettype IN (1,5,4) AND cs3.sporttype IN (161) AND cs3.bettype IN (81))
@@ -268,7 +295,7 @@ BEGIN
 			   ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno, ci.DisableEsports,
 			   ci.DisableGoldDeluxe, ci.HideGoldDeluxe, ci.DisableColossusBet, ci.HideColossusBet,AC.CommRate,ac.CustId,
 			   cps.bitmapIsDisabled,cps.bitmapIsHidden, cps.bitmapHasSynced,cdm.Discount,cu.[site]
-	ORDER BY RowNumber
+	
 			   
 END
 GO
