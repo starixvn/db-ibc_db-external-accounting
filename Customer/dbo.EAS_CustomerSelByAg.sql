@@ -11,7 +11,7 @@ AS
 Created by: Scott  
 Date: 2012-12-17  
 Task : Customer list by agent
-DB: DBCUST.CustDB
+DB: DBCUST/CustDB
 Original SP: Acc_CustomerSelByAg
 Revisions:  
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS
@@ -32,7 +32,8 @@ Revisions:
 	- 20160114@Helen: Cricket - [Redmine: #50027]
 	- 20160127@Billy: Member information for AllBet - [Redmine: #51713]
 	- 20160411@Winnie: VoidBridge - [Redmine: #55546]
-	
+	- 20160606@Elodie: Hot fix to order list customer [Redmine: #58862]
+
 exec EAS_CustomerSelByAg @Recommend=9367272,@Custid=default,@Enabled=default,@Closed=default,@Suspended=default	
 */  
 BEGIN    
@@ -148,12 +149,7 @@ BEGIN
 								THEN 0
 							ELSE 1 
 					END AS BIT) AS HideAllBet,
-			CAST(	CASE	WHEN	@IsHidden_AllBet = 0 
-										--AND	sbhsc.IsHidden = 0
-										AND	ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapIsHidden, @bitmapOrder_AllBet), 1) = 0 
-										THEN 0
-									ELSE 1 
-							END AS BIT) AS HideAllBetUpline,
+			ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapIsHidden, @bitmapOrder_AllBet), 1) AS HideAllBetUpline,
 			ISNULL(dbo.f_GetProductStatus(cps.bitmapHasSynced, @bitmapOrder_AllBet), 1) AS SyncedAllBet,
 			ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapHasSynced, @bitmapOrder_AllBet), 0) AS SyncedAllBetUpline,
 			1 AS SyncedAllBetDownline,
@@ -164,7 +160,7 @@ BEGIN
 
 			-- For VoidBridge
 			ISNULL(dbo.f_GetProductStatus(cps.bitmapIsDisabled, @bitmapOrder_VoidBridge), 1) AS DisableVoidBridge,
-			CAST(CASE WHEN @IsHidden_VoidBridge = 0 AND ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapIsHidden, @bitmapOrder_VoidBridge), 1) = 0 THEN 0 ELSE 1 END AS BIT) AS HideVoidBridgeUpline,	
+			ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapIsHidden, @bitmapOrder_VoidBridge), 1) AS HideVoidBridgeUpline,
 			ISNULL(dbo.f_GetProductStatus(cpsUpline.bitmapIsDisabled, @bitmapOrder_VoidBridge), 1) AS DisableVoidBridgeUpline,
 			CAST(CASE WHEN @IsHidden_VoidBridge = 0 AND ISNULL(dbo.f_GetProductStatus(cps.bitmapIsHidden, @bitmapOrder_VoidBridge), 1) = 0 THEN 0 ELSE 1 END AS BIT) AS HideVoidBridge,
 			ISNULL(dbo.f_GetProductStatus(cps.bitmapHasSynced, @bitmapOrder_VoidBridge), 1) AS SyncedVoidBridge,
@@ -396,15 +392,14 @@ BEGIN
 			   , ci.DisableMuayThai, ci.HideMuayThai,ci.DisableCockFighting,ci.HideCockFighting, ci.DisableAllBet, ci.HideAllBet, ci.HideAllBetUpline,  ci.SyncedAllBet, ci.SyncedAllBetUpline, ci.SyncedAllBetDownline
 			    ,ci.DisableVoidBridge,ci.DisableVoidBridgeUpline, ci.HideVoidBridge,ci.HideVoidBridgeUpline, ci.SyncedVoidBridge,ci.SyncedVoidBridgeUpline, ci.SyncedVoidBridgeDownline
 			   , ci.HideCricket, ci.DisableCricket, cdm.AgentDiscount, cdm.PlayerDiscount
+	ORDER BY RowNumber
 
     DROP TABLE #Custinfo,
                #CustSetting,
                #custsetting3rd
-END               
+END
 
 GO
 GRANT EXECUTE ON [dbo].[EAS_CustomerSelByAg] TO [bodbExtAccNet] AS [dbo]
 GO
 GRANT VIEW DEFINITION ON [dbo].[EAS_CustomerSelByAg] TO [vnteam] AS [dbo]
-
-

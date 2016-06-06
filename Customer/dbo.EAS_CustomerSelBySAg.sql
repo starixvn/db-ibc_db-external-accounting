@@ -1,7 +1,3 @@
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
 ALTER PROCEDURE [dbo].[EAS_CustomerSelBySAg]  
     @SRecommend int,  
     @Custid     int = null,  
@@ -15,7 +11,7 @@ AS
 Created by: Scott  
 Date: 2012-12-17  
 Task : Customer list by super
-DB: DBCUST.CustDB
+DB: DBCUST/CustDB
 Original SP: Acc_CustomerSelBySAg
 Revisions:  
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS
@@ -35,7 +31,8 @@ Revisions:
     - 20160114@Helen: Cricket - [Redmine: #50027]
 	- 20160127@Billy: Member information for AllBet - [Redmine: #51713]
 	- 20160411@Winnie: VoidBridge - [Redmine: #55546]
-    
+    - 20160606@Elodie: Hot fix to order list customer [Redmine: #58862]
+
 exec EAS_CustomerSelBySAg @SRecommend=4792246,@Custid=default,@Enabled=default,@Closed=default,@Suspended=default
 */
 BEGIN
@@ -350,7 +347,7 @@ BEGIN
 			   ci.DisableAllBet, ci.HideAllBet, ci.SyncedAllBet, ci.SyncedAllBetUpline, ci.SyncedAllBetDownline,
 			   ci.DisableCricket, ci.HideCricket, cdm.Discount,
 			   ci.DisableVoidBridge,ci.HideVoidBridgeUpline,ci.HideAllBetUpline, ci.HideVoidBridge,ci.SyncedVoidBridge,ci.SyncedVoidBridgeUpline, ci.SyncedVoidBridgeDownline
-	
+	ORDER BY RowNumber
 END
 
 GO

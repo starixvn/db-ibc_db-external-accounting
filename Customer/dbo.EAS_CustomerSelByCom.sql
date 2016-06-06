@@ -11,7 +11,7 @@ AS
 Created by: Scott  
 Date: 2012-12-17  
 Task : Customer list by company
-DB: DBCUST.CustDB
+DB: DBCUST/CustDB
 Original SP: Acc_CustomerSelBySAg
 Revisions:  
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS, call to bodb_AGE for Acc_CustGroup
@@ -33,7 +33,7 @@ Revisions:
     - 20160114@Helen: Cricket - [Redmine: #50027]
 	- 20160127@Billy: Member information for AllBet - [Redmine: #51713]
 	- 20160411@Winnie: VoidBridge - [Redmine: #55546]
-
+	- 20160606@Elodie: Hot fix to order list customer [Redmine: #58862]
 
 exec EAS_CustomerSelByCom @GroupName='ACCDDD',@Custid=default,@Enabled=default,@Closed=default,@Suspended=default    
 */
@@ -295,9 +295,10 @@ BEGIN
 			   ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno, ci.DisableEsports,
 			   ci.DisableGoldDeluxe, ci.HideGoldDeluxe, ci.DisableColossusBet, ci.HideColossusBet,AC.CommRate,ac.CustId,
 			   cps.bitmapIsDisabled,cps.bitmapIsHidden, cps.bitmapHasSynced,cdm.Discount,cu.[site]
-	
+	ORDER BY RowNumber
 			   
 END
+
 GO
 GRANT EXECUTE ON [dbo].[EAS_CustomerSelByCom] TO [bodbExtAccNet] AS [dbo]
 GO

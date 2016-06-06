@@ -11,7 +11,7 @@ AS
 Created by: Scott  
 Date: 2012-12-17  
 Task : Customer list by MASTER
-DB: DBCUST.CustDB
+DB: DBCUST/CustDB
 Original SP: Acc_CustomerSelByMAg
 Revisions:  
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS
@@ -33,7 +33,8 @@ Revisions:
 	- 20160114@Helen: Cricket - [Redmine: #50027]
 	- 20160127@Billy: Member information for AllBet - [Redmine: #51713]
 	- 20160411@Winnie: VoidBridge - [Redmine: #55546]
-	
+	- 20160606@Elodie: Hot fix to order list customer [Redmine: #58862]
+
 exec EAS_CustomerSelByMAg @MRecommend=4797617,@Custid=default,@Enabled=default,@Closed=default,@Suspended=default    
     
 */
@@ -272,6 +273,7 @@ BEGIN
 														AND	dbo.f_GetProductStatus(cpsDownline.bitmapHasSynced, @bitmapOrder_AllBet) = 0)
 										THEN 0
 									ELSE 1
+
 							END AS SyncedAllBetDownline,
 
 								-- For VoidBridge
@@ -353,8 +355,9 @@ BEGIN
 			ci.DisableAllBet, ci.HideAllBet,ci.HideAllBetUpline, ci.SyncedAllBet, ci.SyncedAllBetUpline, ci.SyncedAllBetDownline,
 			ci.HideCricket,ci.DisableCricket,cdm.Discount,
 			ci.DisableVoidBridge,ci.DisableVoidBridgeUpline, ci.HideVoidBridge, ci.HideVoidBridgeUpline, ci.SyncedVoidBridge, ci.SyncedVoidBridgeUpline, ci.SyncedVoidBridgeDownline
-
+	ORDER BY RowNumber
 END
+
 GO
 GRANT EXECUTE ON [dbo].[EAS_CustomerSelByMAg] TO [bodbExtAccNet] AS [dbo]
 GO
