@@ -36,6 +36,7 @@ Revisions:
 	- 20160606@Elodie: Hot fix to order list customer [Redmine: #58862]
 	- 20160624@Winnie: Enhance Performance for Customer List SPs [Redmine: #59854]
 	- 20160907@Elodie: Apply User Control permission of View/Access Special Site [Redmine: #63012]
+	- 20160810@Winnie: #61733 Allbet VIP Barcarat
 
 exec EAS_CustomerSelByMAg @MRecommend=4797617,@Custid=default,@Enabled=default,@Closed=default,@Suspended=default    
     
@@ -72,6 +73,7 @@ BEGIN
 		,	@bitmapOrder_Cricket		INT
 		,	@IsIMBC						BIT = 0
 		,	@bitmapOrder_AllBet			INT
+		,	@bitmapOrder_AllBetVIP		INT
 		,	@bitmapOrder_VoidBridge		INT
     
     SET @bitmapOrder_MuayThai = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 44 AND Bettype = 3)
@@ -84,6 +86,12 @@ BEGIN
 										FROM	dbo.ProductStatusProfile AS psp WITH(NOLOCK)
 										WHERE	psp.Sporttype = 211
 											AND	psp.Bettype = 2401
+									)
+	SELECT	@bitmapOrder_AllBetVIP =	(
+										SELECT	psp.bitmapOrder
+										FROM	dbo.ProductStatusProfile AS psp WITH(NOLOCK)
+										WHERE	psp.Sporttype = 211
+											AND	psp.Bettype = 2402
 									)
     
     DECLARE	@IsHidden_MuayThai		INT = 1
@@ -220,6 +228,7 @@ BEGIN
 		   ISNULL(ci.HideCockFighting,1) AS HideCockFighting,
 
 		   ISNULL(ci.DisableAllBet,1) AS DisableAllBet,
+		   ISNULL(ci.DisableAllBetVIP,1) AS DisableAllBetVIP,
 		   ISNULL(ci.HideAllBet,1) AS HideAllBet,
 		   ISNULL(ci.HideAllBetUpline,1) AS HideAllBetUpline,
 		   ISNULL(ci.SyncedAllBet,1) AS SyncedAllBet,
@@ -266,6 +275,7 @@ BEGIN
 							CAST(CASE WHEN @IsHidden_CockFighting = 0 AND (SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapIsHidden, @bitmapOrder_CockFighting)) = 0 THEN 0 ELSE 1 END AS BIT) AS HideCockFighting,
 							-- For AllBet
 							(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapIsDisabled, @bitmapOrder_AllBet)) AS DisableAllBet,
+							(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapIsDisabled, @bitmapOrder_AllBetVIP)) AS DisableAllBetVIP,
 							CAST(	CASE	WHEN	@IsHidden_AllBet = 0 
 												--AND	sbhsc.IsHidden = 0
 												AND	(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapIsHidden, @bitmapOrder_AllBet)) = 0 
@@ -368,7 +378,7 @@ BEGIN
 			ci.DisableVirtualSports,ci.DoubleCommLosing, ci.HideVirtualSports,	
 			ci.DisableCasinoBonus, ci.DisableHRFixedOdds, ci.HideKeno, ci.DisableEsports,
 			ci.DisableGoldDeluxe, ci.HideGoldDeluxe, ci.DisableColossusBet, ci.HideColossusBet,AC.CommRate,ac.CustId,ci.DisableMuayThai,ci.HideMuayThai,ci.DisableCockFighting,ci.HideCockFighting,
-			ci.DisableAllBet, ci.HideAllBet,ci.HideAllBetUpline, ci.SyncedAllBet, ci.SyncedAllBetUpline, ci.SyncedAllBetDownline,
+			ci.DisableAllBet,ci.DisableAllBetVIP, ci.HideAllBet,ci.HideAllBetUpline, ci.SyncedAllBet, ci.SyncedAllBetUpline, ci.SyncedAllBetDownline,
 			ci.HideCricket,ci.DisableCricket,cdm.Discount,
 			ci.DisableVoidBridge,ci.DisableVoidBridgeUpline, ci.HideVoidBridge, ci.HideVoidBridgeUpline, ci.SyncedVoidBridge, ci.SyncedVoidBridgeUpline, ci.SyncedVoidBridgeDownline
 	ORDER BY RowNumber
