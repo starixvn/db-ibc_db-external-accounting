@@ -15,13 +15,14 @@ AS
 		- 20130121@Dan: Move sp from DB06/bodb02 to DBEAS/bodb_EAS, call to bodb_AGE for Acc_CustGroup
 		- 20160107@Percy: Get data from bettransRNG, bettransLC and bettrans table [Redmine: #48286]
 		- 20160215@Percy: Support new product AllBet [Redmine: #50922]
-		- 20160414@Victor: Support new product Voidbridge [Redmine: #55468]
+		- 20160414@Victor: Support new product Voidbridge [Redmine: #55468]		
+		- 20160824@Sophia: Enhance Performance (work around for hotfix) [Redmine: #62941]
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @tmpSuperList TABLE( custID INT, username VARCHAR(30))	
+	CREATE TABLE #tmpSuperList ( custID INT, username VARCHAR(30), PRIMARY KEY (custID ASC))	
 	/*
-	INSERT INTO @tmpSuperList(CustID, username)
+	INSERT INTO #tmpSuperList(CustID, username)
 	SELECT	custID, username 
 	FROM	custinfo WITH (NOLOCK)
 	WHERE	currency = @currency 
@@ -29,7 +30,7 @@ BEGIN
 			AND dbo.f_isDummySuper(custID) = 0
 	*/
 	
-	INSERT INTO @tmpSuperList(CustID, username)
+	INSERT INTO #tmpSuperList(CustID, username)
 	SELECT custID,username 
 	FROM bodb02.dbo.custinfo (NOLOCK)
 	WHERE 
@@ -52,7 +53,7 @@ BEGIN
 					SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
 
 			FROM	bodb02.dbo.Bettrans b WITH (NOLOCK)
-					INNER JOIN @tmpSuperList t ON b.srecommend = t.custID 
+					INNER JOIN #tmpSuperList t ON b.srecommend = t.custID 
 			WHERE	b.winlostdate = @winlostdate
 					AND b.ruben = 1
 					AND b.bettype < 19999
@@ -65,12 +66,12 @@ BEGIN
 		DECLARE @isTest BIT = 0
 		SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
 
-		DECLARE @SportBettype TABLE(ProductID INT, Bettype INT)
-		INSERT INTO @SportBettype (ProductID, Bettype)
+		CREATE TABLE #SportBettype (ProductID INT, Bettype INT) 
+		INSERT INTO #SportBettype (ProductID, Bettype)
 		SELECT ProductID, Bettype FROM bodb02.dbo.f_SportBettypeMatrix_Sel(0, 0, 0, 2, '', '', @isTest)
 		
-		DELETE @SportBettype WHERE ProductID NOT IN (6, 11, 17, 21, 22) -- 6, 17, 22: bettransRNG, 11, 21: bettransLC
-		DELETE @SportBettype WHERE Bettype = 71 -- old bettype RNG
+		DELETE #SportBettype WHERE ProductID NOT IN (6, 11, 17, 21, 22) -- 6, 17, 22: bettransRNG, 11, 21: bettransLC
+		DELETE #SportBettype WHERE Bettype = 71 -- old bettype RNG
 		
 		SELECT  CustID, username,
 				SUM(totalTO) AS totalTO,
@@ -97,10 +98,10 @@ BEGIN
 					SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
 
 			FROM	bodb02.dbo.Bettrans b WITH (NOLOCK)
-					INNER JOIN @tmpSuperList t ON b.srecommend = t.custID 
+					INNER JOIN #tmpSuperList t ON b.srecommend = t.custID 
 			WHERE	b.winlostdate = @winlostdate
 					AND b.ruben = 1
-					AND b.bettype < 19999 AND b.bettype NOT IN (SELECT bettype FROM @SportBettype)
+					AND b.bettype < 19999 AND b.bettype NOT IN (SELECT bettype FROM #SportBettype)
 					AND b.statusID NOT IN (101,102,103,121)
 			GROUP BY b.SRecommend, t.username
 			
@@ -120,7 +121,7 @@ BEGIN
 					SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
 
 			FROM	bodb02.dbo.BettransRNG b WITH (NOLOCK)
-					INNER JOIN @tmpSuperList t ON b.srecommend = t.custID 
+					INNER JOIN #tmpSuperList t ON b.srecommend = t.custID 
 			WHERE	b.winlostdate = @winlostdate
 					AND b.gameID < 19999
 					AND b.statusID NOT IN (0,1,101,102,103,121)
@@ -142,7 +143,7 @@ BEGIN
 					SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
 
 			FROM	bodb02.dbo.BettransLC b WITH (NOLOCK)
-					INNER JOIN @tmpSuperList t ON b.srecommend = t.custID 
+					INNER JOIN #tmpSuperList t ON b.srecommend = t.custID 
 			WHERE	b.winlostdate = @winlostdate
 					AND b.gameID < 19999
 					AND b.statusID NOT IN (0,1,101,102,103,121)
@@ -150,8 +151,11 @@ BEGIN
 		) AS A
 		GROUP BY CustID, username
 		ORDER BY username
+		
+		DROP TABLE #SportBettype
 	END
-	
+
+	DROP TABLE #tmpSuperList
 END
 
 GO
