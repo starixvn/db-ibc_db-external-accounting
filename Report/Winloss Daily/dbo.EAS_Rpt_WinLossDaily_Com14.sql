@@ -11,23 +11,24 @@ AS
 	Original: [Acc_Rpt_WinLossDaily_ComEx14]
 	Revisions:
 		- 20130121@Dan: Move sp from DB06/bodb02 to DBEAS/bodb_EAS, call to bodb_AGE for Acc_CustGroup
+		- 20160824@Sophia: Enhance Performance (work around for hotfix) [Redmine: #62941]
 	
 	Param's Explanation:
 		
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @tmpSuperList TABLE( custID INT, username VARCHAR(30))
+	CREATE TABLE #tmpSuperList( custID INT, username VARCHAR(30), PRIMARY KEY (custID ASC))
 
 	/*
-	INSERT INTO @tmpSuperList(CustID, username)
+	INSERT INTO #tmpSuperList(CustID, username)
 	SELECT	custID, username 
 	FROM	custinfo WITH (NOLOCK)
 	WHERE	currency = @currency 
 			AND roleid = 4 
 			AND dbo.f_isDummySuper(custID) = 0
 	*/
-	INSERT INTO @tmpSuperList(CustID, username)
+	INSERT INTO #tmpSuperList(CustID, username)
 	SELECT custID,username 
 	FROM bodb02.dbo.custinfo (NOLOCK)
 	WHERE 
@@ -48,7 +49,7 @@ BEGIN
 			SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
 
 	FROM	bodb02.dbo.Bettrans14 b WITH (NOLOCK)
-			INNER JOIN @tmpSuperList t ON b.srecommend = t.custID 
+			INNER JOIN #tmpSuperList t ON b.srecommend = t.custID 
 	WHERE	b.winlostdate = @winlostdate
 			AND b.ruben = 1
 			AND b.bettype < 19999
@@ -56,6 +57,7 @@ BEGIN
 	GROUP BY b.SRecommend, t.username 
 	ORDER BY t.username
 	
+	DROP TABLE #tmpSuperList
 END
 
 GO
