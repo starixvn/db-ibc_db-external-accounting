@@ -35,6 +35,7 @@ Revisions:
 	- 20160411@Winnie: VoidBridge - [Redmine: #55546]
 	- 20160606@Elodie: Hot fix to order list customer [Redmine: #58862]
 	- 20160624@Winnie: Enhance Performance for Customer List SPs [Redmine: #59854]
+	- 20160801@Elodie: NG2 Product - [Redmine: #60809]
 	- 20160907@Elodie: Apply User Control permission of View/Access Special Site [Redmine: #63012]
 	- 20160810@Winnie: #61733 Allbet VIP Barcarat
 
@@ -75,12 +76,14 @@ BEGIN
 		,	@bitmapOrder_AllBet			INT
 		,	@bitmapOrder_AllBetVIP		INT
 		,	@bitmapOrder_VoidBridge		INT
-    
+		,	@bitmapOrder_NG2			INT
+
     SET @bitmapOrder_MuayThai = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 44 AND Bettype = 3)
     SET @bitmapOrder_CockFighting = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 206 AND Bettype = 1003)
     SET @bitmapOrder_Cricket = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 50 AND Bettype = 501)
 	SET @bitmapOrder_VoidBridge = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 212 AND Bettype = 4001)
-    
+    SET @bitmapOrder_NG2 = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 213 AND Bettype = 2501)
+
 	SELECT	@bitmapOrder_AllBet =	(
 										SELECT	psp.bitmapOrder
 										FROM	dbo.ProductStatusProfile AS psp WITH(NOLOCK)
@@ -99,12 +102,14 @@ BEGIN
 		,	@IsHidden_Cricket		INT = 1
 		,	@IsHidden_AllBet		INT = 1
 		,	@IsHidden_VoidBridge	INT = 1
+		,	@IsHidden_NG2			INT = 1
     
     DECLARE	@SportBook2				INT = 16
 		,	@CockFighting			INT = 19
 		,	@Cricket				INT = 20
 		,	@AllBet					INT = 21
 		,	@VoidBridge				INT = 22
+		,	@NG2					INT = 23
     
 	IF EXISTS( SELECT 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@SportBook2,4))
 	BEGIN
@@ -122,7 +127,10 @@ BEGIN
 	BEGIN
 		SET @IsHidden_VoidBridge = 0
 	END
-	
+	IF EXISTS( SELECT 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@NG2,11))
+	BEGIN
+		SET @IsHidden_NG2 = 0
+	END
 	IF EXISTS (SELECT TOP(1) 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@AllBet, 4))
 	BEGIN
 	    SET	@IsHidden_AllBet = 0
@@ -243,6 +251,14 @@ BEGIN
 		   ISNULL(ci.SyncedVoidBridgeUpline,1) AS SyncedVoidBridgeUpline,
 		   ISNULL(ci.SyncedVoidBridgeDownline,1) AS SyncedVoidBridgeDownline,
 		   
+		   ISNULL(ci.DisableNG2,1) AS DisableNG2,
+		   ISNULL(ci.DisableNG2Upline,1) AS DisableNG2Upline,
+		   ISNULL(ci.HideNG2,1) AS HideNG2,
+		   ISNULL(ci.HideNG2Upline,1) AS HideNG2Upline,
+		   ISNULL(ci.SyncedNG2,1) AS SyncedNG2,
+		   ISNULL(ci.SyncedNG2Upline,1) AS SyncedNG2Upline,
+		   ISNULL(ci.SyncedNG2Downline,1) AS SyncedNG2Downline,
+
 		   --For Myanmar Odds
 		   CASE WHEN ac.CustId IS NOT NULL THEN 1 ELSE 0 END AS  IsMyanmarOdds,
 		   ISNULL(AC.CommRate,0) AS discountMyanmarOdds,
@@ -301,7 +317,7 @@ BEGIN
 
 							END AS SyncedAllBetDownline,
 
-								-- For VoidBridge
+							-- For VoidBridge
 							(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapIsDisabled, @bitmapOrder_VoidBridge)) AS DisableVoidBridge,
 							(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cpsUpline.bitmapIsDisabled, @bitmapOrder_VoidBridge)) AS DisableVoidBridgeUpline,
 							CAST(CASE WHEN @IsHidden_VoidBridge = 0 AND (SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapIsHidden, @bitmapOrder_VoidBridge)) = 0 THEN 0 ELSE 1 END AS BIT) AS HideVoidBridge,
@@ -317,6 +333,24 @@ BEGIN
 										THEN 0
 									ELSE 1
 							END AS SyncedVoidBridgeDownline,
+
+							-- For NG2
+							(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapIsDisabled, @bitmapOrder_NG2)) AS DisableNG2,
+							(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cpsUpline.bitmapIsDisabled, @bitmapOrder_NG2)) AS DisableNG2Upline,
+							CAST(CASE WHEN @IsHidden_NG2 = 0 AND (SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapIsHidden, @bitmapOrder_NG2)) = 0 THEN 0 ELSE 1 END AS BIT) AS HideNG2,
+							CAST(CASE WHEN @IsHidden_NG2 = 0 AND (SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cpsUpline.bitmapIsHidden, @bitmapOrder_NG2)) = 0 THEN 0 ELSE 1 END AS BIT) AS HideNG2Upline,
+							(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapHasSynced, @bitmapOrder_NG2)) AS SyncedNG2,
+							(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cpsUpline.bitmapHasSynced, @bitmapOrder_NG2)) AS SyncedNG2Upline,
+							CASE	WHEN EXISTS	(	SELECT	TOP 1 1
+													FROM		dbo.CustProductStatus AS cpsDownline WITH (NOLOCK)
+													INNER JOIN	dbo.custInfo AS ciDownline WITH (NOLOCK)
+															ON	ciDownline.custid = cpsDownline.CustID
+													WHERE	ciDownline.recommend = custInfo.custid
+														AND	(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cpsDownline.bitmapHasSynced, @bitmapOrder_NG2)) = 0)
+										THEN 0
+									ELSE 1
+							END AS SyncedNG2Downline,
+
 							-- For Cricket
 							(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapIsDisabled, @bitmapOrder_Cricket)) AS DisableCricket,
 							CAST( CASE WHEN @IsIMBC = 1 AND @IsHidden_Cricket = 0 AND (SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapIsHidden, @bitmapOrder_Cricket)) = 0 THEN 0 ELSE 1 END AS BIT) AS HideCricket
@@ -380,7 +414,8 @@ BEGIN
 			ci.DisableGoldDeluxe, ci.HideGoldDeluxe, ci.DisableColossusBet, ci.HideColossusBet,AC.CommRate,ac.CustId,ci.DisableMuayThai,ci.HideMuayThai,ci.DisableCockFighting,ci.HideCockFighting,
 			ci.DisableAllBet,ci.DisableAllBetVIP, ci.HideAllBet,ci.HideAllBetUpline, ci.SyncedAllBet, ci.SyncedAllBetUpline, ci.SyncedAllBetDownline,
 			ci.HideCricket,ci.DisableCricket,cdm.Discount,
-			ci.DisableVoidBridge,ci.DisableVoidBridgeUpline, ci.HideVoidBridge, ci.HideVoidBridgeUpline, ci.SyncedVoidBridge, ci.SyncedVoidBridgeUpline, ci.SyncedVoidBridgeDownline
+			ci.DisableVoidBridge,ci.DisableVoidBridgeUpline, ci.HideVoidBridge, ci.HideVoidBridgeUpline, ci.SyncedVoidBridge, ci.SyncedVoidBridgeUpline, ci.SyncedVoidBridgeDownline,
+			ci.DisableNG2,ci.DisableNG2Upline, ci.HideNG2, ci.HideNG2Upline, ci.SyncedNG2, ci.SyncedNG2Upline, ci.SyncedNG2Downline
 	ORDER BY RowNumber
 END
 
