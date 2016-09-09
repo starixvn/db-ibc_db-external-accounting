@@ -390,7 +390,7 @@ BEGIN
 		   ISNULL(ci.DisableNG2Upline,1) AS DisableNG2Upline,
 		   ISNULL(ci.HideNG2,1) AS HideNG2,
 		   ISNULL(ci.HideNG2Upline,1) AS HideNG2Upline,
-		   ISNULL(ci.SyncedNG2,1) AS SyncedVoidBridge,
+		   ISNULL(ci.SyncedNG2,1) AS SyncedNG2,
 		   ISNULL(ci.SyncedNG2Upline,1) AS SyncedNG2Upline,
 		   ISNULL(ci.SyncedNG2Downline,1) AS SyncedNG2Downline,
 
