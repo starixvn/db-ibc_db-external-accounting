@@ -16,12 +16,14 @@ BEGIN
 	IF EXISTS (	SELECT 1 
 				FROM dbo.acccustomer_1 ac WITH (NOLOCK)
 					INNER JOIN dbo.custInfo ci WITH (NOLOCK) ON ci.custid = ac.custid
-				WHERE ci.roleid > 4)
+				WHERE ci.roleid > 4 AND ac.custid = @CustID)
 		SELECT @IsInternalAdmin = 1
 END
 
 GO
 GRANT EXECUTE ON [Acc_CustomerIsInternalAdmin] TO [bodbExtAccNet]
+GO
+GRANT EXECUTE ON [Acc_CustomerIsInternalAdmin] TO [bodbAdminNet]
 GO
 GRANT VIEW DEFINITION ON [Acc_CustomerIsInternalAdmin] TO [vnteam]
 

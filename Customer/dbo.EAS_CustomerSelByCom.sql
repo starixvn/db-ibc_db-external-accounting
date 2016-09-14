@@ -55,7 +55,7 @@ BEGIN
 		SELECT GameTypeID, GameTypeName, IsDisabled, IBCBettypeID FROM DBTXN.bodb02.dbo.GameType WITH (NOLOCK)
 	 END CATCH
 	 
-	 DECLARE @IsMyanmarOdds BIT = 0
+	 DECLARE @IsMyanmarOdds BIT = 0, @IsInternalAdmin BIT = 0
 	 
     INSERT INTO @tmpSuperList(CustID, username)
     SELECT custID, username 
@@ -79,6 +79,7 @@ BEGIN
                                  ELSE COALESCE(@suspended, ISNULL(reject, 0))
                                END
 
+	EXEC DBPOLICY.bodb02.dbo.Acc_CustomerIsInternalAdmin @Custid = @UserID, @IsInternalAdmin = @IsInternalAdmin OUTPUT
 
     --------output
     -- For DCS
@@ -298,7 +299,7 @@ BEGIN
 		
      WHERE ((cs.sporttype IN (1) AND cs.bettype IN (1,5,4) AND cs3.sporttype IN (161) AND cs3.bettype IN (81))
 				OR (cs.sporttype IS NULL AND cs.bettype IS NULL AND cs3.sporttype IS NULL AND cs3.bettype IS NULL))
-			AND (@Userid IS NULL OR (@Userid IS NOT NULL AND cu.site NOT IN (SELECT site FROM @tmp )))
+			AND (@IsInternalAdmin = 0 OR cu.site NOT IN (SELECT site FROM @tmp ))
 	  GROUP BY cu.custid, cu.username, ci.enabled, ci.closed, ci.reject, cu.roleid,
 			   cu.firstname, cu.lastname, cu.creatdate, cu.iplogin,	ci.DisableOutright,
 			   ci.disablehorseracing, ci.disableOpenTote, ci.disable151_au, ci.disable152_uk,

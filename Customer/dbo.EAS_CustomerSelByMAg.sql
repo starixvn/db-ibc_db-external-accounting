@@ -43,7 +43,7 @@ exec EAS_CustomerSelByMAg @MRecommend=4797617,@Custid=default,@Enabled=default,@
 BEGIN
     SET NOCOUNT ON  
 
-    DECLARE @TransferOption BIT
+    DECLARE @TransferOption BIT, @IsInternalAdmin BIT = 0
 	DECLARE @IsMyanmarOdds BIT = 0
 	
 	DECLARE @tmp_GameType TABLE (GameTypeID INT, GameTypeName NVARCHAR(50), IsDisabled BIT, IBCBettypeID INT)
@@ -63,6 +63,8 @@ BEGIN
                              END
     FROM dbo.custmaster WITH(NOLOCK)
     WHERE custid = @MRecommend
+
+	EXEC DBPOLICY.bodb02.dbo.Acc_CustomerIsInternalAdmin @Custid = @UserID, @IsInternalAdmin = @IsInternalAdmin OUTPUT
 
 	-- For DCS
     DECLARE	@bitmapOrder_MuayThai		INT 
@@ -352,7 +354,7 @@ BEGIN
 		
      WHERE ((cs.sporttype IN (1) AND cs.bettype IN (1, 5, 4) AND cs3.sporttype IN (161) AND cs3.bettype IN (81))
 				OR (cs.sporttype IS NULL AND cs.bettype IS NULL AND cs3.sporttype IS NULL AND cs3.bettype IS NULL))
-			AND (@Userid IS NULL OR (@Userid IS NOT NULL AND cu.site NOT IN (SELECT site FROM @tmp )))
+			AND (@IsInternalAdmin = 0 OR cu.site NOT IN (SELECT site FROM @tmp ))
 	  GROUP BY cu.custid, cu.username, ci.enabled,ci.closed,ci.reject,cu.roleid,
 			cu.firstname, cu.lastname,
 			cu.creatdate ,cu.iplogin,ci.DoubleCommLosing,ci.DisableOutright,  
