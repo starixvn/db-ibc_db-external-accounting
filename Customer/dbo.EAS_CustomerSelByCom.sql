@@ -1,10 +1,10 @@
 ALTER PROCEDURE [dbo].[EAS_CustomerSelByCom]  
-    @GroupName VARCHAR(50) = 'ACCTHAI',
-    @Custid    int = null,
-    @Enabled   bit = null,
-    @Closed    bit = null,
-    @Suspended bit = null
- 
+    @GroupName	VARCHAR(50) = 'ACCTHAI',
+    @Custid		int = null,
+    @Enabled	bit = null,
+    @Closed		bit = null,
+    @Suspended	bit = NULL,
+	@UserID		INT = NULL
 AS  
 
 /*  
@@ -35,6 +35,7 @@ Revisions:
 	- 20160411@Winnie: VoidBridge - [Redmine: #55546]
 	- 20160606@Elodie: Hot fix to order list customer [Redmine: #58862]
 	- 20160624@Winnie: Enhance Performance for Customer List SPs [Redmine: #59854]
+	- 20160907@Elodie: Apply User Control permission of View/Access Special Site [Redmine: #63012]
 
 exec EAS_CustomerSelByCom @GroupName='ACCDDD',@Custid=default,@Enabled=default,@Closed=default,@Suspended=default    
 */
@@ -54,7 +55,7 @@ BEGIN
 		SELECT GameTypeID, GameTypeName, IsDisabled, IBCBettypeID FROM DBTXN.bodb02.dbo.GameType WITH (NOLOCK)
 	 END CATCH
 	 
-	 DECLARE @IsMyanmarOdds BIT = 0
+	 DECLARE @IsMyanmarOdds BIT = 0, @IsInternalAdmin BIT = 0
 	 
     INSERT INTO @tmpSuperList(CustID, username)
     SELECT custID, username 
@@ -78,6 +79,7 @@ BEGIN
                                  ELSE COALESCE(@suspended, ISNULL(reject, 0))
                                END
 
+	EXEC DBPOLICY.bodb02.dbo.Acc_CustomerIsInternalAdmin @Custid = @UserID, @IsInternalAdmin = @IsInternalAdmin OUTPUT
 
     --------output
     -- For DCS
@@ -134,6 +136,18 @@ BEGIN
 		SET @IsHidden_VoidBridge = 0
 	END
 			
+	-- get data for filtered customers	
+	DECLARE @SearchQuery varchar(1024)
+	DECLARE @tmp TABLE (siteid INT,site NVARCHAR(50), SpecialGroup TINYINT )
+	DECLARE @tmpUserid VARCHAR(50)
+	SELECT @tmpUserid=CAST(@Userid AS VARCHAR(50))
+	SELECT @SearchQuery = 'SELECT * 
+	FROM OPENQUERY(DBPOLICY, 
+	''SELECT siteid , site,SpecialGroup FROM bodb02.dbo.f_GetDeniedSiteByUser( ''''' + @tmpUserid + ''''')'')'
+
+	INSERT INTO  @tmp (siteid , site,SpecialGroup)
+	EXECUTE(@SearchQuery)
+
     SELECT cu.custid,
            cu.username,
            ci.enabled,
@@ -283,8 +297,9 @@ BEGIN
 		--OUTER APPLY	dbo.f_CustSetting_SportBetTypeHiddenBySiteCurrency(cu.custid, @AllBet) AS sbhsc
 		   
 		
-     WHERE (cs.sporttype IN (1) AND cs.bettype IN (1,5,4) AND cs3.sporttype IN (161) AND cs3.bettype IN (81))
-	    OR (cs.sporttype IS NULL AND cs.bettype IS NULL AND cs3.sporttype IS NULL AND cs3.bettype IS NULL)
+     WHERE ((cs.sporttype IN (1) AND cs.bettype IN (1,5,4) AND cs3.sporttype IN (161) AND cs3.bettype IN (81))
+				OR (cs.sporttype IS NULL AND cs.bettype IS NULL AND cs3.sporttype IS NULL AND cs3.bettype IS NULL))
+			AND (@IsInternalAdmin = 0 OR cu.site NOT IN (SELECT site FROM @tmp ))
 	  GROUP BY cu.custid, cu.username, ci.enabled, ci.closed, ci.reject, cu.roleid,
 			   cu.firstname, cu.lastname, cu.creatdate, cu.iplogin,	ci.DisableOutright,
 			   ci.disablehorseracing, ci.disableOpenTote, ci.disable151_au, ci.disable152_uk,

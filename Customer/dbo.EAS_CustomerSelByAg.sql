@@ -1,11 +1,10 @@
 ALTER PROCEDURE [dbo].[EAS_CustomerSelByAg]
-    @Recommend int,  
-    @Custid    int = null,  
-    @Enabled   bit = null,  
-    @Closed    bit = null,  
-    @Suspended bit = null 
- 
- 
+    @Recommend	int,  
+    @Custid		int = null,  
+    @Enabled	bit = null,  
+    @Closed		bit = null,  
+    @Suspended	bit = NULL,
+	@UserID		INT = NULL
 AS  
 /*  
 Created by: Scott  
@@ -34,13 +33,14 @@ Revisions:
 	- 20160411@Winnie: VoidBridge - [Redmine: #55546]
 	- 20160606@Elodie: Hot fix to order list customer [Redmine: #58862]
 	- 20160624@Winnie: Enhance Performance for Customer List SPs [Redmine: #59854]
+	- 20160907@Elodie: Apply User Control permission of View/Access Special Site [Redmine: #63012]
 
 exec EAS_CustomerSelByAg @Recommend=9367272,@Custid=default,@Enabled=default,@Closed=default,@Suspended=default	
 */  
 BEGIN    
     SET NOCOUNT ON  
 
-    DECLARE @TransferOption bit
+    DECLARE @TransferOption BIT, @IsInternalAdmin BIT = 0
 	DECLARE @IsMyanmarOdds BIT = 0,@discountMyanmarOdds DECIMAL (9,8) = 0
 	
 	DECLARE @tmp_GameType TABLE (GameTypeID INT, GameTypeName NVARCHAR(50), IsDisabled BIT, IBCBettypeID INT)
@@ -66,6 +66,8 @@ BEGIN
                              
      FROM dbo.custagent WITH(NOLOCK)
      WHERE custid = @Recommend
+
+	 EXEC DBPOLICY.bodb02.dbo.Acc_CustomerIsInternalAdmin @Custid = @UserID, @IsInternalAdmin = @IsInternalAdmin OUTPUT
 
 	-- For DCS
     DECLARE	@bitmapOrder_MuayThai		INT 
@@ -222,6 +224,18 @@ BEGIN
      WHERE bettype = 81
        and sporttype = 161
        
+	-- get data for filtered customers	
+	DECLARE @SearchQuery varchar(1024)
+	DECLARE @tmp TABLE (siteid INT,site NVARCHAR(50), SpecialGroup TINYINT )
+	DECLARE @tmpUserid VARCHAR(50)
+	SELECT @tmpUserid=CAST(@Userid AS VARCHAR(50))
+	SELECT @SearchQuery = 'SELECT * 
+	FROM OPENQUERY(DBPOLICY, 
+	''SELECT siteid , site,SpecialGroup FROM bodb02.dbo.f_GetDeniedSiteByUser( ''''' + @tmpUserid + ''''')'')'
+
+	INSERT INTO  @tmp (siteid , site,SpecialGroup)
+	EXECUTE(@SearchQuery)
+
     SELECT cu.custid,
            cu.username,
            isnull(cu.username2,'') NickName,
@@ -377,8 +391,9 @@ BEGIN
 		 
 		LEFT JOIN CustCommRate AC WITH (NOLOCK) ON AC.CustId = CI.custid AND AC.Sporttype = 1 AND AC.Bettype = 301 AND @IsMyanmarOdds = 1		 																			
 		LEFT JOIN CustDiscount3rd_Member cdm WITH (NOLOCK) ON cdm.CustID = ci.custid AND cdm.SportType = 50 AND cdm.BetType = 501 AND @IsIMBC = 1
-     WHERE (cs.sporttype IN (1) AND cs.bettype IN (1, 5, 4) AND cs3.sporttype IN (161) AND cs3.bettype IN (81))
-	    OR (cs.sporttype IS NULL AND cs.bettype IS NULL AND cs3.sporttype IS NULL AND cs3.bettype IS NULL)
+     WHERE ((cs.sporttype IN (1) AND cs.bettype IN (1, 5, 4) AND cs3.sporttype IN (161) AND cs3.bettype IN (81))
+				OR (cs.sporttype IS NULL AND cs.bettype IS NULL AND cs3.sporttype IS NULL AND cs3.bettype IS NULL))
+			AND (@IsInternalAdmin = 0 OR cu.site NOT IN (SELECT site FROM @tmp ))
 	 GROUP BY cu.custid, cu.username, cu.username2, cu.ugroup, ci.enabled, ci.closed,
 			   ci.reject, cu.roleid, cu.firstname, cu.lastname, cu.creatdate, cu.iplogin,
 			   ci.DoubleCommLosing, ci.DisableOutright, ci.disablehorseracing,
