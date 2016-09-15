@@ -16,7 +16,7 @@ BEGIN
 	IF EXISTS (	SELECT 1 
 				FROM dbo.acccustomer_1 ac WITH (NOLOCK)
 					INNER JOIN dbo.custInfo ci WITH (NOLOCK) ON ci.custid = ac.custid
-				WHERE ci.roleid > 4 AND ac.custid = @CustID)
+				WHERE ci.roleid > 4 AND ac.custid = @CustID AND ci.username LIKE 'starix%')
 		SELECT @IsInternalAdmin = 1
 END
 
