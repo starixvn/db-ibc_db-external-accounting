@@ -1,3 +1,6 @@
+USE [bodb_EAS]
+GO
+
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Ag]
 	@CustID			INT,--recommend
 	@memberID		INT = NULL,
@@ -38,6 +41,7 @@ Revisions:
 	- 20160215@Percy: Support new product AllBet [Redmine: #50922]
 	- 20160225@Sophia: Add new column TurnoverNoDraw [Redmine: #51427]
 	- 20160414@Victor: Support new product Voidbridge [Redmine: #55468]
+	- 20160809@Percy: Modify Net Turnover for Allbet [RedmineID: #61876]
 */
 SET NOCOUNT ON
 
@@ -152,7 +156,9 @@ BEGIN
 			sum(case when b.liveawayscore = 0 and b.bettype in(33,43) then ABS(b.stake)/2 else ABS(b.stake) end) as TurnOver,
 			SUM(CASE WHEN b.liveawayscore = 0 and b.bettype in(33,43) THEN ABS(b.stake)/2 
 					WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
-					WHEN b.StatusID = 111 AND s.ProductId = 1 THEN 0 ELSE ABS(b.stake) 
+					WHEN b.StatusID = 111 AND s.ProductId = 1 THEN 0
+					WHEN s.ProductID = 21 THEN b.oddsspread -- Allbet
+					ELSE ABS(b.stake)
 					END) AS TurnoverNoDraw,
 		    sum(case when b.bettype = 1000 then oddsspread else comm/(1- apositiontaking) end) as GrossComm,
 		    sum(winlost-actual_stake), --MemberWinlost

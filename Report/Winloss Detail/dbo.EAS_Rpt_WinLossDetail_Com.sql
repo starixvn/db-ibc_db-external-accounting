@@ -1,3 +1,6 @@
+USE [bodb_EAS]
+GO
+
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCTHAI',--ACCTHAI or ACCINDO
 	@custid			INT = NULL,	
@@ -39,6 +42,7 @@ Revisions:
 	- 20160215@Percy: Support new product AllBet [Redmine: #50922]
 	- 20160225@Sophia: Add new column TurnoverNoDraw [Redmine: #51427]
 	- 20160414@Victor: Support new product Voidbridge [Redmine: #55468]
+	- 20160809@Percy: Modify Net Turnover for Allbet [RedmineID: #61876]
 	- 20160824@Sophia: Enhance Performance (work around for hotfix) [Redmine: #62941]
 */
 
@@ -288,6 +292,7 @@ BEGIN
 			 SUM(CASE WHEN b.liveawayscore = 0 and b.bettype in(33,43) THEN ABS(b.stake)/2 
 					WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
 					WHEN b.StatusID = 111 AND s.ProductId = 1 THEN 0 
+					WHEN s.ProductID = 21 THEN b.oddsspread -- Allbet
 					ELSE ABS(b.stake) 
 					END) AS TurnoverNoDraw,
 		    --sum(case when b.bettype = 1000 THEN oddsspread else case when tpositiontaking=1 then 0 else scomm/(1-tpositiontaking) end end) as GrossComm,
