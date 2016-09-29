@@ -19,6 +19,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com]
 	@showCF			BIT = 0,
 	@showAB			BIT = 0,
 	@showVB			BIT = 0,
+	@showNG2		BIT = 0,
 	@BalanceUpDay	SMALLDATETIME	
 AS
 
@@ -43,6 +44,7 @@ Revisions:
 	- 20160414@Victor: Support new product Voidbridge [Redmine: #55468]
 	- 20160809@Percy: Modify Net Turnover for Allbet [RedmineID: #61876]
 	- 20160824@Sophia: Enhance Performance (work around for hotfix) [Redmine: #62941]
+	- 20160915@Johnson: Integrate NG2 [RedmineSPU: #30]
 	- 20161001@Daniel: Change to REASDPAST when get from bettrans due to pagesplit
 	
 */
@@ -282,6 +284,18 @@ BEGIN
 	--Sum_winloss
 	INSERT INTO #TmpCondSumWL(sporttype, bettype)
 	VALUES(212, 0)
+END
+IF @showNG2 = 1
+BEGIN
+	-- bettrans
+	INSERT INTO #TmpCond(Sporttype, Bettype) 
+	SELECT	213 AS sporttype, Bettype 
+	FROM	#SportBettype  
+	WHERE	ProductId = 23
+
+	--Sum_winloss
+	INSERT INTO #TmpCondSumWL(sporttype, bettype)
+	VALUES(213, 0)
 END
 
 IF @Todate >= @BalanceUpDay
