@@ -276,6 +276,7 @@ BEGIN
 		   (SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapIsDisabled, @bitmapOrder_Cricket)) AS DisableCricket,
 		   CAST( CASE WHEN cu.[site] = 'IMBC' AND @IsHidden_Cricket = 0 AND (SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapIsHidden, @bitmapOrder_Cricket)) = 0 THEN 0 ELSE 1 END AS BIT) AS HideCricket,
 		   ISNULL(cdm.Discount,0) AS discountCricket,	
+
 		   -- For VoidBridge
 			(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapIsDisabled, @bitmapOrder_VoidBridge)) AS DisableVoidBridge,
 			1 AS DisableVoidBridgeUpline,
@@ -300,15 +301,6 @@ BEGIN
 			CAST(CASE WHEN @IsHidden_NG2 = 0 AND (SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapIsHidden, @bitmapOrder_NG2)) = 0 THEN 0 ELSE 1 END AS BIT) AS HideNG2,
 			(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapHasSynced, @bitmapOrder_NG2)) AS SyncedNG2,
 			1 AS SyncedNG2Upline,
-			CASE	WHEN EXISTS	(	SELECT	TOP 1 1
-									FROM		dbo.CustProductStatus AS cpsDownline WITH (NOLOCK)
-									INNER JOIN	dbo.custInfo AS ciDownline WITH (NOLOCK)
-											ON	ciDownline.custid = cpsDownline.CustID
-									WHERE	ciDownline.srecommend = cu.custid
-										AND	(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cpsDownline.bitmapHasSynced, @bitmapOrder_NG2)) = 0)
-						THEN 0
-					ELSE 1
-			END AS SyncedNG2Downline,
 
 	       ROW_NUMBER() OVER(ORDER BY ci.enabled desc, ci.closed,
 	                                  ISNULL(ci.reject,0), cu.username) as RowNumber

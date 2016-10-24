@@ -257,7 +257,6 @@ BEGIN
 		   ISNULL(ci.HideNG2Upline,1) AS HideNG2Upline,
 		   ISNULL(ci.SyncedNG2,1) AS SyncedNG2,
 		   ISNULL(ci.SyncedNG2Upline,1) AS SyncedNG2Upline,
-		   ISNULL(ci.SyncedNG2Downline,1) AS SyncedNG2Downline,
 
 		   --For Myanmar Odds
 		   CASE WHEN ac.CustId IS NOT NULL THEN 1 ELSE 0 END AS  IsMyanmarOdds,
@@ -341,15 +340,6 @@ BEGIN
 							CAST(CASE WHEN @IsHidden_NG2 = 0 AND (SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cpsUpline.bitmapIsHidden, @bitmapOrder_NG2)) = 0 THEN 0 ELSE 1 END AS BIT) AS HideNG2Upline,
 							(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapHasSynced, @bitmapOrder_NG2)) AS SyncedNG2,
 							(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cpsUpline.bitmapHasSynced, @bitmapOrder_NG2)) AS SyncedNG2Upline,
-							CASE	WHEN EXISTS	(	SELECT	TOP 1 1
-													FROM		dbo.CustProductStatus AS cpsDownline WITH (NOLOCK)
-													INNER JOIN	dbo.custInfo AS ciDownline WITH (NOLOCK)
-															ON	ciDownline.custid = cpsDownline.CustID
-													WHERE	ciDownline.recommend = custInfo.custid
-														AND	(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cpsDownline.bitmapHasSynced, @bitmapOrder_NG2)) = 0)
-										THEN 0
-									ELSE 1
-							END AS SyncedNG2Downline,
 
 							-- For Cricket
 							(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapIsDisabled, @bitmapOrder_Cricket)) AS DisableCricket,
@@ -415,7 +405,7 @@ BEGIN
 			ci.DisableAllBet,ci.DisableAllBetVIP, ci.HideAllBet,ci.HideAllBetUpline, ci.SyncedAllBet, ci.SyncedAllBetUpline, ci.SyncedAllBetDownline,
 			ci.HideCricket,ci.DisableCricket,cdm.Discount,
 			ci.DisableVoidBridge,ci.DisableVoidBridgeUpline, ci.HideVoidBridge, ci.HideVoidBridgeUpline, ci.SyncedVoidBridge, ci.SyncedVoidBridgeUpline, ci.SyncedVoidBridgeDownline,
-			ci.DisableNG2,ci.DisableNG2Upline, ci.HideNG2, ci.HideNG2Upline, ci.SyncedNG2, ci.SyncedNG2Upline, ci.SyncedNG2Downline
+			ci.DisableNG2,ci.DisableNG2Upline, ci.HideNG2, ci.HideNG2Upline, ci.SyncedNG2, ci.SyncedNG2Upline
 	ORDER BY RowNumber
 END
 
