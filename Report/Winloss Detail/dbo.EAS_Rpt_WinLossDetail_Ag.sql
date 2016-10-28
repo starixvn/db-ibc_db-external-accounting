@@ -21,6 +21,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Ag]
 	@showAB			BIT = 0,
 	@showVB			BIT = 0,
 	@showNG2		BIT = 0,
+	@showFW			BIT = 0,
 	@BalanceUpDay	SMALLDATETIME,
 	@PageSize		INT = 0,
 	@PageIndex		INT = 0,
@@ -44,6 +45,7 @@ Revisions:
 	- 20160414@Victor: Support new product Voidbridge [Redmine: #55468]
 	- 20160809@Percy: Modify Net Turnover for Allbet [RedmineID: #61876]
 	- 20160915@Johnson: Integrate NG2 [RedmineSPU: #30]
+	- 20161028@Percy: Support Fishing World [RedmineID: #65735]
 */
 SET NOCOUNT ON
 
@@ -147,6 +149,12 @@ BEGIN
 	INSERT INTO @TmpCondSumWL(sporttype, bettype)
 	VALUES(213, 0)
 END
+IF @showFW = 1
+BEGIN
+	--Sum_winloss
+	INSERT INTO @TmpCondSumWL(sporttype, bettype)
+	VALUES(219, 0)
+END
 
 ----Get Sport Bettype Matrix------
 DECLARE @isTest BIT = 0
@@ -196,6 +204,7 @@ BEGIN
 				OR s.ProductID = CASE WHEN @showAB			= 1 THEN 21 ELSE 0 END
 				OR s.ProductID = CASE WHEN @showVB			= 1 THEN 22 ELSE 0 END
 				OR s.ProductID = CASE WHEN @showNG2			= 1 THEN 23 ELSE 0 END
+				OR s.ProductID = CASE WHEN @showFW			= 1 THEN 24 ELSE 0 END
 			)
 		    AND winlostdate between @FromDate and @todate
 		    --and status not in ('VOID', 'REJECT', 'Refund')
