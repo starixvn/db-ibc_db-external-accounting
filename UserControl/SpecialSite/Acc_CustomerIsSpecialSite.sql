@@ -1,5 +1,5 @@
 ALTER PROCEDURE [dbo].[Acc_CustomerIsSpecialSite]
-	@UserName NVARCHAR(30),
+	@UserName VARCHAR(30),
 	@IsSpecialSite BIT = 0 OUTPUT 
 AS
 /*
@@ -8,6 +8,7 @@ AS
 	Database: DBCust/CustDB
 	
 	Revision:
+		- 20161031@Elodie: Change a type of parameter Username NVARCHAR(30) - > VARCHAR(30)
 	Param's Explanation:
 */
 BEGIN
