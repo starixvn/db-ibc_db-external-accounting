@@ -39,6 +39,7 @@ Revisions:
 	- 20160907@Elodie: Apply User Control permission of View/Access Special Site [Redmine: #63012]
 	- 20160810@Winnie: #61733 Allbet VIP Barcarat
 	- 20170120@Elodie: Don't offer Massac(1507), Malta(1509) anymore [#70693]
+	- 20161031@Winnie: FishingWorld - [Redmine: #65474]
 
 exec EAS_CustomerSelByMAg @MRecommend=4797617,@Custid=default,@Enabled=default,@Closed=default,@Suspended=default    
     
@@ -78,12 +79,14 @@ BEGIN
 		,	@bitmapOrder_AllBetVIP		INT
 		,	@bitmapOrder_VoidBridge		INT
 		,	@bitmapOrder_NG2			INT
+		,	@bitmapOrder_FishingWorld	INT
 
     SET @bitmapOrder_MuayThai = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 44 AND Bettype = 3)
     SET @bitmapOrder_CockFighting = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 206 AND Bettype = 1003)
     SET @bitmapOrder_Cricket = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 50 AND Bettype = 501)
 	SET @bitmapOrder_VoidBridge = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 212 AND Bettype = 4001)
     SET @bitmapOrder_NG2 = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 213 AND Bettype = 2501)
+    SET @bitmapOrder_FishingWorld = (SELECT bitmapOrder FROM ProductStatusProfile WITH (NOLOCK) WHERE Sporttype = 219 AND Bettype = 1011)
 
 	SELECT	@bitmapOrder_AllBet =	(
 										SELECT	psp.bitmapOrder
@@ -104,6 +107,7 @@ BEGIN
 		,	@IsHidden_AllBet		INT = 1
 		,	@IsHidden_VoidBridge	INT = 1
 		,	@IsHidden_NG2			INT = 1
+		,	@IsHidden_FishingWorld	INT = 1
     
     DECLARE	@SportBook2				INT = 16
 		,	@CockFighting			INT = 19
@@ -111,6 +115,7 @@ BEGIN
 		,	@AllBet					INT = 21
 		,	@VoidBridge				INT = 22
 		,	@NG2					INT = 23
+		,	@FishingWorld			INT = 24
     
 	IF EXISTS( SELECT 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@SportBook2,4))
 	BEGIN
@@ -136,7 +141,10 @@ BEGIN
 	BEGIN
 	    SET	@IsHidden_AllBet = 0
 	END
-	
+	IF EXISTS (SELECT TOP(1) 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@FishingWorld, 4))
+	BEGIN
+	    SET	@IsHidden_FishingWorld = 0
+	END
 	IF EXISTS (SELECT 1 FROM Customer WITH (NOLOCK) WHERE custid = @MRecommend AND [Site] = 'IMBC')
 		SET @IsIMBC = 1
 			
@@ -253,7 +261,17 @@ BEGIN
 		   ISNULL(ci.HideNG2Upline,1) AS HideNG2Upline,
 		   ISNULL(ci.SyncedNG2,1) AS SyncedNG2,
 		   ISNULL(ci.SyncedNG2Upline,1) AS SyncedNG2Upline,
+		   ISNULL(ci.DisableFishingWorld,1) AS DisableFishingWorld,
+		   ISNULL(ci.DisableFishingWorldUpline,1) AS DisableFishingWorldUpline,
+		   ISNULL(ci.HideFishingWorld,1) AS HideFishingWorld,
+		   ISNULL(ci.HideFishingWorldUpline,1) AS HideFishingWorldUpline,
+		   ISNULL(ci.SyncedFishingWorld,1) AS SyncedFishingWorld,
+		   ISNULL(ci.SyncedFishingWorldUpline,1) AS SyncedFishingWorldUpline,
+		   ISNULL(ci.SyncedFishingWorldDownline,1) AS SyncedFishingWorldDownline,
+		   
 
+		   
+		   
 		   --For Myanmar Odds
 		   CASE WHEN ac.CustId IS NOT NULL THEN 1 ELSE 0 END AS  IsMyanmarOdds,
 		   ISNULL(AC.CommRate,0) AS discountMyanmarOdds,
@@ -336,7 +354,23 @@ BEGIN
 							CAST(CASE WHEN @IsHidden_NG2 = 0 AND (SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cpsUpline.bitmapIsHidden, @bitmapOrder_NG2)) = 0 THEN 0 ELSE 1 END AS BIT) AS HideNG2Upline,
 							(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapHasSynced, @bitmapOrder_NG2)) AS SyncedNG2,
 							(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cpsUpline.bitmapHasSynced, @bitmapOrder_NG2)) AS SyncedNG2Upline,
+							-- For FishingWorld
+							(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapIsDisabled, @bitmapOrder_FishingWorld)) AS DisableFishingWorld,
+							(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cpsUpline.bitmapIsDisabled, @bitmapOrder_FishingWorld)) AS DisableFishingWorldUpline,
+							CAST(CASE WHEN @IsHidden_FishingWorld = 0 AND (SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapIsHidden, @bitmapOrder_FishingWorld)) = 0 THEN 0 ELSE 1 END AS BIT) AS HideFishingWorld,
+							CAST(CASE WHEN @IsHidden_FishingWorld = 0 AND (SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cpsUpline.bitmapIsHidden, @bitmapOrder_FishingWorld)) = 0 THEN 0 ELSE 1 END AS BIT) AS HideFishingWorldUpline,						
+							(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapHasSynced, @bitmapOrder_FishingWorld)) AS SyncedFishingWorld,
+							(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cpsUpline.bitmapHasSynced, @bitmapOrder_FishingWorld)) AS SyncedFishingWorldUpline,
+							CASE	WHEN EXISTS	(	SELECT	1
+													FROM		dbo.CustProductStatus AS cpsDownline WITH (NOLOCK)
 
+													INNER JOIN	dbo.custInfo AS ciDownline WITH (NOLOCK)
+															ON	ciDownline.custid = cpsDownline.CustID
+													WHERE	ciDownline.recommend = custInfo.custid
+														AND	(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cpsDownline.bitmapHasSynced, @bitmapOrder_FishingWorld)) = 0)
+										THEN 0
+									ELSE 1
+							END AS SyncedFishingWorldDownline,
 							-- For Cricket
 							(SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapIsDisabled, @bitmapOrder_Cricket)) AS DisableCricket,
 							CAST( CASE WHEN @IsIMBC = 1 AND @IsHidden_Cricket = 0 AND (SELECT value FROM dbo.f_CustSetting_ProductStatusSel(cps.bitmapIsHidden, @bitmapOrder_Cricket)) = 0 THEN 0 ELSE 1 END AS BIT) AS HideCricket
@@ -399,7 +433,8 @@ BEGIN
 			ci.DisableAllBet,ci.DisableAllBetVIP, ci.HideAllBet,ci.HideAllBetUpline, ci.SyncedAllBet, ci.SyncedAllBetUpline, ci.SyncedAllBetDownline,
 			ci.HideCricket,ci.DisableCricket,cdm.Discount,
 			ci.DisableVoidBridge,ci.DisableVoidBridgeUpline, ci.HideVoidBridge, ci.HideVoidBridgeUpline, ci.SyncedVoidBridge, ci.SyncedVoidBridgeUpline, ci.SyncedVoidBridgeDownline,
-			ci.DisableNG2,ci.DisableNG2Upline, ci.HideNG2, ci.HideNG2Upline, ci.SyncedNG2, ci.SyncedNG2Upline
+			ci.DisableNG2,ci.DisableNG2Upline, ci.HideNG2, ci.HideNG2Upline, ci.SyncedNG2, ci.SyncedNG2Upline,
+			ci.DisableFishingWorld,ci.DisableFishingWorldUpline, ci.HideFishingWorld, ci.HideFishingWorldUpline, ci.SyncedFishingWorld, ci.SyncedFishingWorldUpline, ci.SyncedFishingWorldDownline
 	ORDER BY RowNumber
 END
 
