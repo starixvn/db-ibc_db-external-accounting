@@ -1,6 +1,5 @@
 USE [bodb_EAS]
 GO
-
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCTHAI',--ACCTHAI or ACCINDO
 	@custid			INT = NULL,	
@@ -44,6 +43,8 @@ Revisions:
 	- 20160414@Victor: Support new product Voidbridge [Redmine: #55468]
 	- 20160809@Percy: Modify Net Turnover for Allbet [RedmineID: #61876]
 	- 20160824@Sophia: Enhance Performance (work around for hotfix) [Redmine: #62941]
+	- 20161001@Daniel: Change to REASDPAST when get from bettrans due to pagesplit
+	
 */
 
 SET NOCOUNT ON
@@ -311,7 +312,7 @@ BEGIN
 		    isnull(sum(swinlost), 0) + isnull(sum(scomm), 0)-sum(acomm), --SAgTotal
 		    -(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost-actual_stake), 0)) --Company				
 	    FROM
-		    bodb02.dbo.bettrans b WITH (NOLOCK) 
+		    bodb02.dbo.bettrans b WITH (READPAST) 
 			INNER JOIN #TmpCond t ON b.bettype = t.bettype
 			LEFT JOIN #SportBettype s ON b.bettype = s.Bettype
 	    WHERE
@@ -459,15 +460,6 @@ DROP TABLE #TmpCond
 DROP TABLE #TmpCondSumWL
 
 GO
-
-SET QUOTED_IDENTIFIER OFF 
+GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [bodbExtAccNet] AS [dbo]
 GO
-SET ANSI_NULLS ON 
-GO
-
-
-GO 
- GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [bodbExtAccNet]
-GO 
- GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [vnteam]
-GO 
+GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [vnteam] AS [dbo]
