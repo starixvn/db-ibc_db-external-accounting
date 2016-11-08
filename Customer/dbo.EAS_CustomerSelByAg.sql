@@ -396,13 +396,22 @@ BEGIN
 		   ISNULL(ci.SyncedVoidBridge,1) AS SyncedVoidBridge,
 		   ISNULL(ci.SyncedVoidBridgeUpline,1) AS SyncedVoidBridgeUpline,
 		   ISNULL(ci.SyncedVoidBridgeDownline,1) AS SyncedVoidBridgeDownline,
-
+		   
 		   ISNULL(ci.DisableNG2,1) AS DisableNG2,
 		   ISNULL(ci.DisableNG2Upline,1) AS DisableNG2Upline,
 		   ISNULL(ci.HideNG2,1) AS HideNG2,
 		   ISNULL(ci.HideNG2Upline,1) AS HideNG2Upline,
 		   ISNULL(ci.SyncedNG2,1) AS SyncedNG2,
 		   ISNULL(ci.SyncedNG2Upline,1) AS SyncedNG2Upline,
+		   ISNULL(ci.DisableFishingWorld,1) AS DisableFishingWorld,
+		   ISNULL(ci.DisableFishingWorldUpline,1) AS DisableFishingWorldUpline,
+		   ISNULL(ci.HideFishingWorld,1) AS HideFishingWorld,
+		   ISNULL(ci.HideFishingWorldUpline,1) AS HideFishingWorldUpline,
+		   ISNULL(ci.SyncedFishingWorld,1) AS SyncedFishingWorld,
+		   ISNULL(ci.SyncedFishingWorldUpline,1) AS SyncedFishingWorldUpline,
+		   ISNULL(ci.SyncedFishingWorldDownline,1) AS SyncedFishingWorldDownline,
+
+
 
 	       --transfer condition
 	       @TransferOption disableTransfer,	
@@ -451,6 +460,7 @@ BEGIN
 			   , ci.DisableMuayThai, ci.HideMuayThai,ci.DisableCockFighting,ci.HideCockFighting, ci.DisableAllBet,ci.DisableAllBetVIP, ci.HideAllBet, ci.HideAllBetUpline,  ci.SyncedAllBet, ci.SyncedAllBetUpline, ci.SyncedAllBetDownline
 			   ,ci.DisableVoidBridge,ci.DisableVoidBridgeUpline, ci.HideVoidBridge,ci.HideVoidBridgeUpline, ci.SyncedVoidBridge,ci.SyncedVoidBridgeUpline, ci.SyncedVoidBridgeDownline
 			   ,ci.DisableNG2,ci.DisableNG2Upline, ci.HideNG2,ci.HideNG2Upline, ci.SyncedNG2,ci.SyncedNG2Upline
+			   ,ci.DisableFishingWorld,ci.DisableFishingWorldUpline, ci.HideFishingWorld,ci.HideFishingWorldUpline, ci.SyncedFishingWorld,ci.SyncedFishingWorldUpline, ci.SyncedFishingWorldDownline
 			   , ci.HideCricket, ci.DisableCricket, cdm.AgentDiscount, cdm.PlayerDiscount
 	ORDER BY RowNumber
 
@@ -458,7 +468,6 @@ BEGIN
                #CustSetting,
                #custsetting3rd
 END
-
 GO
 GRANT EXECUTE ON [dbo].[EAS_CustomerSelByAg] TO [bodbExtAccNet] AS [dbo]
 GO
