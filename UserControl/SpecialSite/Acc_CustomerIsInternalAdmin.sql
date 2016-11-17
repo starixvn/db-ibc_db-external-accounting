@@ -15,37 +15,37 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	SELECT @IsInternalAdmin = 0, @IsAllowAccess = 0
+	SELECT @IsInternalAdmin = 0, @IsAllowAccess = 1
 
 	IF EXISTS (	SELECT 1 
 				FROM dbo.acccustomer_1 ac WITH (NOLOCK)
 					INNER JOIN dbo.custInfo ci WITH (NOLOCK) ON ci.custid = ac.custid
-				WHERE ci.roleid > 4 AND ac.custid = @CustID)
+				WHERE ci.roleid > 4 AND ac.custid = @CustID AND ci.username LIKE 'starix%')
 	BEGIN
 		SELECT @IsInternalAdmin = 1
-		IF @CustID IN (	360418		--starix1
-						,15471134	--starix10
-						,15477066	--starix11
-						,15477075	--starix12
-						,862400		--starix2
-						,15512861	--starix20
-						,15512891	--starix21
-						,15513549	--starix23
-						,15552859	--starix26
-						,15560315	--starix27
-						,169368		--starix3
-						,16994226	--starix37
-						,1070340	--starix4
-						,22040268	--starix59
-						,22040272	--starix60
-						,22040275	--starix61
-						,24103343	--starix65
-						,15470946	--starix7
-						,15470969	--starix8
-						,15471129	--starix9
-						,10278938	--starixIT)
-					)
-			SELECT @IsAllowAccess = 1
+		IF @CustID NOT IN (	360418		--starix1
+							,15471134	--starix10
+							,15477066	--starix11
+							,15477075	--starix12
+							,862400		--starix2
+							,15512861	--starix20
+							,15512891	--starix21
+							,15513549	--starix23
+							,15552859	--starix26
+							,15560315	--starix27
+							,169368		--starix3
+							,16994226	--starix37
+							,1070340	--starix4
+							,22040268	--starix59
+							,22040272	--starix60
+							,22040275	--starix61
+							,24103343	--starix65
+							,15470946	--starix7
+							,15470969	--starix8
+							,15471129	--starix9
+							,10278938	--starixIT
+						)
+			SELECT @IsAllowAccess = 0
 	END
 END
 
