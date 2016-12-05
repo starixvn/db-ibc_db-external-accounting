@@ -10,6 +10,7 @@ AS
 	
 	Revision:
 		- 20161111@Elodie: Remove hardcode statrix, add list username who has permission to access special site		
+		- 20161205@Winnie: Remove hardcode like statrix [RedmineID:#67772]
 	Param's Explanation:
 */
 BEGIN
@@ -20,7 +21,7 @@ BEGIN
 	IF EXISTS (	SELECT 1 
 				FROM dbo.acccustomer_1 ac WITH (NOLOCK)
 					INNER JOIN dbo.custInfo ci WITH (NOLOCK) ON ci.custid = ac.custid
-				WHERE ci.roleid > 4 AND ac.custid = @CustID AND ci.username LIKE 'starix%')
+				WHERE ci.roleid > 4 AND ac.custid = @CustID )
 	BEGIN
 		SELECT @IsInternalAdmin = 1
 		IF @CustID NOT IN (	360418		--starix1
