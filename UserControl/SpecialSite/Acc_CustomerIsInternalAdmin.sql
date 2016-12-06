@@ -15,7 +15,8 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-
+	
+	DECLARE @UserName NVARCHAR(50)
 	SELECT @IsInternalAdmin = 0, @IsAllowAccess = 1
 
 	IF EXISTS (	SELECT 1 
@@ -24,6 +25,8 @@ BEGIN
 				WHERE ci.roleid > 4 AND ac.custid = @CustID )
 	BEGIN
 		SELECT @IsInternalAdmin = 1
+		SELECT @UserName=UserName FROM custInfo WITH(NOLOCK) WHERE custid=@CustID
+		
 		IF @CustID NOT IN (	360418		--starix1
 							,15471134	--starix10
 							,15477066	--starix11
@@ -45,10 +48,11 @@ BEGIN
 							,15470969	--starix8
 							,15471129	--starix9
 							,10278938	--starixIT
-						)
+						) AND @UserName LIKE 'starix%'			
 			SELECT @IsAllowAccess = 0
 	END
 END
+
 
 GO
 GRANT EXECUTE ON [Acc_CustomerIsInternalAdmin] TO [bodbExtAccNet]
