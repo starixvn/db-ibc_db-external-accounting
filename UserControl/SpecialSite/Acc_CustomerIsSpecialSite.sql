@@ -19,9 +19,9 @@ AS
 	Database: DBPOLICY/bodb02
 	
 	Revision:
-		- 20161031@Elodie: Change a type of parameter Username NVARCHAR(30) - > VARCHAR(30)
+		- 20161031@Elodie: Change a type of parameter Username NVARCHAR(30) - > VARCHAR(30) 
 		- 20161111@Elodie: Check more member of group headline
-		- 20161201@Elodie: Output more @IsSpecialHeadline 
+		- 20161201@Elodie: Output more @IsSpecialHeadline [RedmineID: #66873]
 	Param's Explanation:
 */
 BEGIN
