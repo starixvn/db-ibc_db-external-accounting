@@ -59,5 +59,10 @@ GRANT EXECUTE ON [Acc_CustomerIsInternalAdmin] TO [bodbExtAccNet]
 GO
 GRANT EXECUTE ON [Acc_CustomerIsInternalAdmin] TO [bodbAdminNet]
 GO
+GRANT EXECUTE ON [Acc_CustomerIsInternalAdmin] TO BODBDownlineNet
+GO
+GRANT EXECUTE ON [Acc_CustomerIsInternalAdmin] TO BODBDownlineNetView
+GO
+ 
 GRANT VIEW DEFINITION ON [Acc_CustomerIsInternalAdmin] TO [vnteam]
 
