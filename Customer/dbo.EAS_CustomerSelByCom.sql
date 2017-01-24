@@ -38,6 +38,8 @@ Revisions:
 	- 20160801@Elodie: NG2 Product - [Redmine: #60809]
 	- 20160907@Elodie: Apply User Control permission of View/Access Special Site [Redmine: #63012]
 	- 20160810@Winnie: #61733 Allbet VIP Barcarat
+	- 20170120@Elodie: Don't offer Massac(1507), Malta(1509) anymore [#70693]
+
 exec EAS_CustomerSelByCom @GroupName='ACCDDD',@Custid=default,@Enabled=default,@Closed=default,@Suspended=default    
 */
 BEGIN
@@ -228,12 +230,7 @@ BEGIN
 	       ci.DisableEsports,
 	       -- For Keno
 	       ci.HideKeno,
-	       MIN(CASE
-	             WHEN g.IBCBetTypeID in (1501, 1503, 1504,
-	                                     1505, 1507, 1508,
-	                                     1509, 1511, 1513) THEN cg.IsDisabled
-	             ELSE 1
-	           END) as DisableKeno,
+	       MIN(CASE WHEN g.IBCBetTypeID in (1501,1503,1504,1505,1508,1511,1513,1514,1515,1516) THEN cg.IsDisabled ELSE 1 END) as DisableKeno, 
 	       ISNULL(ci.DisableGoldDeluxe,1) AS DisableGoldDeluxe,
 		   ISNULL(ci.HideGoldDeluxe,1) AS HideGoldDeluxe,
 		   
@@ -312,9 +309,7 @@ BEGIN
 		 LEFT JOIN dbo.custsetting3rd cs3 with(nolock) on cu.custid = cs3.custid
 		 LEFT JOIN dbo.CustGameType cg WITH(NOLOCK) ON cu.custid = cg.CustID
 		 LEFT JOIN @tmp_GameType g ON g.GameTypeID = cg.GameTypeID
-													 AND g.IBCBetTypeID IN (1501, 1503, 1504,
-																			1505, 1507, 1508,
-																			1509, 1511, 1513)
+													 AND g.IBCBetTypeID IN (1501,1503,1504,1505,1508,1511,1513,1514,1515,1516)
 		LEFT JOIN AgentCommRate AC WITH (NOLOCK) ON AC.CustId = CI.custid AND AC.Sporttype = 1 AND AC.Bettype = 301 																			
 		LEFT JOIN CustProductStatus cps WITH (NOLOCK) ON cps.CustID = ci.custid 
 		LEFT JOIN CustDiscount3rd_Agent cdm WITH (NOLOCK) ON cdm.CustID = ci.custid AND cdm.SportType = 50 AND cdm.BetType = 501 AND cu.[site] = 'IMBC' AND @IsHidden_Cricket = 0
