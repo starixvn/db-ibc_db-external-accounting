@@ -1,3 +1,6 @@
+USE [bodb_EAS]
+GO
+
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDaily_Com]
 	@winlostdate	DATETIME,
 	@custid			INT = NULL,	
@@ -17,6 +20,9 @@ AS
 		- 20160215@Percy: Support new product AllBet [Redmine: #50922]
 		- 20160414@Victor: Support new product Voidbridge [Redmine: #55468]		
 		- 20160824@Sophia: Enhance Performance (work around for hotfix) [Redmine: #62941]
+		- 20161028@Percy:
+			1. Support Fishing World [RedmineID: #65735]
+			2. Apply column RefTable
 */
 BEGIN
 	SET NOCOUNT ON
@@ -69,9 +75,7 @@ BEGIN
 		CREATE TABLE #SportBettype (ProductID INT, Bettype INT) 
 		INSERT INTO #SportBettype (ProductID, Bettype)
 		SELECT ProductID, Bettype FROM bodb02.dbo.f_SportBettypeMatrix_Sel(0, 0, 0, 2, '', '', @isTest)
-		
-		DELETE #SportBettype WHERE ProductID NOT IN (6, 11, 17, 21, 22) -- 6, 17, 22: bettransRNG, 11, 21: bettransLC
-		DELETE #SportBettype WHERE Bettype = 71 -- old bettype RNG
+		WHERE RefTable IN (1,2) -- bettype in bettransRnG/bettransLC
 		
 		SELECT  CustID, username,
 				SUM(totalTO) AS totalTO,
@@ -123,7 +127,7 @@ BEGIN
 			FROM	bodb02.dbo.BettransRNG b WITH (NOLOCK)
 					INNER JOIN #tmpSuperList t ON b.srecommend = t.custID 
 			WHERE	b.winlostdate = @winlostdate
-					AND b.gameID < 19999
+					--AND b.gameID < 19999
 					AND b.statusID NOT IN (0,1,101,102,103,121)
 			GROUP BY b.SRecommend, t.username 
 			
@@ -145,7 +149,7 @@ BEGIN
 			FROM	bodb02.dbo.BettransLC b WITH (NOLOCK)
 					INNER JOIN #tmpSuperList t ON b.srecommend = t.custID 
 			WHERE	b.winlostdate = @winlostdate
-					AND b.gameID < 19999
+					--AND b.gameID < 19999
 					AND b.statusID NOT IN (0,1,101,102,103,121)
 			GROUP BY b.SRecommend, t.username 
 		) AS A
