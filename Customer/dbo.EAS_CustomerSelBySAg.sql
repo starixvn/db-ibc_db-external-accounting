@@ -37,6 +37,7 @@ Revisions:
 	- 20160810@Winnie: #61733 Allbet VIP Barcarat
 	- 20170120@Elodie: Don't offer Massac(1507), Malta(1509) anymore [#70693]
 	- 20161031@Winnie: FishingWorld - [Redmine: #65474]
+	- 20160801@Elodie: Implementing NewProductStatus Plugin - [Redmine #70722]	
 
 exec EAS_CustomerSelBySAg @SRecommend=4792246,@Custid=default,@Enabled=default,@Closed=default,@Suspended=default
 */
@@ -140,7 +141,7 @@ BEGIN
 	BEGIN
 		SET @IsHidden_NG2 = 0
 	END
-	IF EXISTS( SELECT 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@FishingWorld,4))
+	IF EXISTS( SELECT 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@FishingWorld,13))
 	BEGIN
 		SET @IsHidden_FishingWorld = 0
 	END
