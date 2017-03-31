@@ -110,42 +110,14 @@ BEGIN
 		,	@IsHidden_NG2			INT = 1
 		,	@IsHidden_FishingWorld	INT = 1
     
-    DECLARE	@SportBook2				INT = 16
-		,	@CockFighting			INT = 19
-		,	@Cricket				INT = 20
-		,	@AllBet					INT = 21
-		,	@VoidBridge				INT = 22
-		,	@NG2					INT = 23
-		,	@FishingWorld			INT = 24
-    
-	IF EXISTS( SELECT 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@SportBook2,4))
-	BEGIN
-		SET @IsHidden_MuayThai = 0
-	END
-	IF EXISTS( SELECT 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@CockFighting,4))
-	BEGIN
-		SET @IsHidden_CockFighting = 0
-	END
-	IF EXISTS( SELECT 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@Cricket,4))
-	BEGIN
-		SET @IsHidden_Cricket = 0
-	END
-	IF EXISTS( SELECT TOP 1 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@VoidBridge,4))
-	BEGIN
-		SET @IsHidden_VoidBridge = 0
-	END
-	IF EXISTS( SELECT 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@NG2,11))
-	BEGIN
-		SET @IsHidden_NG2 = 0
-	END
-	IF EXISTS (SELECT TOP(1) 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@AllBet, 4))
-	BEGIN
-	    SET	@IsHidden_AllBet = 0
-	END
-	IF EXISTS (SELECT TOP(1) 1 FROM dbo.f_CustSetting_SportBetTypeSettingSelect(@FishingWorld, 13))
-	BEGIN
-	    SET	@IsHidden_FishingWorld = 0
-	END
+   	EXEC Acc_CheckShowProduct @ProductID = 16, @IsShow = @IsHidden_MuayThai
+	EXEC Acc_CheckShowProduct @ProductID = 19, @IsShow = @IsHidden_CockFighting
+	EXEC Acc_CheckShowProduct @ProductID = 20, @IsShow = @IsHidden_Cricket
+	EXEC Acc_CheckShowProduct @ProductID = 21, @IsShow = @IsHidden_AllBet
+	EXEC Acc_CheckShowProduct @ProductID = 22, @IsShow = @IsHidden_VoidBridge
+	EXEC Acc_CheckShowProduct @ProductID = 23, @IsShow = @IsHidden_NG2
+	EXEC Acc_CheckShowProduct @ProductID = 24, @IsShow = @IsHidden_FishingWorld
+
 	IF EXISTS (SELECT 1 FROM Customer WITH (NOLOCK) WHERE custid = @MRecommend AND [Site] = 'IMBC')
 		SET @IsIMBC = 1
 			
