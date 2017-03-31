@@ -110,13 +110,13 @@ BEGIN
 		,	@IsHidden_NG2			INT = 1
 		,	@IsHidden_FishingWorld	INT = 1
     
-   	EXEC Acc_CheckShowProduct @ProductID = 16, @IsShow = @IsHidden_MuayThai
-	EXEC Acc_CheckShowProduct @ProductID = 19, @IsShow = @IsHidden_CockFighting
-	EXEC Acc_CheckShowProduct @ProductID = 20, @IsShow = @IsHidden_Cricket
-	EXEC Acc_CheckShowProduct @ProductID = 21, @IsShow = @IsHidden_AllBet
-	EXEC Acc_CheckShowProduct @ProductID = 22, @IsShow = @IsHidden_VoidBridge
-	EXEC Acc_CheckShowProduct @ProductID = 23, @IsShow = @IsHidden_NG2
-	EXEC Acc_CheckShowProduct @ProductID = 24, @IsShow = @IsHidden_FishingWorld
+   	EXEC Acc_CheckShowProduct @ProductID = 16, @IsHide = @IsHidden_MuayThai OUTPUT
+	EXEC Acc_CheckShowProduct @ProductID = 19, @IsHide = @IsHidden_CockFighting OUTPUT
+	EXEC Acc_CheckShowProduct @ProductID = 20, @IsHide = @IsHidden_Cricket OUTPUT
+	EXEC Acc_CheckShowProduct @ProductID = 21, @IsHide = @IsHidden_AllBet OUTPUT
+	EXEC Acc_CheckShowProduct @ProductID = 22, @IsHide = @IsHidden_VoidBridge OUTPUT
+	EXEC Acc_CheckShowProduct @ProductID = 23, @IsHide = @IsHidden_NG2 OUTPUT
+	EXEC Acc_CheckShowProduct @ProductID = 24, @IsHide = @IsHidden_FishingWorld OUTPUT
 
 	IF EXISTS (SELECT 1 FROM Customer WITH (NOLOCK) WHERE custid = @MRecommend AND [Site] = 'IMBC')
 		SET @IsIMBC = 1
