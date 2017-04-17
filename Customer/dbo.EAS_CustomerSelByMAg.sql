@@ -41,7 +41,7 @@ Revisions:
 	- 20170120@Elodie: Don't offer Massac(1507), Malta(1509) anymore [#70693]
 	- 20161031@Winnie: FishingWorld - [Redmine: #65474]
 	- 20160801@Elodie: Implementing NewProductStatus Plugin - [Redmine #70722]	
-
+	- 20170417@Winnie: Change to call the sp Acc_CheckShowProduct- [Redmine #72336]	
 exec EAS_CustomerSelByMAg @MRecommend=4797617,@Custid=default,@Enabled=default,@Closed=default,@Suspended=default    
     
 */
