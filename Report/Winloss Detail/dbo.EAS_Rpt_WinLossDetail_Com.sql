@@ -1,5 +1,6 @@
 USE [bodb_EAS]
 GO
+
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCTHAI',--ACCTHAI or ACCINDO
 	@custid			INT = NULL,	
@@ -49,6 +50,7 @@ Revisions:
 	- 20161028@Percy: Support Fishing World [RedmineID: #65735]
 	- 20161001@Daniel: Change to REASDPAST when get from bettrans due to pagesplit
 	- 20161020@Francis: Avoid pagesplit by prompting index seek on bettrans [Redmine: #65042]
+	- 20170622@Percy: Combine Betradar Virtual Sports with Virtual Sports [RedmineID: #78340]
 	
 */
 
@@ -200,15 +202,21 @@ BEGIN
 	--SELECT 180 AS sporttype, typeid FROM bodb02.dbo.bettype (NOLOCK)
 	--WHERE typeid BETWEEN 1201 AND 1299
 
+	-- Virtual Sports
 	INSERT INTO #TmpCond(Sporttype, Bettype) 
 	SELECT	180 AS sporttype, Bettype 
 	FROM	#SportBettype  
 	WHERE	ProductId = 5
 
+	-- Betradar Virtual Sports
+	INSERT INTO #TmpCond(Sporttype, Bettype) 
+	SELECT	190 AS sporttype, Bettype 
+	FROM	#SportBettype  
+	WHERE	ProductId = 27
 
 	--Sum_winloss
 	INSERT INTO #TmpCondSumWL(Sporttype, Bettype)
-	VALUES(180,0)
+	VALUES(180,0), (190,0)
 END
 
 IF @showKeno = 1

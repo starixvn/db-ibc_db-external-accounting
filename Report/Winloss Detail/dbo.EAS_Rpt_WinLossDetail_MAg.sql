@@ -1,5 +1,6 @@
 USE [bodb_EAS]
 GO
+
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_MAg]
 	@custid			INT,--mrecommend
 	@Agentid		INT = NULL,
@@ -46,6 +47,7 @@ Revisions:
 	- 20160915@Johnson: Integrate NG2 [RedmineSPU: #30]
 	- 20161020@Francis: Enhance SP and avoid pagesplit by prompting index seek on bettrans [Redmine: #65042]
 	- 20161028@Percy: Support Fishing World [RedmineID: #65735]
+	- 20170622@Percy: Combine Betradar Virtual Sports with Virtual Sports [RedmineID: #78340]
 */
 
 SET NOCOUNT ON
@@ -115,7 +117,7 @@ IF @showVS = 1
 BEGIN
 	--Sum_winloss  
 	INSERT INTO @TmpCondSumWL(Sporttype, Bettype)  
-	VALUES(180,0) 
+	VALUES(180,0), (190,0)
 END
 
 IF @showKeno = 1
@@ -173,7 +175,8 @@ SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
 
 DECLARE @SportBettype TABLE(ProductID INT, Bettype INT)
 INSERT INTO @SportBettype (ProductID, Bettype)
-SELECT ProductID, Bettype FROM bodb02.dbo.f_SportBettypeMatrix_Sel(0, 0, 0, 2, '', '', @isTest)
+SELECT ISNULL(p.GroupProductId, s.ProductID), Bettype FROM bodb02.dbo.f_SportBettypeMatrix_Sel(0, 0, 0, 2, '', '', @isTest) s
+	LEFT JOIN bodb02.dbo.f_GroupProduct() p ON s.ProductID = p.ProductId
 
 
 IF @Todate >= @BalanceUpDay
