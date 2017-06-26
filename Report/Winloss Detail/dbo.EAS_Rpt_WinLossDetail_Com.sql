@@ -48,12 +48,13 @@ Revisions:
 	- 20160915@Johnson: Integrate NG2 [RedmineSPU: #30]
 	- 20161028@Percy: Support Fishing World [RedmineID: #65735]
 	- 20161001@Daniel: Change to REASDPAST when get from bettrans due to pagesplit
+	- 20161020@Francis: Avoid pagesplit by prompting index seek on bettrans [Redmine: #65042]
 	
 */
 
 SET NOCOUNT ON
 
-CREATE TABLE #tmpSuperList ( custID INT PRIMARY KEY)
+CREATE TABLE #tmpSuperList (custID INT PRIMARY KEY)
 
 INSERT INTO #tmpSuperList(CustID)
 SELECT custID 
@@ -312,6 +313,9 @@ BEGIN
 	VALUES(219, 0)
 END
 
+--Force optimizer to seek on IX_srecommend index
+DECLARE @n INT = 2147483647
+	
 IF @Todate >= @BalanceUpDay
 BEGIN 
     INSERT INTO #ComWinLossDetails
@@ -345,11 +349,12 @@ BEGIN
 			LEFT JOIN #SportBettype s ON b.bettype = s.Bettype
 	    WHERE
 		    b.winlostdate between @FromDate and @todate and
-		    b.srecommend in (SELECT custID FROM #tmpSuperList) and
+		    b.srecommend in (SELECT TOP (@n) custID FROM #tmpSuperList) and
 		    b.ruben = 1 and
-		    b.statusID not in (101, 102, 103)   and 
+		    b.statusID not in (101, 102, 103) and 
 		    b.bettype <> 1000
 	    GROUP BY SRecommend, CASE WHEN b.bettype = 71 OR b.bettype BETWEEN 2101 AND 2399 THEN 71 ELSE b.bettype END
+	    OPTION (OPTIMIZE FOR (@n = 1))
 	    
 	-- seperate P2P to improve performance
 	IF @showP2P = 1 
@@ -377,11 +382,12 @@ BEGIN
 		    bodb02.dbo.bettrans b WITH (NOLOCK) INNER JOIN #TmpCond t ON b.bettype = t.bettype
 	    WHERE
 		    b.winlostdate between @FromDate and @todate and
-		    b.srecommend in (SELECT custID FROM #tmpSuperList) and
+		    b.srecommend in (SELECT TOP (@n) custID FROM #tmpSuperList) and
 		    b.ruben = 1 and
-		    b.statusID not in (101, 102, 103)  and 
+		    b.statusID not in (101, 102, 103) and 
 		    b.bettype = 1000
 	    GROUP BY SRecommend, b.bettype
+	    OPTION (OPTIMIZE FOR (@n = 1))
 	END 
 
 	if @BalanceUpDay < @FromDate
