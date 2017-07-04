@@ -22,6 +22,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_MAg]
 	@showVB			BIT = 0,
 	@showNG2		BIT = 0,
 	@showFW			BIT = 0,
+	@showLO			BIT = 0,
 	@BalanceUpDay	SMALLDATETIME,
 	@PageSize		INT = 0,
 	@PageIndex		INT = 0,
@@ -48,6 +49,7 @@ Revisions:
 	- 20161020@Francis: Enhance SP and avoid pagesplit by prompting index seek on bettrans [Redmine: #65042]
 	- 20161028@Percy: Support Fishing World [RedmineID: #65735]
 	- 20170622@Percy: Combine Betradar Virtual Sports with Virtual Sports [RedmineID: #78340]
+	- 20170703@Percy: Support Keno Lottery [RedmineID: #78068]
 */
 
 SET NOCOUNT ON
@@ -168,6 +170,12 @@ BEGIN
 	INSERT INTO @TmpCondSumWL(sporttype, bettype)
 	VALUES(219, 0)
 END
+IF @showLO = 1
+BEGIN
+	--Sum_winloss
+	INSERT INTO @TmpCondSumWL(sporttype, bettype)
+	VALUES(220, 0)
+END
 
 ----Get Sport Bettype Matrix------
 DECLARE @isTest BIT = 0
@@ -226,6 +234,7 @@ BEGIN
 				OR s.ProductID = CASE WHEN @showVB			= 1 THEN 22 ELSE 0 END
 				OR s.ProductID = CASE WHEN @showNG2			= 1 THEN 23 ELSE 0 END
 				OR s.ProductID = CASE WHEN @showFW			= 1 THEN 24 ELSE 0 END
+				OR s.ProductID = CASE WHEN @showLO			= 1 THEN 28 ELSE 0 END
 			)
 			AND winlostdate BETWEEN @FromDate AND @todate
 		    AND statusID NOT IN (101, 102, 103) 

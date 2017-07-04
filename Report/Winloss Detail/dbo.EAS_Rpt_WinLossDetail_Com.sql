@@ -22,6 +22,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com]
 	@showVB			BIT = 0,
 	@showNG2		BIT = 0,
 	@showFW			BIT = 0,
+	@showLO			BIT = 0,
 	@BalanceUpDay	SMALLDATETIME	
 AS
 
@@ -51,6 +52,7 @@ Revisions:
 	- 20161001@Daniel: Change to REASDPAST when get from bettrans due to pagesplit
 	- 20161020@Francis: Avoid pagesplit by prompting index seek on bettrans [Redmine: #65042]
 	- 20170622@Percy: Combine Betradar Virtual Sports with Virtual Sports [RedmineID: #78340]
+	- 20170703@Percy: Support Keno Lottery [RedmineID: #78068]
 	
 */
 
@@ -319,6 +321,18 @@ BEGIN
 	--Sum_winloss
 	INSERT INTO #TmpCondSumWL(sporttype, bettype)
 	VALUES(219, 0)
+END
+IF @showLO = 1
+BEGIN
+	-- bettrans
+	INSERT INTO #TmpCond(Sporttype, Bettype) 
+	SELECT	220 AS sporttype, Bettype 
+	FROM	#SportBettype  
+	WHERE	ProductId = 28
+
+	--Sum_winloss
+	INSERT INTO #TmpCondSumWL(sporttype, bettype)
+	VALUES(220, 0)
 END
 
 --Force optimizer to seek on IX_srecommend index
