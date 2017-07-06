@@ -1,3 +1,4 @@
+/*<info serverAlias="DBEAS-bodb_EAS" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_EAS]
 GO
 
@@ -22,7 +23,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_SAg]
 	@showVB			BIT = 0,
 	@showNG2		BIT = 0,
 	@showFW			BIT = 0,
-	@showLO			BIT = 0,
+	@showLT			BIT = 0,
 	@BalanceUpDay	SMALLDATETIME,
 	@PageSize		INT = 0,
 	@PageIndex		INT = 0,
@@ -164,7 +165,7 @@ BEGIN
 	INSERT INTO @TmpCondSumWL(sporttype, bettype)
 	VALUES(219, 0)
 END
-IF @showLO = 1
+IF @showLT = 1
 BEGIN
 	--Sum_winloss
 	INSERT INTO @TmpCondSumWL(sporttype, bettype)
@@ -227,7 +228,7 @@ BEGIN
 				OR s.ProductID = CASE WHEN @showVB			= 1 THEN 22 ELSE 0 END
 				OR s.ProductID = CASE WHEN @showNG2			= 1 THEN 23 ELSE 0 END
 				OR s.ProductID = CASE WHEN @showFW			= 1 THEN 24 ELSE 0 END
-				OR s.ProductID = CASE WHEN @showLO			= 1 THEN 28 ELSE 0 END
+				OR s.ProductID = CASE WHEN @showLT			= 1 THEN 28 ELSE 0 END
 			)
 		    AND winlostdate between @FromDate and @todate 
 		    AND srecommend = @custid 
@@ -389,18 +390,4 @@ FROM
     ) wl
 
 WHERE wl.RowNum between @RowStart and @RowEnd
-
-
 GO
-
-SET QUOTED_IDENTIFIER OFF 
-GO
-SET ANSI_NULLS ON 
-GO
-
-
-GO 
- GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDetail_SAg] TO [bodbExtAccNet]
-GO 
- GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDetail_SAg] TO [vnteam]
-GO 

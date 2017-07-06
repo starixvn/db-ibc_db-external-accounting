@@ -1,3 +1,4 @@
+/*<info serverAlias="DBEAS-bodb_EAS" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_EAS]
 GO
 
@@ -22,7 +23,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com]
 	@showVB			BIT = 0,
 	@showNG2		BIT = 0,
 	@showFW			BIT = 0,
-	@showLO			BIT = 0,
+	@showLT			BIT = 0,
 	@BalanceUpDay	SMALLDATETIME	
 AS
 
@@ -322,7 +323,7 @@ BEGIN
 	INSERT INTO #TmpCondSumWL(sporttype, bettype)
 	VALUES(219, 0)
 END
-IF @showLO = 1
+IF @showLT = 1
 BEGIN
 	-- bettrans
 	INSERT INTO #TmpCond(Sporttype, Bettype) 
@@ -516,6 +517,3 @@ DROP TABLE #TmpCond
 DROP TABLE #TmpCondSumWL
 
 GO
-GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [bodbExtAccNet] AS [dbo]
-GO
-GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [vnteam] AS [dbo]
