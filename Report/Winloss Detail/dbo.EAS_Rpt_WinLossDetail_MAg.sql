@@ -45,7 +45,9 @@ Revisions:
 	- 20160414@Victor: Support new product Voidbridge [Redmine: #55468]
 	- 20160809@Percy: Modify Net Turnover for Allbet [RedmineID: #61876]
 	- 20160915@Johnson: Integrate NG2 [RedmineSPU: #30]
+	- 20161020@Francis: Enhance SP and avoid pagesplit by prompting index seek on bettrans [Redmine: #65042]
 	- 20161028@Percy: Support Fishing World [RedmineID: #65735]
+	- 20170622@Percy: Combine Betradar Virtual Sports with Virtual Sports [RedmineID: #78340]
 */
 
 SET NOCOUNT ON
@@ -58,6 +60,15 @@ DECLARE @MAgWinLossDetails TABLE(CustID int, TurnOver money, TurnoverNoDraw MONE
 	PlayerComm money, MemberTotal money, AgWinLost money, AgComm money, AgTotal money, 
 	MAgWinLost money, MAgComm money, MAgTotal money, Company money)
 
+DECLARE @tmpAg AS TABLE (CustID INT PRIMARY KEY)
+IF @Agentid IS NULL
+	INSERT INTO @tmpAg (CustID)
+		SELECT CustID
+		FROM bodb02.dbo.custInfo WITH (NOLOCK)
+		WHERE mrecommend = @custid AND roleid = 2
+ELSE
+	INSERT INTO @tmpAg (CustID)
+		SELECT @Agentid
 
 DECLARE @TmpCondSumWL TABLE(sporttype INT, bettype INT)
 IF @ShowSB = 1
@@ -106,7 +117,7 @@ IF @showVS = 1
 BEGIN
 	--Sum_winloss  
 	INSERT INTO @TmpCondSumWL(Sporttype, Bettype)  
-	VALUES(180,0) 
+	VALUES(180,0), (190,0)
 END
 
 IF @showKeno = 1
@@ -164,7 +175,8 @@ SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
 
 DECLARE @SportBettype TABLE(ProductID INT, Bettype INT)
 INSERT INTO @SportBettype (ProductID, Bettype)
-SELECT ProductID, Bettype FROM bodb02.dbo.f_SportBettypeMatrix_Sel(0, 0, 0, 2, '', '', @isTest)
+SELECT ISNULL(p.GroupProductId, s.ProductID), Bettype FROM bodb02.dbo.f_SportBettypeMatrix_Sel(0, 0, 0, 2, '', '', @isTest) s
+	LEFT JOIN bodb02.dbo.f_GroupProduct() p ON s.ProductID = p.ProductId
 
 
 IF @Todate >= @BalanceUpDay
@@ -193,7 +205,8 @@ BEGIN
 		    isnull(sum(mwinlost), 0) + isnull(sum(acomm), 0)-sum(comm), --MAgTotal
 		    -(isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(acomm), 0) + isnull(sum(winlost-actual_stake), 0))--Company				
 	    FROM
-		    bodb02.dbo.bettrans b WITH (NOLOCK)
+		    bodb02.dbo.bettrans b WITH (NOLOCK)--, INDEX = CIX_recommend_matchid_bettype)
+		    INNER JOIN @tmpAg Ag ON b.recommend = Ag.CustID
 			INNER JOIN @SportBettype s ON b.bettype = s.Bettype
 	    WHERE	
 			(
@@ -215,11 +228,8 @@ BEGIN
 				OR s.ProductID = CASE WHEN @showFW			= 1 THEN 24 ELSE 0 END
 			)
 			AND winlostdate BETWEEN @FromDate AND @todate
-		    --status not in ('running','waiting','VOID', 'REJECT', 'Refund') and
-			AND statusID NOT IN (101, 102, 103) 
+		    AND statusID NOT IN (101, 102, 103) 
 		    AND ruben=1 
-		    AND mrecommend=@custid
-		    AND (@Agentid IS NULL OR b.recommend = @Agentid)
 	    GROUP BY Recommend, CASE WHEN b.bettype = 71 OR b.bettype BETWEEN 2101 AND 2399 THEN 71 ELSE b.bettype END
 	    
 	    		
@@ -349,18 +359,7 @@ FROM
     ) wl
     
 WHERE wl.RowNum between @RowStart and @RowEnd
-
-
 GO
-
-SET QUOTED_IDENTIFIER OFF 
+GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDetail_MAg] TO [bodbExtAccNet] AS [dbo]
 GO
-SET ANSI_NULLS ON 
-GO
-
-
-GO 
- GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDetail_MAg] TO [bodbExtAccNet]
-GO 
- GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDetail_MAg] TO [vnteam]
-GO 
+GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDetail_MAg] TO [vnteam] AS [dbo]

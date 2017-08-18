@@ -1,5 +1,6 @@
 USE [bodb_EAS]
 GO
+
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCTHAI',--ACCTHAI or ACCINDO
 	@custid			INT = NULL,	
@@ -48,12 +49,14 @@ Revisions:
 	- 20160915@Johnson: Integrate NG2 [RedmineSPU: #30]
 	- 20161028@Percy: Support Fishing World [RedmineID: #65735]
 	- 20161001@Daniel: Change to REASDPAST when get from bettrans due to pagesplit
+	- 20161020@Francis: Avoid pagesplit by prompting index seek on bettrans [Redmine: #65042]
+	- 20170622@Percy: Combine Betradar Virtual Sports with Virtual Sports [RedmineID: #78340]
 	
 */
 
 SET NOCOUNT ON
 
-CREATE TABLE #tmpSuperList ( custID INT PRIMARY KEY)
+CREATE TABLE #tmpSuperList (custID INT PRIMARY KEY)
 
 INSERT INTO #tmpSuperList(CustID)
 SELECT custID 
@@ -199,15 +202,21 @@ BEGIN
 	--SELECT 180 AS sporttype, typeid FROM bodb02.dbo.bettype (NOLOCK)
 	--WHERE typeid BETWEEN 1201 AND 1299
 
+	-- Virtual Sports
 	INSERT INTO #TmpCond(Sporttype, Bettype) 
 	SELECT	180 AS sporttype, Bettype 
 	FROM	#SportBettype  
 	WHERE	ProductId = 5
 
+	-- Betradar Virtual Sports
+	INSERT INTO #TmpCond(Sporttype, Bettype) 
+	SELECT	190 AS sporttype, Bettype 
+	FROM	#SportBettype  
+	WHERE	ProductId = 27
 
 	--Sum_winloss
 	INSERT INTO #TmpCondSumWL(Sporttype, Bettype)
-	VALUES(180,0)
+	VALUES(180,0), (190,0)
 END
 
 IF @showKeno = 1
@@ -312,6 +321,9 @@ BEGIN
 	VALUES(219, 0)
 END
 
+--Force optimizer to seek on IX_srecommend index
+DECLARE @n INT = 2147483647
+	
 IF @Todate >= @BalanceUpDay
 BEGIN 
     INSERT INTO #ComWinLossDetails
@@ -345,11 +357,12 @@ BEGIN
 			LEFT JOIN #SportBettype s ON b.bettype = s.Bettype
 	    WHERE
 		    b.winlostdate between @FromDate and @todate and
-		    b.srecommend in (SELECT custID FROM #tmpSuperList) and
+		    b.srecommend in (SELECT TOP (@n) custID FROM #tmpSuperList) and
 		    b.ruben = 1 and
-		    b.statusID not in (101, 102, 103)   and 
+		    b.statusID not in (101, 102, 103) and 
 		    b.bettype <> 1000
 	    GROUP BY SRecommend, CASE WHEN b.bettype = 71 OR b.bettype BETWEEN 2101 AND 2399 THEN 71 ELSE b.bettype END
+	    OPTION (OPTIMIZE FOR (@n = 1))
 	    
 	-- seperate P2P to improve performance
 	IF @showP2P = 1 
@@ -377,11 +390,12 @@ BEGIN
 		    bodb02.dbo.bettrans b WITH (NOLOCK) INNER JOIN #TmpCond t ON b.bettype = t.bettype
 	    WHERE
 		    b.winlostdate between @FromDate and @todate and
-		    b.srecommend in (SELECT custID FROM #tmpSuperList) and
+		    b.srecommend in (SELECT TOP (@n) custID FROM #tmpSuperList) and
 		    b.ruben = 1 and
-		    b.statusID not in (101, 102, 103)  and 
+		    b.statusID not in (101, 102, 103) and 
 		    b.bettype = 1000
 	    GROUP BY SRecommend, b.bettype
+	    OPTION (OPTIMIZE FOR (@n = 1))
 	END 
 
 	if @BalanceUpDay < @FromDate
