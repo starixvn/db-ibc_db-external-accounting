@@ -1,3 +1,4 @@
+/*<info serverAlias="DBEAS-bodb_EAS" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_EAS]
 GO
 
@@ -22,6 +23,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com]
 	@showVB			BIT = 0,
 	@showNG2		BIT = 0,
 	@showFW			BIT = 0,
+	@showLT			BIT = 0,
 	@BalanceUpDay	SMALLDATETIME	
 AS
 
@@ -51,6 +53,7 @@ Revisions:
 	- 20161001@Daniel: Change to REASDPAST when get from bettrans due to pagesplit
 	- 20161020@Francis: Avoid pagesplit by prompting index seek on bettrans [Redmine: #65042]
 	- 20170622@Percy: Combine Betradar Virtual Sports with Virtual Sports [RedmineID: #78340]
+	- 20170703@Percy: Support Keno Lottery [RedmineID: #78068]
 	
 */
 
@@ -320,6 +323,18 @@ BEGIN
 	INSERT INTO #TmpCondSumWL(sporttype, bettype)
 	VALUES(219, 0)
 END
+IF @showLT = 1
+BEGIN
+	-- bettrans
+	INSERT INTO #TmpCond(Sporttype, Bettype) 
+	SELECT	220 AS sporttype, Bettype 
+	FROM	#SportBettype  
+	WHERE	ProductId = 28
+
+	--Sum_winloss
+	INSERT INTO #TmpCondSumWL(sporttype, bettype)
+	VALUES(220, 0)
+END
 
 --Force optimizer to seek on IX_srecommend index
 DECLARE @n INT = 2147483647
@@ -502,6 +517,3 @@ DROP TABLE #TmpCond
 DROP TABLE #TmpCondSumWL
 
 GO
-GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [bodbExtAccNet] AS [dbo]
-GO
-GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDetail_Com] TO [vnteam] AS [dbo]
