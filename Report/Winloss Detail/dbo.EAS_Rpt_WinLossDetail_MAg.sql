@@ -7,23 +7,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_MAg]
 	@Agentid		INT = NULL,
 	@FromDate		SMALLDATETIME,
 	@ToDate			SMALLDATETIME,
-	@showSB			BIT = 1,
-	@showCasino		BIT = 0,
-	@showP2P		BIT = 0,
-	@showRB			BIT = 0,	
-	@showNG			BIT = 0,
-	@showBI			BIT = 0,
-	@showLiveCasino BIT = 0,
-	@showVS			BIT = 0,
-	@showKeno		BIT = 0,
-	@showGD			BIT = 0,
-	@showCB			BIT = 0,
-	@showCF			BIT = 0,
-	@showAB			BIT = 0,
-	@showVB			BIT = 0,
-	@showNG2		BIT = 0,
-	@showFW			BIT = 0,
-	@showLT			BIT = 0,
+	@ProductIds		VARCHAR(MAX) = '',
 	@BalanceUpDay	SMALLDATETIME,
 	@PageSize		INT = 0,
 	@PageIndex		INT = 0,
@@ -51,6 +35,9 @@ Revisions:
 	- 20161028@Percy: Support Fishing World [RedmineID: #65735]
 	- 20170622@Percy: Combine Betradar Virtual Sports with Virtual Sports [RedmineID: #78340]
 	- 20170703@Percy: Support Keno Lottery [RedmineID: #78068]
+	- 20170830@Percy:
+		1. Integrate Lucky 3 [RedmineID: #76770]
+		2. Change list of @show[ProductCode] to @ProductIDs - apply all new products
 */
 
 SET NOCOUNT ON
@@ -73,110 +60,12 @@ ELSE
 	INSERT INTO @tmpAg (CustID)
 		SELECT @Agentid
 
-DECLARE @TmpCondSumWL TABLE(sporttype INT, bettype INT)
-IF @ShowSB = 1
-BEGIN
-	--Sum_winloss
-	INSERT INTO @TmpCondSumWL(sporttype, Bettype)
-	VALUES(0,0)	
-END
-IF @ShowCasino = 1
-BEGIN
-	--Sum_winloss
-	INSERT INTO @TmpCondSumWL(sporttype, Bettype)
-	VALUES(251,71), (208,0), (209,0), (210,0)
-END
-IF @ShowP2P = 1
-BEGIN
-	--Sum_winloss
-	INSERT INTO @TmpCondSumWL(sporttype, Bettype)
-	VALUES(253,1000)
-END
-IF @ShowRB = 1
-BEGIN
-	--Sum_winloss
-	INSERT INTO @TmpCondSumWL(Sporttype, Bettype)
-	SELECT 151,0
-END
-IF @ShowNG = 1
-BEGIN
-	--Sum_winloss
-	INSERT INTO @TmpCondSumWL(Sporttype, Bettype)
-	VALUES(161,0)
-END
-IF @ShowBI = 1
-BEGIN
-	--Sum_winloss
-	INSERT INTO @TmpCondSumWL(Sporttype, Bettype)
-	VALUES(252,73)
-END
-IF @showLiveCasino = 1
-BEGIN
-	--Sum_winloss  
-	INSERT INTO @TmpCondSumWL(Sporttype, Bettype)  
-	VALUES(162,0) 
-END
-IF @showVS = 1
-BEGIN
-	--Sum_winloss  
-	INSERT INTO @TmpCondSumWL(Sporttype, Bettype)  
-	VALUES(180,0), (190,0)
-END
+SELECT @ProductIds = bodb02.dbo.f_AddRelatedProducts(@ProductIds)
 
-IF @showKeno = 1
-BEGIN
-	--Sum_winloss
-	INSERT INTO @TmpCondSumWL(Sporttype, Bettype)
-	VALUES(202,0)
-END
-IF @showGD = 1
-BEGIN 
-	--Sum_winloss  
-	INSERT INTO @TmpCondSumWL(Sporttype, Bettype)  
-	VALUES(255, 0) 
-END
-IF @showCB = 1
-BEGIN
-	--Sum_winloss
-	INSERT INTO @TmpCondSumWL(sporttype, bettype)
-	VALUES(204, 0)
-END
-IF @showCF = 1
-BEGIN
-	--Sum_winloss
-	INSERT INTO @TmpCondSumWL(sporttype, bettype)
-	VALUES(206, 1003)
-END
-IF @showAB = 1
-BEGIN
-	--Sum_winloss
-	INSERT INTO @TmpCondSumWL(sporttype, bettype)
-	VALUES(211, 0)
-END
-IF @showVB = 1
-BEGIN
-	--Sum_winloss
-	INSERT INTO @TmpCondSumWL(sporttype, bettype)
-	VALUES(212, 0)
-END
-IF @showNG2 = 1
-BEGIN
-	--Sum_winloss
-	INSERT INTO @TmpCondSumWL(sporttype, bettype)
-	VALUES(213, 0)
-END
-IF @showFW = 1
-BEGIN
-	--Sum_winloss
-	INSERT INTO @TmpCondSumWL(sporttype, bettype)
-	VALUES(219, 0)
-END
-IF @showLT = 1
-BEGIN
-	--Sum_winloss
-	INSERT INTO @TmpCondSumWL(sporttype, bettype)
-	VALUES(220, 0)
-END
+DECLARE @TmpCondSumWL TABLE(sporttype INT, bettype INT)
+INSERT INTO @TmpCondSumWL (sporttype, bettype)
+SELECT sporttype, bettype
+FROM bodb02.dbo.f_SumWinloss_ConditionSel(@ProductIds)
 
 ----Get Sport Bettype Matrix------
 DECLARE @isTest BIT = 0
@@ -184,9 +73,8 @@ SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
 
 DECLARE @SportBettype TABLE(ProductID INT, Bettype INT)
 INSERT INTO @SportBettype (ProductID, Bettype)
-SELECT ISNULL(p.GroupProductId, s.ProductID), Bettype FROM bodb02.dbo.f_SportBettypeMatrix_Sel(0, 0, 0, 2, '', '', @isTest) s
+SELECT ISNULL(p.GroupProductId, s.ProductID), Bettype FROM bodb02.dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @isTest) s
 	LEFT JOIN bodb02.dbo.f_GroupProduct() p ON s.ProductID = p.ProductId
-
 
 IF @Todate >= @BalanceUpDay
 BEGIN 
@@ -218,26 +106,7 @@ BEGIN
 		    INNER JOIN @tmpAg Ag ON b.recommend = Ag.CustID
 			INNER JOIN @SportBettype s ON b.bettype = s.Bettype
 	    WHERE	
-			(
-				   s.ProductID = CASE WHEN @showSB			= 1 THEN 1  ELSE 0 END
-				OR s.ProductID = CASE WHEN @ShowRB			= 1 THEN 2  ELSE 0 END
-				OR s.ProductID = CASE WHEN @showCasino		= 1 THEN 6  ELSE 0 END
-				OR s.ProductID = CASE WHEN @showP2P			= 1 THEN 9  ELSE 0 END
-				OR s.ProductID = CASE WHEN @showNG			= 1 THEN 3  ELSE 0 END
-				OR s.ProductID = CASE WHEN @showBI			= 1 THEN 7  ELSE 0 END
-				OR s.ProductID = CASE WHEN @showLiveCasino	= 1 THEN 4  ELSE 0 END
-				OR s.ProductID = CASE WHEN @showVS			= 1 THEN 5  ELSE 0 END
-				OR s.ProductID = CASE WHEN @showKeno		= 1 THEN 8  ELSE 0 END
-				OR s.ProductID = CASE WHEN @showGD			= 1 THEN 12 ELSE 0 END
-				OR s.ProductID = CASE WHEN @showCB			= 1 THEN 15 ELSE 0 END
-				OR s.ProductID = CASE WHEN @showCF			= 1 THEN 19 ELSE 0 END
-				OR s.ProductID = CASE WHEN @showAB			= 1 THEN 21 ELSE 0 END
-				OR s.ProductID = CASE WHEN @showVB			= 1 THEN 22 ELSE 0 END
-				OR s.ProductID = CASE WHEN @showNG2			= 1 THEN 23 ELSE 0 END
-				OR s.ProductID = CASE WHEN @showFW			= 1 THEN 24 ELSE 0 END
-				OR s.ProductID = CASE WHEN @showLT			= 1 THEN 28 ELSE 0 END
-			)
-			AND winlostdate BETWEEN @FromDate AND @todate
+			winlostdate BETWEEN @FromDate AND @todate
 		    AND statusID NOT IN (101, 102, 103) 
 		    AND ruben=1 
 	    GROUP BY Recommend, CASE WHEN b.bettype = 71 OR b.bettype BETWEEN 2101 AND 2399 THEN 71 ELSE b.bettype END
