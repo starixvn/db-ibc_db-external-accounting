@@ -41,6 +41,7 @@ Revisions:
 	- 20170830@Percy:
 		1. Integrate Lucky 3 [RedmineID: #76770]
 		2. Change list of @show[ProductCode] to @ProductIDs - apply all new products
+	- 20171002@Percy: Hotfix - Duplicated data due to duplicated bettype [RedmineID: #84167]
 */
 
 SET NOCOUNT ON
@@ -57,7 +58,6 @@ CREATE TABLE #ComWinLossDetails (CustID int, Turnover money, TurnoverNoDraw MONE
 	PlayerComm money, MemberTotal money, AgWinLost money, AgComm money, AgTotal money, 
 	MAgWinLost money, MAgComm money, MAgTotal money, SAgWinLost money, SAgComm money, SAgTotal money, Company money)
 
-CREATE TABLE #TmpCond  (sporttype INT, bettype INT)--, PRIMARY KEY NONCLUSTERED (Bettype ASC, sporttype ASC))
 CREATE TABLE #TmpCondSumWL (sporttype INT, bettype INT)--, PRIMARY KEY NONCLUSTERED (Bettype ASC, sporttype ASC))
 
 SELECT @ProductIds = bodb02.dbo.f_AddRelatedProducts(@ProductIds)
@@ -70,11 +70,6 @@ CREATE TABLE #SportBettype (ProductID INT, Bettype INT, PRIMARY KEY NONCLUSTERED
 
 INSERT INTO #SportBettype (ProductID, Bettype)
 SELECT ProductID, Bettype FROM bodb02.dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @isTest) s
-
-INSERT INTO #TmpCond(Sporttype, Bettype) 
-SELECT f.sporttype, s.BetType
-FROM bodb02.dbo.f_SumWinloss_ConditionSel(@ProductIds) f
-	INNER JOIN bodb02.dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @isTest) s ON f.ProductID = s.ProductID
 
 INSERT INTO #TmpCondSumWL (sporttype, bettype)
 SELECT sporttype, bettype
@@ -111,9 +106,8 @@ BEGIN
 		    isnull(sum(swinlost), 0) + isnull(sum(scomm), 0)-sum(acomm), --SAgTotal
 		    -(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost-actual_stake), 0)) --Company				
 	    FROM
-		    bodb02.dbo.bettrans b WITH (READPAST) 
-			INNER JOIN #TmpCond t ON b.bettype = t.bettype
-			LEFT JOIN #SportBettype s ON b.bettype = s.Bettype
+		    bodb02.dbo.bettrans b WITH (READPAST)
+			INNER JOIN #SportBettype s ON b.bettype = s.Bettype
 	    WHERE
 		    b.winlostdate between @FromDate and @todate and
 		    b.srecommend in (SELECT TOP (@n) custID FROM #tmpSuperList) and
@@ -146,7 +140,7 @@ BEGIN
 		    isnull(sum(swinlost), 0) + isnull(sum(scomm), 0)-sum(acomm), --SAgTotal
 		    -(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost-actual_stake), 0)) --Company				
 	    FROM
-		    bodb02.dbo.bettrans b WITH (NOLOCK) INNER JOIN #TmpCond t ON b.bettype = t.bettype
+		    bodb02.dbo.bettrans b WITH (NOLOCK) INNER JOIN #SportBettype s ON b.bettype = s.bettype
 	    WHERE
 		    b.winlostdate between @FromDate and @todate and
 		    b.srecommend in (SELECT TOP (@n) custID FROM #tmpSuperList) and
@@ -254,7 +248,6 @@ DROP TABLE #ComWinLossDetails
 
 DROP TABLE #tmpSuperList
 DROP TABLE #SportBettype
-DROP TABLE #TmpCond
 DROP TABLE #TmpCondSumWL
 
 GO
