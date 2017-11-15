@@ -12,23 +12,25 @@ AS
 /*
 	Created by Percy
 	Date: 2017-06-23
-	DB: DBAGE.bodb02, DBACC.bodb02, DBEXT.bodb02
+	DB: DBAGE.bodb02, DBEXT.bodb02, DBACC.bodb02
 	Task: Add related products
 
 	Revisions:
 		- 20170623@Percy: Create new [RedmineID: #78339]
+		- 20171101@Percy: Enhance Performance [RedmineID: #86200]
 */
 
 BEGIN
-	DECLARE @ProductIdList VARCHAR(MAX) = ''
+	DECLARE @ProductIdList VARCHAR(MAX)
 
-	SELECT @ProductIdList = @ProductIdList + COALESCE(CONVERT(VARCHAR(5), ProductId) + ',', '')
-	FROM (
-		SELECT DISTINCT ISNULL(p.ProductId, CONVERT(INT, val)) AS ProductId FROM dbo.strSplit(@ProductIds, ',') s
-			LEFT JOIN dbo.f_GroupProduct() p ON s.val = p.GroupProductId
-	) AS A
-
-	SELECT @ProductIdList = LEFT(@ProductIdList, LEN(@ProductIdList)-1)
+	SELECT @ProductIdList = @ProductIds + 
+		ISNULL(
+				(SELECT ',' + CONVERT(VARCHAR(10), ProductId)
+				FROM dbo.f_GroupProduct()
+				WHERE ProductId <> GroupProductId
+					AND CHARINDEX(',' + CONVERT(VARCHAR(10), GroupProductId) + ',', ',' + @ProductIds + ',') > 0
+				FOR XML PATH(''))
+			, '')
 	
 	RETURN @ProductIdList
 END
