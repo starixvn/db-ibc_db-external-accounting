@@ -16,6 +16,7 @@ AS
 	
 	Revisions:
 		- 20170622@Percy: Create new [RedmineID: #78339]
+		- 20180418@Razor: Add Macau game and Pragmatic [RedmineID: #92647]
 */
 
 RETURN
@@ -23,4 +24,8 @@ RETURN
 	SELECT 27 AS ProductId, 5 AS GroupProductId
 	UNION ALL
 	SELECT 5, 5
+	UNION ALL	-- Macau Games and Pragmatic
+	SELECT 32, 22
+	UNION ALL
+	SELECT 22, 22
 GO
