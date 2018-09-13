@@ -42,6 +42,7 @@ Revisions:
 		1. Integrate Lucky 3 [RedmineID: #76770]
 		2. Change list of @show[ProductCode] to @ProductIDs - apply all new products
 	- 20171002@Percy: Hotfix - Duplicated data due to duplicated bettype [RedmineID: #84167]
+	- 20180913@Percy: Bullfighting - Add data into TurnoverNoDraw column [RedmineID: #101288]
 */
 
 SET NOCOUNT ON
@@ -86,7 +87,7 @@ BEGIN
 			SUM(case when b.liveawayscore = 0 and b.bettype in(33,43) then b.stake/2 else ABS(b.stake) end),	
 			 SUM(CASE WHEN b.liveawayscore = 0 and b.bettype in(33,43) THEN ABS(b.stake)/2 
 					WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
-					WHEN b.StatusID = 111 AND s.ProductId = 1 THEN 0 
+					WHEN b.StatusID = 111 AND s.ProductId IN (1,30) THEN 0 -- Sportsbook, Bullfighting
 					WHEN s.ProductID = 21 THEN b.oddsspread -- Allbet
 					ELSE ABS(b.stake) 
 					END) AS TurnoverNoDraw,
