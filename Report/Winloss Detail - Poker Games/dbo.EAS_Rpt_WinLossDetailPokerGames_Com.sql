@@ -1,5 +1,5 @@
-/*<info serverAlias="DBEAS-bodb_EAS" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
-USE [bodb_EAS]
+/*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
+USE [bodb02]
 GO
 
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetailPokerGames_Com] 	
@@ -15,7 +15,7 @@ AS
 /*
 	Created by: 20180912@Sophia
 	Task : 	Company Poker Games Winloss Detail [redmine: #101376]
-	DB: 	DBEAS/bodb_EAS
+	DB: 	DBAGE/bodb02
 	Original: EAS_Rpt_WinLossDetail_Com
 	Revisions:
 	
@@ -27,7 +27,7 @@ CREATE TABLE #tmpSuperList (custID INT PRIMARY KEY)
 
 INSERT INTO #tmpSuperList(CustID)
 SELECT custID 
-FROM DBAGE.bodb_AGE.dbo.Acc_CustGroup WITH(NOLOCK)
+FROM bodb_AGE.dbo.Acc_CustGroup WITH(NOLOCK)
 WHERE (@custid IS NULL OR custid = @custid)
 	AND GroupName = @GroupName
 	
@@ -43,7 +43,7 @@ SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
 
 DECLARE @SportBettypeMatrix AS TABLE (Bettype INT)
 INSERT INTO @SportBettypeMatrix (Bettype)
-SELECT DISTINCT Bettype FROM bodb02.dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @isTest) s
+SELECT Bettype FROM bodb02.dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @isTest) s
 
 ----Avoid Parameter Sniffing 
 	DECLARE @FDate	SMALLDATETIME,
@@ -213,7 +213,8 @@ SELECT
 	sum(SAgComm) as SAgComm,
 	sum(SAgTotal) as SAgTotal,
 	sum(Company) as Company	
-FROM #ComWinLossDetails w INNER JOIN bodb02.dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID 
+FROM #ComWinLossDetails w 
+INNER JOIN bodb02.dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID 
 Group by w.CustID, c.UserName
 order by c.Username
 
