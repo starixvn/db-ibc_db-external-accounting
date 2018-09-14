@@ -21,6 +21,7 @@ AS
 	DB: DBAGE-bodb02
 	Original: EAS_Rpt_WinLossDetail_Ag
 	Revisions:
+		-20180912@Sophia: initial SP
 	
 */
 

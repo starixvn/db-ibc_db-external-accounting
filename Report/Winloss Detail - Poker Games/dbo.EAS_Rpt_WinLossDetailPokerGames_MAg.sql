@@ -21,7 +21,7 @@ AS
 	DB: DBAGE-bodb02
 	Original: EAS_Rpt_WinLossDetail_MAg
 	Revisions:
-		
+		-20180912@Sophia: initial SP
 */
 
 SET NOCOUNT ON
