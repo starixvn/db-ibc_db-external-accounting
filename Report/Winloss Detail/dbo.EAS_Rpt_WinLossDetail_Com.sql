@@ -43,6 +43,7 @@ Revisions:
 		2. Change list of @show[ProductCode] to @ProductIDs - apply all new products
 	- 20171002@Percy: Hotfix - Duplicated data due to duplicated bettype [RedmineID: #84167]
 	- 20180913@Percy: Bullfighting - Add data into TurnoverNoDraw column [RedmineID: #101288]
+	- 20180914@Percy: Poker Games - Modify GrossComm [RedmineID: #101550]
 */
 
 SET NOCOUNT ON
@@ -92,7 +93,8 @@ BEGIN
 					ELSE ABS(b.stake) 
 					END) AS TurnoverNoDraw,
 		    --sum(case when b.bettype = 1000 THEN oddsspread else case when tpositiontaking=1 then 0 else scomm/(1-tpositiontaking) end end) as GrossComm,
-		    sum(case when tpositiontaking=1 then 0 else scomm/(1-tpositiontaking) end) as GrossComm,
+		    SUM(CASE WHEN b.bettype BETWEEN 1401 AND 1499 THEN scomm
+				ELSE CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END END) AS GrossComm,
 		    sum(winlost-actual_stake), --MemberWinlost
 		    sum(playercomm), -- PlayerComm
 		    isnull(sum(winlost-actual_stake), 0) + isnull(sum(playercomm), 0), --MemberTotal

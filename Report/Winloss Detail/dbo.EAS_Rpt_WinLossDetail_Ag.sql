@@ -38,6 +38,7 @@ Revisions:
 		1. Integrate Lucky 3 [RedmineID: #76770]
 		2. Change list of @show[ProductCode] to @ProductIDs - apply all new products
 	- 20180913@Percy: Bullfighting - Add data into TurnoverNoDraw column [RedmineID: #101288]
+	- 20180914@Percy: Poker Games - Modify GrossComm [RedmineID: #101550]
 
 */
 SET NOCOUNT ON
@@ -76,7 +77,10 @@ BEGIN
 					WHEN s.ProductID = 21 THEN b.oddsspread -- Allbet
 					ELSE ABS(b.stake)
 					END) AS TurnoverNoDraw,
-		    sum(case when b.bettype = 1000 then oddsspread else comm/(1- apositiontaking) end) as GrossComm,
+		    SUM(CASE
+				WHEN b.bettype = 1000 THEN oddsspread
+				WHEN b.bettype BETWEEN 1401 AND 1499 THEN comm
+				ELSE CASE WHEN apositiontaking = 1 THEN 0 ELSE comm/(1- apositiontaking) END END) AS GrossComm,
 		    sum(winlost-actual_stake), --MemberWinlost
 		    sum(playercomm), -- PlayerComm
 		    isnull(sum(winlost-actual_stake), 0) + isnull(sum(playercomm), 0), --MemberTotal
