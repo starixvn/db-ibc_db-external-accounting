@@ -49,13 +49,11 @@ FROM bodb02.dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @isTest) s
 	SELECT	@FDate = @FromDate,
 			@TDate = @ToDate 
 			
-IF @ToDate >= @BalanceUpDay
-	BEGIN 
-		IF @FromDate <= @MoveBetsDay
-		BEGIN
-			SET @FDate = DATEADD(DD, 1, @MoveBetsDay);
-		END
-  
+IF @ToDate > @MoveBetsDay
+	BEGIN
+		SELECT	@TDate = @ToDate,
+				@FDate = CASE WHEN @FromDate <= @MoveBetsDay THEN DATEADD(DAY, 1, @MoveBetsDay) ELSE @FromDate END
+				
 		INSERT INTO @AgWinLossDetails
 	    SELECT
 		    CustID,
@@ -84,20 +82,12 @@ IF @ToDate >= @BalanceUpDay
 			AND EXISTS (SELECT 1 FROM @SportBettype s WHERE b.bettype = s.Bettype)
 	    GROUP BY CustID 
 
-	IF @BalanceUpDay < @FromDate
-		BEGIN
-			SET @FDate = @FromDate;
-		END
-		ELSE
-		BEGIN
-			SET @FDate = @BalanceUpDay;
-		END
-		
-		IF @ToDate > @MoveBetsDay
-		BEGIN
-			SET @TDate = @MoveBetsDay;
-		END
-				
+	END
+	
+	IF @FromDate <= @MoveBetsDay
+	BEGIN
+		SELECT  @FDate = @FromDate,
+				@TDate = CASE WHEN @ToDate > @MoveBetsDay THEN @MoveBetsDay ELSE @ToDate END
 		
 		INSERT INTO @AgWinLossDetails
 	    SELECT
@@ -126,43 +116,6 @@ IF @ToDate >= @BalanceUpDay
 	    GROUP BY CustID
 	END
 
-	SELECT	@FDate = @FromDate,
-			@TDate = @ToDate;
-
-	IF @FromDate < @BalanceUpDay 
-	BEGIN
-		IF @ToDate >= DATEADD(dd, -1, @BalanceUpDay)
-		BEGIN
-			SELECT @TDate = DATEADD(dd, -1, @BalanceUpDay);
-		END
-		
-	
-		INSERT INTO @AgWinLossDetails
-	    SELECT
-		   CustID,
-			SUM(TurnOver) AS TurnOver,
-			SUM(NetTurnover) AS NetTurnover,
-		    SUM(TotalComm) AS TaxComm,
-		    SUM(Winloss) AS TotalMemberWinLoss,
-			SUM(WinLoss) - SUM(InsGemMemberWinLoss) AS MemberWinLoss,
-			SUM(InsGemMemberWinLoss) AS InsGemMemberWinLoss,
-		    SUM(PlayerComm) AS PlayerComm,			
-		    SUM(Winloss) +  SUM(PlayerComm) AS MemberTotal,
-			
-		    SUM(AgWinLoss) AS InsGemAgWinLoss,
-			SUM(AgComm) - SUM(PlayerComm) AS AgComm,
-		    SUM(AgWinLoss) +SUM(AgComm) - SUM(PlayerComm) AS AgTotal,
-			
-			- (SUM(b.Winloss) + SUM(b.AgWinLoss) +SUM(AgComm)) AS Company
-	    FROM
-		    bodb_Summary.dbo.rptPokerGamesSumWinLoss_Old b WITH(NOLOCK) 
-	    WHERE
-		    winlostdate between @FDate and @TDate	
-		    and recommend=@custid
-		    and RoleID=1
-		    and (@memberID is null or b.custid = @memberID)
-	    GROUP BY CustID
-	END
 
 IF ((@PageSize <= 0) AND (@PageIndex <= 0))
 BEGIN
