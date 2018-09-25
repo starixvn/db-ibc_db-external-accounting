@@ -19,6 +19,7 @@ AS
 	Original: EAS_Rpt_WinLossDetail_Com
 	Revisions:
 		-20180912@Sophia: initial SP
+		-20180925@Viet: enhance SP
 	
 */
 
@@ -42,60 +43,67 @@ CREATE TABLE #ComWinLossDetails (CustID int, Turnover money, NetTurnover MONEY, 
 DECLARE @isTest BIT = 0
 SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
 
-DECLARE @SportBettypeMatrix AS TABLE (Bettype INT)
-INSERT INTO @SportBettypeMatrix (Bettype)
-SELECT Bettype FROM bodb02.dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @isTest) s
-
 ----Avoid Parameter Sniffing 
-	DECLARE @FDate	SMALLDATETIME,
-			@TDate	SMALLDATETIME
+DECLARE @FDate	SMALLDATETIME,
+		@TDate	SMALLDATETIME
 	    
-	SELECT	@FDate = @FromDate,
-			@TDate = @ToDate 
+SELECT	@FDate = @FromDate,
+		@TDate = @ToDate 
 
 --Force optimizer to seek on IX_srecommend index
-DECLARE @n INT = 2147483647
+--DECLARE @n INT = 2147483647
 		
 IF @ToDate > @MoveBetsDay
 	BEGIN
 		SELECT	@TDate = @ToDate,
 				@FDate = CASE WHEN @FromDate <= @MoveBetsDay THEN DATEADD(DAY, 1, @MoveBetsDay) ELSE @FromDate END
  
-		INSERT INTO #ComWinLossDetails
-	    SELECT
-		    SRecommend,						
-			SUM(ABS(b.stake)) as Turnover,
-			SUM(CASE WHEN b.bettype = 1499 THEN ABS(b.stake) ELSE ISNULL(CAST(('<xml>' + b.ExtraInfo + '</xml>') AS XML).value('data(/xml/p33/@to)[1]','MONEY'), 0) END ) AS NetTurnover,
-			SUM(ISNULL(b.oddsspread,0)) as TaxComm,			
-			
-			SUM(b.winlost - b.actual_stake) AS TotalMemberWinLoss,			
-			SUM(b.winlost - b.actual_stake) - SUM(ISNULL(b.TransID2,0)/ CONVERT(DECIMAL(19,8),10000)) AS MemberWinLoss,			
-			SUM(ISNULL(b.TransID2,0)/ CONVERT(DECIMAL(19,8),10000)) AS InsGemMemberWinLoss,			
-			SUM(ISNULL(b.playercomm,0)) AS PlayerComm,			
-		    SUM(b.winlost - b.actual_stake) + SUM(ISNULL(b.playercomm,0)) as MemberTotal, 
-			
-			SUM(b.awinlost) AS InsGemAgWinLoss,
-			SUM(ISNULL(b.comm,0)) - SUM(ISNULL(b.playercomm,0)) AS AgComm,
-			SUM(b.awinlost) + SUM(ISNULL(b.comm,0)) - SUM(ISNULL(b.playercomm,0)) AS AgTotal,					
-			
-			SUM(b.mwinlost) AS InsGemMAgWinLoss,
-			SUM(ISNULL(b.acomm,0)) - SUM(ISNULL(b.comm,0)) AS MAgComm,
-			SUM(b.mwinlost) + SUM(ISNULL(b.acomm,0)) - SUM(ISNULL(b.comm,0)) AS MAgTotal,
-			
-			SUM(b.swinlost) AS InsGemSAgWinLoss,
-			SUM(ISNULL(b.scomm,0)) - SUM(ISNULL(b.acomm,0)) AS SAgComm,
-			SUM(b.swinlost) +SUM(ISNULL(b.scomm,0)) - SUM(ISNULL(b.acomm,0)) AS SAgTotal,				
-			
-			- (SUM(b.winlost - b.actual_stake) + SUM(b.awinlost) + SUM(b.mwinlost) + SUM(b.swinlost) + SUM(ISNULL(b.scomm,0))) as Company		 
-	    FROM
-		    bodb02.dbo.bettrans b WITH (NOLOCK)
-	    WHERE
+		SELECT srecommend, bettype, swinlost, actual_stake, stake, winlost, acomm, comm, playercomm, mwinlost, awinlost, scomm, transid, oddsspread
+		INTO #Temp_bettrans
+		FROM dbo.bettrans b WITH(NOLOCK, Index = IX_srecommend)
+			INNER JOIN #tmpSuperList t ON b.srecommend = t.custID
+		WHERE
 		    b.winlostdate BETWEEN @FDate and @TDate and
-		    b.srecommend in (SELECT TOP (@n) custID FROM #tmpSuperList) and
-		    b.statusID In (111,112,113) and 	
-			EXISTS (SELECT 1 FROM @SportBettypeMatrix s WHERE b.bettype = s.Bettype)
-	    GROUP BY SRecommend
-	    OPTION (OPTIMIZE FOR (@n = 1))
+		    b.statusID In (111,112,113) and 
+			b.bettype IN (
+				SELECT bettype 
+				FROM bodb02.dbo.SportBettypeMatrix WITH(NOLOCK) 
+				WHERE ProductID = 33 AND (IsTest = 0 OR IsTest = @IsTest)
+			)
+
+		IF @@ROWCOUNT > 0
+		BEGIN
+			INSERT INTO #ComWinLossDetails
+			SELECT
+				b.SRecommend,						
+				SUM(ABS(b.stake)) as Turnover,
+				SUM(CASE WHEN b.bettype = 1499 THEN ABS(b.stake) ELSE ISNULL(CAST(('<xml>' + d.ExtraInfo + '</xml>') AS XML).value('data(/xml/p33/@to)[1]','MONEY'), 0) END ) AS NetTurnover,
+				SUM(ISNULL(b.oddsspread,0)) as TaxComm,			
+			
+				SUM(b.winlost - b.actual_stake) AS TotalMemberWinLoss,			
+				SUM(b.winlost - b.actual_stake) - SUM(ISNULL(d.TransID2,0)/ CONVERT(DECIMAL(19,8),10000)) AS MemberWinLoss,			
+				SUM(ISNULL(d.TransID2,0)/ CONVERT(DECIMAL(19,8),10000)) AS InsGemMemberWinLoss,			
+				SUM(ISNULL(b.playercomm,0)) AS PlayerComm,			
+				SUM(b.winlost - b.actual_stake) + SUM(ISNULL(b.playercomm,0)) as MemberTotal, 
+			
+				SUM(b.awinlost) AS InsGemAgWinLoss,
+				SUM(ISNULL(b.comm,0)) - SUM(ISNULL(b.playercomm,0)) AS AgComm,
+				SUM(b.awinlost) + SUM(ISNULL(b.comm,0)) - SUM(ISNULL(b.playercomm,0)) AS AgTotal,					
+			
+				SUM(b.mwinlost) AS InsGemMAgWinLoss,
+				SUM(ISNULL(b.acomm,0)) - SUM(ISNULL(b.comm,0)) AS MAgComm,
+				SUM(b.mwinlost) + SUM(ISNULL(b.acomm,0)) - SUM(ISNULL(b.comm,0)) AS MAgTotal,
+			
+				SUM(b.swinlost) AS InsGemSAgWinLoss,
+				SUM(ISNULL(b.scomm,0)) - SUM(ISNULL(b.acomm,0)) AS SAgComm,
+				SUM(b.swinlost) +SUM(ISNULL(b.scomm,0)) - SUM(ISNULL(b.acomm,0)) AS SAgTotal,				
+			
+				- (SUM(b.winlost - b.actual_stake) + SUM(b.awinlost) + SUM(b.mwinlost) + SUM(b.swinlost) + SUM(ISNULL(b.scomm,0))) as Company		 
+			FROM #Temp_bettrans b
+				INNER JOIN dbo.bettrans d WITH(NOLOCK) on b.transid = d.transid
+			GROUP BY b.srecommend	
+		END
+		DROP TABLE #Temp_bettrans
 	END    
 		
 	IF @FromDate <= @MoveBetsDay
@@ -166,6 +174,5 @@ order by c.Username
 
 DROP TABLE #ComWinLossDetails
 
-DROP TABLE #tmpSuperList 
-
+DROP TABLE #tmpSuperList
 GO
