@@ -1,7 +1,12 @@
+/*<info serverAlias="DBEAS-bodb_EAS" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
+USE [bodb_EAS]
+GO
+
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDaily_MAg14]
-	@winlostdate	DATETIME,
-	@custID			INT,
-	@agentID		INT = NULL
+	@winlostdate		SMALLDATETIME,
+	@custID				INT,
+	@agentID			INT = NULL,
+	@ExcludeProductIds	VARCHAR(MAX) = ''
 AS
 /*
 	Created by: Dan
@@ -9,14 +14,25 @@ AS
 	Task: Daily WinLoss for Site 
 	DB: DBEAS/bodb_EAS
 	Original: [Acc_Rpt_WinLossDaily_MAgEx14]
+	
 	Revisions:
 		- 20130121@Dan: Move sp from DB06/bodb02 to DBEAS/bodb_EAS
+		- 20181004@Percy: Add @ExcludeProductIds to exclude some products [RedmineID: #101644]
+
 	Param's Explanation:		
 		@custID: Master ID 
 */
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @isTest BIT = 0
+	SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
 	
+	DECLARE @ExcludeBettype TABLE(Bettype INT)
+
+	IF ISNULL(@ExcludeProductIds, '') <> ''
+		INSERT INTO @ExcludeBettype (Bettype)
+		SELECT DISTINCT Bettype FROM bodb02.dbo.f_SportBettypeMatrixByProduct_Sel(@ExcludeProductIds, @isTest)
 
 	SELECT	b.Recommend CustID,
 			ci.username,
@@ -39,12 +55,8 @@ BEGIN
 			AND b.ruben = 1
 			AND b.bettype < 19999
 			AND b.statusID NOT IN (101,102,103,121)
+			AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.bettype)
 	GROUP BY b.Recommend, ci.username 
 	ORDER BY ci.username
-	
 END
-
 GO
-GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDaily_MAg14] TO [bodbExtAccNet]
-GO
-GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDaily_MAg14] TO [vnteam]

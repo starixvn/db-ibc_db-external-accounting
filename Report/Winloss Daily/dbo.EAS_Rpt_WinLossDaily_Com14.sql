@@ -1,7 +1,12 @@
+/*<info serverAlias="DBEAS-bodb_EAS" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
+USE [bodb_EAS]
+GO
+
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDaily_Com14]
-	@winlostdate	DATETIME,	
-	@custid			INT = NULL,	
-	@GroupName		VARCHAR(50) = 'ACCTHAI'--ACCTHAI or ACCINDO
+	@winlostdate		DATETIME,	
+	@custid				INT = NULL,	
+	@GroupName			VARCHAR(50) = 'ACCTHAI',
+	@ExcludeProductIds	VARCHAR(MAX) = ''
 AS
 /*
 	Created by: Dan
@@ -12,22 +17,25 @@ AS
 	Revisions:
 		- 20130121@Dan: Move sp from DB06/bodb02 to DBEAS/bodb_EAS, call to bodb_AGE for Acc_CustGroup
 		- 20160824@Sophia: Enhance Performance (work around for hotfix) [Redmine: #62941]
+		- 20181004@Percy: Add @ExcludeProductIds to exclude some products [RedmineID: #101644]
 	
 	Param's Explanation:
 		
 */
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @isTest BIT = 0
+	SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
+	
+	DECLARE @ExcludeBettype TABLE(Bettype INT)
+
+	IF ISNULL(@ExcludeProductIds, '') <> ''
+		INSERT INTO @ExcludeBettype (Bettype)
+		SELECT DISTINCT Bettype FROM bodb02.dbo.f_SportBettypeMatrixByProduct_Sel(@ExcludeProductIds, @isTest)
+
 	CREATE TABLE #tmpSuperList( custID INT, username VARCHAR(30), PRIMARY KEY (custID ASC))
 
-	/*
-	INSERT INTO #tmpSuperList(CustID, username)
-	SELECT	custID, username 
-	FROM	custinfo WITH (NOLOCK)
-	WHERE	currency = @currency 
-			AND roleid = 4 
-			AND dbo.f_isDummySuper(custID) = 0
-	*/
 	INSERT INTO #tmpSuperList(CustID, username)
 	SELECT custID,username 
 	FROM bodb02.dbo.custinfo (NOLOCK)
@@ -54,13 +62,10 @@ BEGIN
 			AND b.ruben = 1
 			AND b.bettype < 19999
 			AND b.statusID NOT IN (101,102,103,121)
+			AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.bettype)
 	GROUP BY b.SRecommend, t.username 
 	ORDER BY t.username
 	
 	DROP TABLE #tmpSuperList
 END
-
 GO
-GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDaily_Com14] TO [bodbExtAccNet]
-GO
-GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDaily_Com14] TO [vnteam]
