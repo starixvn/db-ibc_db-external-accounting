@@ -47,7 +47,6 @@ BEGIN
 		    
 		SELECT	@FDate = @FromDate,
 				@TDate = @ToDate 
-				
 
 	----- Get Report			
 			
@@ -83,7 +82,7 @@ BEGIN
 				FROM
 					bodb02.dbo.bettrans b WITH (NOLOCK)
 				WHERE b.mrecommend = @custid	
-					AND b.recommend * @ID = 0 -- get by recommend only
+					AND b.recommend * @ID <> 0 -- get by recommend only
 					AND winlostdate BETWEEN @FDate AND @TDate
 					AND statusID IN (111, 112, 113)				
 					AND EXISTS (SELECT 1 FROM @SportBettype s WHERE b.bettype = s.Bettype)
