@@ -1,10 +1,12 @@
+/*<info serverAlias="DBEAS-bodb_EAS" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_EAS]
 GO
 
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDaily_MAg]
-	@winlostdate	DATETIME,
-	@custID			INT,
-	@agentID		INT = NULL
+	@winlostdate		SMALLDATETIME,
+	@custID				INT,
+	@agentID			INT = NULL,
+	@ExcludeProductIds	VARCHAR(MAX) = ''
 AS
 /*
 	Created by: Dan
@@ -20,12 +22,22 @@ AS
 		- 20161028@Percy:
 			1. Support Fishing World [RedmineID: #65735]
 			2. Apply column RefTable
+		- 20181004@Percy: Add @ExcludeProductIds to exclude some products [RedmineID: #101644]
 		
 	Param's Explanation:		
 		@custID: Master ID 
 */
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @isTest BIT = 0
+	SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
+	
+	DECLARE @ExcludeBettype TABLE(Bettype INT)
+
+	IF ISNULL(@ExcludeProductIds, '') <> ''
+		INSERT INTO @ExcludeBettype (Bettype)
+		SELECT DISTINCT Bettype FROM bodb02.dbo.f_SportBettypeMatrixByProduct_Sel(@ExcludeProductIds, @isTest)
 	
 	IF @winlostdate < CAST(DATEADD(DD, -1, GETDATE()) AS DATE)
 	BEGIN	
@@ -50,14 +62,12 @@ BEGIN
 				AND b.ruben = 1
 				AND b.bettype < 19999
 				AND b.statusID NOT IN (101,102,103,121)
+				AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.bettype)
 		GROUP BY b.Recommend, ci.username 
 		ORDER BY ci.username
 	END
 	ELSE
 	BEGIN
-		DECLARE @isTest BIT = 0
-		SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
-
 		DECLARE @SportBettype TABLE(ProductID INT, Bettype INT)
 		INSERT INTO @SportBettype (ProductID, Bettype)
 		SELECT ProductID, Bettype FROM bodb02.dbo.f_SportBettypeMatrix_Sel(0, 0, 0, 2, '', '', @isTest)
@@ -93,8 +103,9 @@ BEGIN
 					AND b.MRecommend = @CustID 
 					AND (@agentID is null or b.recommend = @agentID) 
 					AND b.ruben = 1
-					AND b.bettype < 19999 AND b.bettype NOT IN (SELECT bettype FROM @SportBettype)
+					AND b.bettype < 19999
 					AND b.statusID NOT IN (101,102,103,121)
+					AND NOT EXISTS (SELECT 1 FROM @SportBettype s WHERE s.Bettype = b.bettype)
 			GROUP BY b.Recommend, ci.username 
 			
 			UNION ALL -- bettransRNG
@@ -119,6 +130,7 @@ BEGIN
 					AND (@agentID is null or b.recommend = @agentID)
 					--AND b.gameID < 19999
 					AND b.statusID NOT IN (0,1,101,102,103,121)
+					AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.gameId)
 			GROUP BY b.Recommend, ci.username
 
 			UNION ALL -- bettransLC
@@ -143,16 +155,11 @@ BEGIN
 					AND (@agentID is null or b.recommend = @agentID)
 					--AND b.gameID < 19999
 					AND b.statusID NOT IN (0,1,101,102,103,121)
+					AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.gameId)
 			GROUP BY b.Recommend, ci.username
 		) AS A
 		GROUP BY CustID, username
 		ORDER BY username
 	END
 END
-
-
-GO
-GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDaily_MAg] TO [bodbExtAccNet]
-GO
-GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDaily_MAg] TO [vnteam]
 GO

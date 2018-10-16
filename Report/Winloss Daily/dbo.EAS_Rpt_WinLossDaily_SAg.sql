@@ -1,10 +1,12 @@
+/*<info serverAlias="DBEAS-bodb_EAS" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
 USE [bodb_EAS]
 GO
 
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDaily_SAg]
-	@winlostdate	DATETIME,
-	@custID			INT,
-	@masterID		INT = NULL
+	@winlostdate		SMALLDATETIME,
+	@custID				INT,
+	@masterID			INT = NULL,
+	@ExcludeProductIds	VARCHAR(MAX) = ''
 AS
 /*
 	Created by: Dan
@@ -20,12 +22,22 @@ AS
 		- 20161028@Percy:
 			1. Support Fishing World [RedmineID: #65735]
 			2. Apply column RefTable
+		- 20181004@Percy: Add @ExcludeProductIds to exclude some products [RedmineID: #101644]
 
 	Param's Explanation:		
 		@custID: Super ID 
 */
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @isTest BIT = 0
+	SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
+	
+	DECLARE @ExcludeBettype TABLE(Bettype INT)
+
+	IF ISNULL(@ExcludeProductIds, '') <> ''
+		INSERT INTO @ExcludeBettype (Bettype)
+		SELECT DISTINCT Bettype FROM bodb02.dbo.f_SportBettypeMatrixByProduct_Sel(@ExcludeProductIds, @isTest)
 	
 	IF @winlostdate < CAST(DATEADD(DD, -1, GETDATE()) AS DATE)
 	BEGIN
@@ -50,18 +62,22 @@ BEGIN
 				AND b.ruben = 1
 				AND b.bettype < 19999
 				AND b.statusID NOT IN (101,102,103,121)
+				AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.bettype)
 		GROUP BY b.MRecommend, ci.username 
 		ORDER BY ci.username
 	END
 	ELSE
 	BEGIN
-		DECLARE @isTest BIT = 0
-		SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
-
-		DECLARE @SportBettype TABLE(ProductID INT, Bettype INT)
-		INSERT INTO @SportBettype (ProductID, Bettype)
-		SELECT ProductID, Bettype FROM bodb02.dbo.f_SportBettypeMatrix_Sel(0, 0, 0, 2, '', '', @isTest)
+		DECLARE @SportBettype TABLE (Bettype INT)
+		INSERT INTO @SportBettype (Bettype)
+		SELECT DISTINCT Bettype FROM bodb02.dbo.f_SportBettypeMatrix_Sel(0, 0, 0, 2, '', '', @isTest)
 		WHERE RefTable IN (1,2) -- bettype in bettransRnG/bettransLC
+
+		INSERT INTO @SportBettype (bettype)
+		SELECT e.Bettype
+		FROM @ExcludeBettype e
+			LEFT JOIN @SportBettype s ON e.Bettype = s.Bettype
+		WHERE s.Bettype IS NULL
 		
 		SELECT  CustID, username,
 				SUM(totalTO) AS totalTO,
@@ -93,8 +109,9 @@ BEGIN
 					AND b.srecommend = @CustID 
 					AND (@masterID is null or b.mrecommend = @masterID) 
 					AND b.ruben = 1
-					AND b.bettype < 19999 AND b.bettype NOT IN (SELECT bettype FROM @SportBettype)
+					AND b.bettype < 19999
 					AND b.statusID NOT IN (101,102,103,121)
+					AND NOT EXISTS (SELECT 1 FROM @SportBettype s WHERE s.Bettype = b.bettype)
 			GROUP BY b.MRecommend, ci.username
 			
 			UNION ALL -- bettransRNG
@@ -119,6 +136,7 @@ BEGIN
 					AND (@masterID is null or b.mrecommend = @masterID)
 					--AND b.gameID < 19999
 					AND b.statusID NOT IN (0,1,101,102,103,121)
+					AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.gameId)
 			GROUP BY b.MRecommend, ci.username
 			
 			UNION ALL -- bettransLC
@@ -143,6 +161,7 @@ BEGIN
 					AND (@masterID is null or b.mrecommend = @masterID)
 					--AND b.gameID < 19999
 					AND b.statusID NOT IN (0,1,101,102,103,121)
+					AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.gameId)
 			GROUP BY b.MRecommend, ci.username
 		) AS A
 		GROUP BY CustID, username
@@ -150,9 +169,4 @@ BEGIN
 	END
 	
 END
-
-GO
-GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDaily_SAg] TO [bodbExtAccNet]
-GO
-GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDaily_SAg] TO [vnteam]
 GO
