@@ -101,7 +101,7 @@ BEGIN
 				isnull(sum(swinlost), 0) + isnull(sum(scomm), 0)-sum(acomm), --SAgTotal
 				-(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost-actual_stake), 0)) --Company				
 			FROM
-				bodb02.dbo.bettrans b WITH (NOLOCK, index=IX_srecommend)
+				bodb02.dbo.bettrans b WITH (NOLOCK)
 				INNER JOIN @SportBettype s ON b.bettype = s.Bettype
 			WHERE	
 				winlostdate between @FromDate and @todate 
@@ -140,7 +140,7 @@ BEGIN
 				isnull(sum(swinlost), 0) + isnull(sum(scomm), 0)-sum(acomm), --SAgTotal
 				-(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost-actual_stake), 0)) --Company				
 			FROM
-				bodb02.dbo.bettrans b WITH (NOLOCK, index=IX_srecommend)
+				bodb02.dbo.bettrans b WITH (NOLOCK)
 				INNER JOIN @SportBettype s ON b.bettype = s.Bettype
 			WHERE	
 				winlostdate between @FromDate and @todate 
