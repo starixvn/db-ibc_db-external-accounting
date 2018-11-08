@@ -1,7 +1,4 @@
 /*<info serverAlias="DBEAS-bodb_EAS" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
-USE [bodb_EAS]
-GO
-
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDaily_MAg14]
 	@winlostdate		SMALLDATETIME,
 	@custID				INT,
@@ -18,7 +15,8 @@ AS
 	Revisions:
 		- 20130121@Dan: Move sp from DB06/bodb02 to DBEAS/bodb_EAS
 		- 20181004@Percy: Add @ExcludeProductIds to exclude some products [RedmineID: #101644]
-
+		- 20181031@Helen: DB052 Indexes Revolution [RedmineID: 103572]
+		
 	Param's Explanation:		
 		@custID: Master ID 
 */
@@ -30,33 +28,66 @@ BEGIN
 	
 	DECLARE @ExcludeBettype TABLE(Bettype INT)
 
+	DECLARE @username_tmp NVARCHAR(50) 
+	
+	IF @agentID IS NOT NULL
+	BEGIN
+		SET @username_tmp = (SELECT username FROM bodb02.dbo.custinfo ci WITH (NOLOCK)  WHERE custID = @agentID)
+	END
+	
 	IF ISNULL(@ExcludeProductIds, '') <> ''
 		INSERT INTO @ExcludeBettype (Bettype)
 		SELECT DISTINCT Bettype FROM bodb02.dbo.f_SportBettypeMatrixByProduct_Sel(@ExcludeProductIds, @isTest)
 
-	SELECT	b.Recommend CustID,
-			ci.username,
-			SUM(CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END) totalTO,
-			SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*(1 - b.tpositiontaking)) ComTO,
-			SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.spositiontaking) SAgTO,
-			SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.mpositiontaking) MAgTO,
-			SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.apositiontaking) AgTO,
-			
-			-SUM(b.winlost - b.actual_stake + b.awinlost + b.mwinlost + b.swinlost + b.scomm) ComWinlost,
-			SUM(b.swinlost + b.scomm - b.acomm) SAgWinlost,
-			SUM(b.mwinlost + b.acomm - b.comm) MAgWinlost,
-			SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
+	IF @agentID IS NULL
+	BEGIN
+		SELECT	b.Recommend CustID,
+				ci.username,
+				SUM(CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END) totalTO,
+				SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*(1 - b.tpositiontaking)) ComTO,
+				SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.spositiontaking) SAgTO,
+				SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.mpositiontaking) MAgTO,
+				SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.apositiontaking) AgTO,
+				
+				-SUM(b.winlost - b.actual_stake + b.awinlost + b.mwinlost + b.swinlost + b.scomm) ComWinlost,
+				SUM(b.swinlost + b.scomm - b.acomm) SAgWinlost,
+				SUM(b.mwinlost + b.acomm - b.comm) MAgWinlost,
+				SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
 
-	FROM	bodb02.dbo.Bettrans14 b WITH (NOLOCK)
-			INNER JOIN bodb02.dbo.custinfo ci WITH (NOLOCK) ON b.Recommend = ci.custID 
-	WHERE	b.winlostdate = @winlostdate
-			AND b.MRecommend = @CustID 
-			AND (@agentID is null or b.recommend = @agentID) 
-			AND b.ruben = 1
-			AND b.bettype < 19999
-			AND b.statusID NOT IN (101,102,103,121)
-			AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.bettype)
-	GROUP BY b.Recommend, ci.username 
-	ORDER BY ci.username
+		FROM	bodb02.dbo.Bettrans14 b WITH (NOLOCK)
+				INNER JOIN bodb02.dbo.custinfo ci WITH (NOLOCK) ON b.Recommend = ci.custID 
+		WHERE	b.winlostdate = @winlostdate
+				AND b.MRecommend = @CustID 
+				AND b.ruben = 1
+				AND b.bettype < 19999
+				AND b.statusID NOT IN (101,102,103,121)
+				AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.bettype)
+		GROUP BY b.Recommend, ci.username 
+		ORDER BY ci.username
+	END
+	ELSE
+	BEGIN
+		SELECT	b.Recommend CustID,
+				@username_tmp AS username,
+				SUM(CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END) totalTO,
+				SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*(1 - b.tpositiontaking)) ComTO,
+				SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.spositiontaking) SAgTO,
+				SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.mpositiontaking) MAgTO,
+				SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.apositiontaking) AgTO,
+				
+				-SUM(b.winlost - b.actual_stake + b.awinlost + b.mwinlost + b.swinlost + b.scomm) ComWinlost,
+				SUM(b.swinlost + b.scomm - b.acomm) SAgWinlost,
+				SUM(b.mwinlost + b.acomm - b.comm) MAgWinlost,
+				SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
+
+		FROM	bodb02.dbo.Bettrans14 b WITH (NOLOCK)
+		WHERE	b.winlostdate = @winlostdate
+				AND b.recommend = @agentID
+				AND b.ruben = 1
+				AND b.bettype < 19999
+				AND b.statusID NOT IN (101,102,103,121)
+				AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.bettype)
+		GROUP BY b.Recommend
+	END
 END
 GO
