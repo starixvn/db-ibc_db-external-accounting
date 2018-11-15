@@ -26,6 +26,7 @@ AS
 			1. Support Fishing World [RedmineID: #65735]
 			2. Apply column RefTable
 		- 20181004@Percy: Add @ExcludeProductIds to exclude some products [RedmineID: #101644]
+		- 20181113@Paul: Enhance performance [RedmineID: #103479]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -50,28 +51,39 @@ BEGIN
 	
 	IF @winlostdate < CAST(DATEADD(DD, -1, GETDATE()) AS DATE)
 	BEGIN
-		SELECT	b.SRecommend CustID,
-					t.username,
-					SUM(CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END) totalTO,
-					SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*(1 - b.tpositiontaking)) ComTO,
-					SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.spositiontaking) SAgTO,
-					SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.mpositiontaking) MAgTO,
-					SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.apositiontaking) AgTO,
+		SELECT	d.CustID,
+				t.username,
+				d.totalTO,
+				d.ComTO,
+				d.SAgTO,
+				d.MAgTO,
+				d.AgTO,
+				d.ComWinlost,
+				d.SAgWinlost,
+				d.MAgWinlost,
+				d.AgWinlost
+		FROM #tmpSuperList t
+			CROSS APPLY (
+				SELECT	TOP 1 b.SRecommend CustID,
+						SUM(CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END) totalTO,
+						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*(1 - b.tpositiontaking)) ComTO,
+						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.spositiontaking) SAgTO,
+						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.mpositiontaking) MAgTO,
+						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.apositiontaking) AgTO,
 					
-					-SUM(b.winlost - b.actual_stake + b.awinlost + b.mwinlost + b.swinlost + b.scomm) ComWinlost,
-					SUM(b.swinlost + b.scomm - b.acomm) SAgWinlost,
-					SUM(b.mwinlost + b.acomm - b.comm) MAgWinlost,
-					SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
+						-SUM(b.winlost - b.actual_stake + b.awinlost + b.mwinlost + b.swinlost + b.scomm) ComWinlost,
+						SUM(b.swinlost + b.scomm - b.acomm) SAgWinlost,
+						SUM(b.mwinlost + b.acomm - b.comm) MAgWinlost,
+						SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
 
-			FROM	bodb02.dbo.Bettrans b WITH (NOLOCK)
-					INNER JOIN #tmpSuperList t ON b.srecommend = t.custID 
-			WHERE	b.winlostdate = @winlostdate
-					AND b.ruben = 1
-					AND b.bettype < 19999
-					AND b.statusID NOT IN (101,102,103,121)
-					AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.bettype)
-			GROUP BY b.SRecommend, t.username
-			ORDER BY t.username
+				FROM	bodb02.dbo.Bettrans b WITH (NOLOCK)
+				WHERE	b.winlostdate = @winlostdate
+						AND b.statusID IN (111,112,113)
+						AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.bettype)
+						AND b.srecommend = t.custID
+				GROUP BY b.SRecommend
+			) d
+		ORDER BY t.username
 	END
 	ELSE
 	BEGIN
@@ -97,73 +109,102 @@ BEGIN
 				SUM(MAgWinlost) AS MAgWinlost,
 				SUM(AgWinlost) AS AgWinlost
 		FROM (	
-			SELECT	b.SRecommend CustID,
+			SELECT d.CustID,
 					t.username,
-					SUM(CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END) totalTO,
-					SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*(1 - b.tpositiontaking)) ComTO,
-					SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.spositiontaking) SAgTO,
-					SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.mpositiontaking) MAgTO,
-					SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.apositiontaking) AgTO,
-					
-					-SUM(b.winlost - b.actual_stake + b.awinlost + b.mwinlost + b.swinlost + b.scomm) ComWinlost,
-					SUM(b.swinlost + b.scomm - b.acomm) SAgWinlost,
-					SUM(b.mwinlost + b.acomm - b.comm) MAgWinlost,
-					SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
-
-			FROM	bodb02.dbo.Bettrans b WITH (NOLOCK)
-					INNER JOIN #tmpSuperList t ON b.srecommend = t.custID 
-			WHERE	b.winlostdate = @winlostdate
-					AND b.ruben = 1
-					AND b.bettype < 19999 
-					AND b.statusID NOT IN (101,102,103,121)
-					AND NOT EXISTS (SELECT 1 FROM #SportBettype s WHERE s.Bettype = b.bettype)
-			GROUP BY b.SRecommend, t.username
+					d.totalTO,
+					d.ComTO,
+					d.SAgTO,
+					d.MAgTO,
+					d.AgTO,					
+					d.ComWinlost,
+					d.SAgWinlost,
+					d.MAgWinlost,
+					d.AgWinlost
+			FROM #tmpSuperList t
+				CROSS APPLY (
+					SELECT	TOP 1 b.SRecommend CustID,
+							SUM(CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END) totalTO,
+							SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*(1 - b.tpositiontaking)) ComTO,
+							SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.spositiontaking) SAgTO,
+							SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.mpositiontaking) MAgTO,
+							SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.apositiontaking) AgTO,					
+							-SUM(b.winlost - b.actual_stake + b.awinlost + b.mwinlost + b.swinlost + b.scomm) ComWinlost,
+							SUM(b.swinlost + b.scomm - b.acomm) SAgWinlost,
+							SUM(b.mwinlost + b.acomm - b.comm) MAgWinlost,
+							SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
+					FROM	bodb02.dbo.Bettrans b WITH (NOLOCK)
+					WHERE	b.winlostdate = @winlostdate
+							AND b.statusID IN (111,112,113)
+							AND NOT EXISTS (SELECT 1 FROM #SportBettype s WHERE s.Bettype = b.bettype)
+							AND b.srecommend = t.custID
+					GROUP BY b.SRecommend
+				) d
 			
 			UNION ALL -- bettransRNG
 			
-			SELECT	b.SRecommend CustID,
+			SELECT d.CustID,
 					t.username,
-					SUM(ABS(b.stake)) totalTO,
-					SUM(ABS(b.stake)*(1 - b.tpositiontaking)) ComTO,
-					SUM(ABS(b.stake)*b.spositiontaking) SAgTO,
-					SUM(ABS(b.stake)*b.mpositiontaking) MAgTO,
-					SUM(ABS(b.stake)*b.apositiontaking) AgTO,
-					
-					-SUM(b.winlost - b.actual_stake + b.awinlost + b.mwinlost + b.swinlost + b.scomm) ComWinlost,
-					SUM(b.swinlost + b.scomm - b.acomm) SAgWinlost,
-					SUM(b.mwinlost + b.acomm - b.comm) MAgWinlost,
-					SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
-
-			FROM	bodb02.dbo.BettransRNG b WITH (NOLOCK)
-					INNER JOIN #tmpSuperList t ON b.srecommend = t.custID 
-			WHERE	b.winlostdate = @winlostdate
-					--AND b.gameID < 19999
-					AND b.statusID NOT IN (0,1,101,102,103,121)
-					AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.gameId)
-			GROUP BY b.SRecommend, t.username 
+					d.totalTO,
+					d.ComTO,
+					d.SAgTO,
+					d.MAgTO,
+					d.AgTO,					
+					d.ComWinlost,
+					d.SAgWinlost,
+					d.MAgWinlost,
+					d.AgWinlost
+			FROM #tmpSuperList t
+				CROSS APPLY (
+					SELECT	TOP 1 b.SRecommend CustID,
+							SUM(ABS(b.stake)) totalTO,
+							SUM(ABS(b.stake)*(1 - b.tpositiontaking)) ComTO,
+							SUM(ABS(b.stake)*b.spositiontaking) SAgTO,
+							SUM(ABS(b.stake)*b.mpositiontaking) MAgTO,
+							SUM(ABS(b.stake)*b.apositiontaking) AgTO,					
+							-SUM(b.winlost - b.actual_stake + b.awinlost + b.mwinlost + b.swinlost + b.scomm) ComWinlost,
+							SUM(b.swinlost + b.scomm - b.acomm) SAgWinlost,
+							SUM(b.mwinlost + b.acomm - b.comm) MAgWinlost,
+							SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
+					FROM	bodb02.dbo.BettransRNG b WITH (NOLOCK)
+					WHERE	b.winlostdate = @winlostdate
+							AND b.statusID IN (111,112,113)
+							AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.gameId)
+							AND b.srecommend = t.custID 
+					GROUP BY b.SRecommend
+				) d
 			
 			UNION ALL -- bettransLC
 			
-			SELECT	b.SRecommend CustID,
+			SELECT d.CustID,
 					t.username,
-					SUM(ABS(b.stake)) totalTO,
-					SUM(ABS(b.stake)*(1 - b.tpositiontaking)) ComTO,
-					SUM(ABS(b.stake)*b.spositiontaking) SAgTO,
-					SUM(ABS(b.stake)*b.mpositiontaking) MAgTO,
-					SUM(ABS(b.stake)*b.apositiontaking) AgTO,
-					
-					-SUM(b.winlost - b.actual_stake + b.awinlost + b.mwinlost + b.swinlost + b.scomm) ComWinlost,
-					SUM(b.swinlost + b.scomm - b.acomm) SAgWinlost,
-					SUM(b.mwinlost + b.acomm - b.comm) MAgWinlost,
-					SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
-
-			FROM	bodb02.dbo.BettransLC b WITH (NOLOCK)
-					INNER JOIN #tmpSuperList t ON b.srecommend = t.custID 
-			WHERE	b.winlostdate = @winlostdate
-					--AND b.gameID < 19999
-					AND b.statusID NOT IN (0,1,101,102,103,121)
-					AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.gameId)
-			GROUP BY b.SRecommend, t.username 
+					d.totalTO,
+					d.ComTO,
+					d.SAgTO,
+					d.MAgTO,
+					d.AgTO,					
+					d.ComWinlost,
+					d.SAgWinlost,
+					d.MAgWinlost,
+					d.AgWinlost
+			FROM #tmpSuperList t
+				CROSS APPLY (
+					SELECT	TOP 1 b.SRecommend CustID,
+							SUM(ABS(b.stake)) totalTO,
+							SUM(ABS(b.stake)*(1 - b.tpositiontaking)) ComTO,
+							SUM(ABS(b.stake)*b.spositiontaking) SAgTO,
+							SUM(ABS(b.stake)*b.mpositiontaking) MAgTO,
+							SUM(ABS(b.stake)*b.apositiontaking) AgTO,					
+							-SUM(b.winlost - b.actual_stake + b.awinlost + b.mwinlost + b.swinlost + b.scomm) ComWinlost,
+							SUM(b.swinlost + b.scomm - b.acomm) SAgWinlost,
+							SUM(b.mwinlost + b.acomm - b.comm) MAgWinlost,
+							SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
+					FROM	bodb02.dbo.BettransLC b WITH (NOLOCK)
+					WHERE	b.winlostdate = @winlostdate
+							AND b.statusID IN (111,112,113)
+							AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.gameId)
+							AND b.srecommend = t.custID 
+					GROUP BY b.SRecommend
+				) d
 		) AS A
 		GROUP BY CustID, username
 		ORDER BY username

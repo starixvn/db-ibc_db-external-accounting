@@ -21,6 +21,7 @@ AS
 			2. Apply column RefTable
 		- 20181004@Percy: Add @ExcludeProductIds to exclude some products [RedmineID: #101644]
 		- 20181031@Helen: DB052 Indexes Revolution [RedmineID: 103572]
+		- 20181113@Paul: Enhance performance [RedmineID: #103479]
 		
 	Param's Explanation:		
 		@custID: Master ID 
@@ -48,28 +49,38 @@ BEGIN
 	BEGIN
 		IF @agentID IS NULL
 		BEGIN
-			SELECT	b.Recommend CustID,
-				ci.username,
-				SUM(CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END) totalTO,
-				SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*(1 - b.tpositiontaking)) ComTO,
-				SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.spositiontaking) SAgTO,
-				SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.mpositiontaking) MAgTO,
-				SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.apositiontaking) AgTO,
+			SELECT	d.CustID,
+					ci.username,
+					d.totalTO,
+					d.ComTO,
+					d.SAgTO,
+					d.MAgTO,
+					d.AgTO,
+					d.ComWinlost,
+					d.SAgWinlost,
+					d.MAgWinlost,
+					d.AgWinlost
+			FROM (
+					SELECT	b.Recommend CustID,
+						SUM(CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END) totalTO,
+						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*(1 - b.tpositiontaking)) ComTO,
+						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.spositiontaking) SAgTO,
+						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.mpositiontaking) MAgTO,
+						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.apositiontaking) AgTO,
 				
-				-SUM(b.winlost - b.actual_stake + b.awinlost + b.mwinlost + b.swinlost + b.scomm) ComWinlost,
-				SUM(b.swinlost + b.scomm - b.acomm) SAgWinlost,
-				SUM(b.mwinlost + b.acomm - b.comm) MAgWinlost,
-				SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
+						-SUM(b.winlost - b.actual_stake + b.awinlost + b.mwinlost + b.swinlost + b.scomm) ComWinlost,
+						SUM(b.swinlost + b.scomm - b.acomm) SAgWinlost,
+						SUM(b.mwinlost + b.acomm - b.comm) MAgWinlost,
+						SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
 
-			FROM	bodb02.dbo.Bettrans b WITH (NOLOCK)
-					INNER JOIN bodb02.dbo.custinfo ci WITH (NOLOCK) ON b.Recommend = ci.custID 
-			WHERE	b.winlostdate = @winlostdate
-					AND b.MRecommend = @CustID 
-					AND b.ruben = 1
-					AND b.bettype < 19999
-					AND b.statusID NOT IN (101,102,103,121)
-					AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.bettype)
-			GROUP BY b.Recommend, ci.username 
+					FROM	bodb02.dbo.Bettrans b WITH (NOLOCK)
+					WHERE	b.winlostdate = @winlostdate
+							AND b.MRecommend = @CustID 
+							AND b.statusID IN (111,112,113)
+							AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.bettype)
+					GROUP BY b.Recommend 
+				) d
+				INNER JOIN bodb02.dbo.custinfo ci WITH (NOLOCK) ON d.CustID = ci.custID 
 			ORDER BY ci.username
 		END
 		ELSE
@@ -91,9 +102,7 @@ BEGIN
 			FROM	bodb02.dbo.Bettrans b WITH (NOLOCK)
 			WHERE	b.winlostdate = @winlostdate
 					AND b.recommend = @agentID
-					AND b.ruben = 1
-					AND b.bettype < 19999
-					AND b.statusID NOT IN (101,102,103,121)
+					AND b.statusID IN (111,112,113)
 					AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.bettype)
 			GROUP BY b.Recommend
 			
@@ -108,7 +117,7 @@ BEGIN
 		
 		IF @agentID IS NULL
 		BEGIN
-			SELECT  CustID, username,
+			SELECT  a.CustID, username,
 				SUM(totalTO) AS totalTO,
 				SUM(ComTO) AS ComTO,
 				SUM(SAgTO) AS SAgTO,
@@ -120,7 +129,6 @@ BEGIN
 				SUM(AgWinlost) AS AgWinlost
 			FROM (
 				SELECT	b.Recommend CustID,
-						ci.username,
 						SUM(CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END) totalTO,
 						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*(1 - b.tpositiontaking)) ComTO,
 						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.spositiontaking) SAgTO,
@@ -133,19 +141,15 @@ BEGIN
 						SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
 
 				FROM	bodb02.dbo.Bettrans b WITH (NOLOCK)
-						INNER JOIN bodb02.dbo.custinfo ci WITH (NOLOCK) ON b.Recommend = ci.custID 
 				WHERE	b.winlostdate = @winlostdate
 						AND b.MRecommend = @CustID 
-						AND b.ruben = 1
-						AND b.bettype < 19999
-						AND b.statusID NOT IN (101,102,103,121)
+						AND b.statusID IN (111,112,113)
 						AND NOT EXISTS (SELECT 1 FROM @SportBettype s WHERE s.Bettype = b.bettype)
-				GROUP BY b.Recommend, ci.username 
+				GROUP BY b.Recommend
 				
 				UNION ALL -- bettransRNG
 				
 				SELECT	b.Recommend CustID,
-						ci.username,
 						SUM(ABS(b.stake)) totalTO,
 						SUM(ABS(b.stake)*(1 - b.tpositiontaking)) ComTO,
 						SUM(ABS(b.stake)*b.spositiontaking) SAgTO,
@@ -158,17 +162,15 @@ BEGIN
 						SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
 
 				FROM	bodb02.dbo.BettransRNG b WITH (NOLOCK)
-						INNER JOIN bodb02.dbo.custinfo ci WITH (NOLOCK) ON b.Recommend = ci.custID 
 				WHERE	b.winlostdate = @winlostdate
 						AND b.MRecommend = @CustID 
-						AND b.statusID NOT IN (0,1,101,102,103,121)
+						AND b.statusID IN (111,112,113)
 						AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.gameId)
-				GROUP BY b.Recommend, ci.username
+				GROUP BY b.Recommend
 
 				UNION ALL -- bettransLC
 				
 				SELECT	b.Recommend CustID,
-						ci.username,
 						SUM(ABS(b.stake)) totalTO,
 						SUM(ABS(b.stake)*(1 - b.tpositiontaking)) ComTO,
 						SUM(ABS(b.stake)*b.spositiontaking) SAgTO,
@@ -181,14 +183,14 @@ BEGIN
 						SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
 
 				FROM	bodb02.dbo.BettransLC b WITH (NOLOCK)
-						INNER JOIN bodb02.dbo.custinfo ci WITH (NOLOCK) ON b.Recommend = ci.custID 
 				WHERE	b.winlostdate = @winlostdate
 						AND b.MRecommend = @CustID 
-						AND b.statusID NOT IN (0,1,101,102,103,121)
+						AND b.statusID IN (111,112,113)
 						AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.gameId)
-				GROUP BY b.Recommend, ci.username
+				GROUP BY b.Recommend
 			) AS A
-			GROUP BY CustID, username
+			INNER JOIN bodb02.dbo.custinfo ci WITH (NOLOCK) ON a.custID = ci.custID 
+			GROUP BY a.CustID, username
 			ORDER BY username
 		
 		END
@@ -222,9 +224,7 @@ BEGIN
 						
 				WHERE	b.winlostdate = @winlostdate
 						AND b.recommend = @agentID
-						AND b.ruben = 1
-						AND b.bettype < 19999
-						AND b.statusID NOT IN (101,102,103,121)
+						AND b.statusID IN (111,112,113)
 						AND NOT EXISTS (SELECT 1 FROM @SportBettype s WHERE s.Bettype = b.bettype)
 				GROUP BY b.Recommend
 				
@@ -246,7 +246,7 @@ BEGIN
 				FROM	bodb02.dbo.BettransRNG b WITH (NOLOCK)
 				WHERE	b.winlostdate = @winlostdate
 						AND b.recommend = @agentID
-						AND b.statusID NOT IN (0,1,101,102,103,121)
+						AND b.statusID IN (111,112,113)
 						AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.gameId)
 				GROUP BY b.Recommend
 
@@ -269,7 +269,7 @@ BEGIN
 						
 				WHERE	b.winlostdate = @winlostdate
 						AND b.recommend = @agentID
-						AND b.statusID NOT IN (0,1,101,102,103,121)
+						AND b.statusID IN (111,112,113)
 						AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.gameId)
 				GROUP BY b.Recommend
 			) AS A
