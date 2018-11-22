@@ -21,6 +21,7 @@ AS
 			2. Apply column RefTable
 		- 20181004@Percy: Add @ExcludeProductIds to exclude some products [RedmineID: #101644]
 		- 20181031@Helen: DB052 Indexes Revolution [RedmineID: 103572]
+		- 20181113@Paul: Enhance performance [RedmineID: #103479]
 		
 	Param's Explanation:		
 		@custID: Agent ID 
@@ -29,6 +30,7 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @isTest BIT = 0
+
 	SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
 	
 	DECLARE @ExcludeBettype TABLE(Bettype INT)
@@ -57,9 +59,7 @@ BEGIN
 			FROM	bodb02.dbo.Bettrans b WITH (NOLOCK)
 			WHERE	b.winlostdate = @winlostdate
 					AND b.Recommend = @CustID 
-					AND b.ruben = 1
-					AND b.bettype < 19999
-					AND b.statusID NOT IN (101,102,103,121)
+					AND b.statusID IN (111,112,113)
 					AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.bettype)
 			GROUP BY b.custID, b.username
 			ORDER BY b.username	
@@ -82,9 +82,7 @@ BEGIN
 			FROM	bodb02.dbo.Bettrans b WITH (NOLOCK)
 			WHERE	b.winlostdate = @winlostdate
 					AND b.custid = @memberID
-					AND b.ruben = 1
-					AND b.bettype < 19999
-					AND b.statusID NOT IN (101,102,103,121)
+					AND b.statusID IN (111,112,113)
 					AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.bettype)
 			GROUP BY b.custID, b.username
 			ORDER BY b.username	
@@ -127,9 +125,7 @@ BEGIN
 				FROM	bodb02.dbo.Bettrans b WITH (NOLOCK)
 				WHERE	b.winlostdate = @winlostdate
 						AND b.Recommend = @CustID 
-						AND b.ruben = 1
-						AND b.bettype < 19999
-						AND b.statusID NOT IN (101,102,103,121)
+						AND b.statusID IN (111,112,113)
 						AND NOT EXISTS (SELECT 1 FROM @SportBettype s WHERE s.Bettype = b.Bettype)
 				GROUP BY b.custID, b.username
 				
@@ -151,7 +147,7 @@ BEGIN
 				FROM	bodb02.dbo.BettransRNG b WITH (NOLOCK)
 				WHERE	b.winlostdate = @winlostdate
 						AND b.Recommend = @CustID 
-						AND b.statusID NOT IN (0,1,101,102,103,121)
+						AND b.statusID IN (111,112,113)
 						AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.gameId)
 				GROUP BY b.custID, b.username
 
@@ -173,7 +169,7 @@ BEGIN
 				FROM	bodb02.dbo.BettransLC b WITH (NOLOCK)
 				WHERE	b.winlostdate = @winlostdate
 						AND b.Recommend = @CustID 
-						AND b.statusID NOT IN (0,1,101,102,103,121)
+						AND b.statusID IN (111,112,113)
 						AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.gameId)
 				GROUP BY b.custID, b.username
 			) AS A
@@ -209,9 +205,7 @@ BEGIN
 				FROM	bodb02.dbo.Bettrans b WITH (NOLOCK)
 				WHERE	b.winlostdate = @winlostdate
 						AND b.custid = @memberID
-						AND b.ruben = 1
-						AND b.bettype < 19999
-						AND b.statusID NOT IN (101,102,103,121)
+						AND b.statusID IN (111,112,113)
 						AND NOT EXISTS (SELECT 1 FROM @SportBettype s WHERE s.Bettype = b.Bettype)
 				GROUP BY b.custID, b.username
 				
@@ -233,7 +227,7 @@ BEGIN
 				FROM	bodb02.dbo.BettransRNG b WITH (NOLOCK)
 				WHERE	b.winlostdate = @winlostdate
 						AND b.custid = @memberID
-						AND b.statusID NOT IN (0,1,101,102,103,121)
+						AND b.statusID IN (111,112,113)
 						AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.gameId)
 				GROUP BY b.custID, b.username
 
@@ -255,7 +249,7 @@ BEGIN
 				FROM	bodb02.dbo.BettransLC b WITH (NOLOCK)
 				WHERE	b.winlostdate = @winlostdate
 						AND b.custid = @memberID
-						AND b.statusID NOT IN (0,1,101,102,103,121)
+						AND b.statusID IN (111,112,113)
 						AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.gameId)
 				GROUP BY b.custID, b.username
 			) AS A
