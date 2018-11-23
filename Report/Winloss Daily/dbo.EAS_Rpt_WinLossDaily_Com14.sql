@@ -18,7 +18,8 @@ AS
 		- 20130121@Dan: Move sp from DB06/bodb02 to DBEAS/bodb_EAS, call to bodb_AGE for Acc_CustGroup
 		- 20160824@Sophia: Enhance Performance (work around for hotfix) [Redmine: #62941]
 		- 20181004@Percy: Add @ExcludeProductIds to exclude some products [RedmineID: #101644]
-	
+		- 20181122@Elodie: DB053/bodb_Age Migration [Redmine:#104770]
+
 	Param's Explanation:
 		
 */
@@ -40,7 +41,7 @@ BEGIN
 	SELECT custID,username 
 	FROM bodb02.dbo.custinfo (NOLOCK)
 	WHERE 
-		custid in (SELECT custid from DBAGE.bodb_AGE.dbo.Acc_CustGroup WITH(nolock) WHERE GroupName = @GroupName)
+		custid in (SELECT custid from bodb02.dbo.Acc_CustGroup WITH(nolock) WHERE GroupName = @GroupName)
 		AND (@custid IS NULL OR custid=@custid)	
 
 	SELECT	b.SRecommend CustID,
