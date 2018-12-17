@@ -1,6 +1,4 @@
 /*<info serverAlias="DBEAS-bodb_EAS" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
-USE [bodb_EAS]
-GO
 
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDaily_Com]
 	@winlostdate		SMALLDATETIME,

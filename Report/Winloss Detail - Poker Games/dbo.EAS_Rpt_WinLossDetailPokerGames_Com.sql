@@ -1,6 +1,4 @@
 /*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
-USE [bodb02]
-GO
 
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetailPokerGames_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCTHAI',--ACCTHAI or ACCINDO
