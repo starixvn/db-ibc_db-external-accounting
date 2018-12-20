@@ -1,7 +1,4 @@
 /*<info serverAlias="DBEAS-bodb_EAS" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
-USE [bodb_EAS]
-GO
-
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCTHAI',--ACCTHAI or ACCINDO
 	@custid			INT = NULL,	
@@ -10,40 +7,40 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com]
 	@ProductIds		VARCHAR(MAX) = '',
 	@BalanceUpDay	SMALLDATETIME	
 AS
-
 /*
-Created by: Dan
-Date: 2012-10-29
-Task : Super Winloss Detail
-DB: DBEAS/bodb_EAS
-Original: Acc_Rpt_WinLossDetail_ComEx
-Revisions:
-	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS, call to bodb_AGE for Acc_CustGroup, add linked server DBSUM for bodb_Summary
-	- 20140305@Patrick: Add more Keno product(sport:202, bettype between 1501 and 1599)
-	- 20140321@Lukas: seperate P2P product to enhance performance
-	- 20140420@Francis: revise SP to use temporary table instead of variable table to improve performance
-	- 20150502@Lukas: Revise SP to insert into Temporary table (#Sum_WinLoss_Old) of a remote table (DBSUM.bodb_Summary.dbo.Sum_WinLoss_Old) to enhance performance (HotFix #35279)
-	- 20150528@Sophia: Apply Gold Deluxe and Sport bettype Matrix [Redmine: #36775]
-	- 20150907@Winnie: Add CB [Redmine: #43099]
-	- 20151217@Percy: Add Cockfighting [Redmine: #48836]
-	- 20160107@Percy: Include new bettype range of the new RNG Casino [Redmine: #48286]
-	- 20160215@Percy: Support new product AllBet [Redmine: #50922]
-	- 20160225@Sophia: Add new column TurnoverNoDraw [Redmine: #51427]
-	- 20160414@Victor: Support new product Voidbridge [Redmine: #55468]
-	- 20160809@Percy: Modify Net Turnover for Allbet [RedmineID: #61876]
-	- 20160824@Sophia: Enhance Performance (work around for hotfix) [Redmine: #62941]
-	- 20160915@Johnson: Integrate NG2 [RedmineSPU: #30]
-	- 20161028@Percy: Support Fishing World [RedmineID: #65735]
-	- 20161001@Daniel: Change to REASDPAST when get from bettrans due to pagesplit
-	- 20161020@Francis: Avoid pagesplit by prompting index seek on bettrans [Redmine: #65042]
-	- 20170622@Percy: Combine Betradar Virtual Sports with Virtual Sports [RedmineID: #78340]
-	- 20170703@Percy: Support Keno Lottery [RedmineID: #78068]
-	- 20170830@Percy:
-		1. Integrate Lucky 3 [RedmineID: #76770]
-		2. Change list of @show[ProductCode] to @ProductIDs - apply all new products
-	- 20171002@Percy: Hotfix - Duplicated data due to duplicated bettype [RedmineID: #84167]
-	- 20180913@Percy: Bullfighting - Add data into TurnoverNoDraw column [RedmineID: #101288]
-	- 20180914@Percy: Poker Games - Modify GrossComm [RedmineID: #101550]
+	Created by: Dan
+	Date: 2012-10-29
+	Task : Super Winloss Detail
+	DB: DBEAS/bodb_EAS
+	Original: Acc_Rpt_WinLossDetail_ComEx
+	Revisions:
+		- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS, call to bodb_AGE for Acc_CustGroup, add linked server DBSUM for bodb_Summary
+		- 20140305@Patrick: Add more Keno product(sport:202, bettype between 1501 and 1599)
+		- 20140321@Lukas: seperate P2P product to enhance performance
+		- 20140420@Francis: revise SP to use temporary table instead of variable table to improve performance
+		- 20150502@Lukas: Revise SP to insert into Temporary table (#Sum_WinLoss_Old) of a remote table (DBSUM.bodb_Summary.dbo.Sum_WinLoss_Old) to enhance performance (HotFix #35279)
+		- 20150528@Sophia: Apply Gold Deluxe and Sport bettype Matrix [Redmine: #36775]
+		- 20150907@Winnie: Add CB [Redmine: #43099]
+		- 20151217@Percy: Add Cockfighting [Redmine: #48836]
+		- 20160107@Percy: Include new bettype range of the new RNG Casino [Redmine: #48286]
+		- 20160215@Percy: Support new product AllBet [Redmine: #50922]
+		- 20160225@Sophia: Add new column TurnoverNoDraw [Redmine: #51427]
+		- 20160414@Victor: Support new product Voidbridge [Redmine: #55468]
+		- 20160809@Percy: Modify Net Turnover for Allbet [RedmineID: #61876]
+		- 20160824@Sophia: Enhance Performance (work around for hotfix) [Redmine: #62941]
+		- 20160915@Johnson: Integrate NG2 [RedmineSPU: #30]
+		- 20161028@Percy: Support Fishing World [RedmineID: #65735]
+		- 20161001@Daniel: Change to REASDPAST when get from bettrans due to pagesplit
+		- 20161020@Francis: Avoid pagesplit by prompting index seek on bettrans [Redmine: #65042]
+		- 20170622@Percy: Combine Betradar Virtual Sports with Virtual Sports [RedmineID: #78340]
+		- 20170703@Percy: Support Keno Lottery [RedmineID: #78068]
+		- 20170830@Percy:
+			1. Integrate Lucky 3 [RedmineID: #76770]
+			2. Change list of @show[ProductCode] to @ProductIDs - apply all new products
+		- 20171002@Percy: Hotfix - Duplicated data due to duplicated bettype [RedmineID: #84167]
+		- 20180913@Percy: Bullfighting - Add data into TurnoverNoDraw column [RedmineID: #101288]
+		- 20180914@Percy: Poker Games - Modify GrossComm [RedmineID: #101550]
+		- 20181122@Elodie: DB053/bodb_Age Migration [Redmine:#104770]
 */
 
 SET NOCOUNT ON
@@ -52,7 +49,7 @@ CREATE TABLE #tmpSuperList (custID INT PRIMARY KEY)
 
 INSERT INTO #tmpSuperList(CustID)
 SELECT custID 
-FROM DBAGE.bodb_AGE.dbo.Acc_CustGroup WITH(NOLOCK)
+FROM bodb02.dbo.Acc_CustGroup WITH(NOLOCK)
 WHERE (@custid IS NULL OR custid = @custid)
 	AND GroupName = @GroupName
 

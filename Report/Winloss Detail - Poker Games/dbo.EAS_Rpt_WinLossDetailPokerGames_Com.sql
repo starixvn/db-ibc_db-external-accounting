@@ -1,6 +1,4 @@
 /*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
-USE [bodb02]
-GO
 
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetailPokerGames_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCTHAI',--ACCTHAI or ACCINDO
@@ -18,9 +16,9 @@ AS
 	DB: 	DBAGE/bodb02
 	Original: EAS_Rpt_WinLossDetail_Com
 	Revisions:
-		-20180912@Sophia: initial SP
-		-20180925@Viet: enhance SP
-	
+		- 20180912@Sophia: initial SP
+		- 20180925@Viet: enhance SP
+		- 20181122@Elodie: DB053/bodb_Age Migration [Redmine:#104770]
 */
 
 SET NOCOUNT ON
@@ -29,7 +27,7 @@ CREATE TABLE #tmpSuperList (custID INT PRIMARY KEY)
 
 INSERT INTO #tmpSuperList(CustID)
 SELECT custID 
-FROM bodb_AGE.dbo.Acc_CustGroup WITH(NOLOCK)
+FROM dbo.Acc_CustGroup WITH(NOLOCK)
 WHERE (@custid IS NULL OR custid = @custid)
 	AND GroupName = @GroupName
 	

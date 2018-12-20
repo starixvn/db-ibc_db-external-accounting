@@ -1,6 +1,4 @@
 /*<info serverAlias="DBEAS-bodb_EAS" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
-USE [bodb_EAS]
-GO
 
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDaily_Com]
 	@winlostdate		SMALLDATETIME,
@@ -27,6 +25,8 @@ AS
 			2. Apply column RefTable
 		- 20181004@Percy: Add @ExcludeProductIds to exclude some products [RedmineID: #101644]
 		- 20181113@Paul: Enhance performance [RedmineID: #103479]
+		- 20181122@Elodie: DB053/bodb_Age Migration [Redmine:#104770]
+
 */
 BEGIN
 	SET NOCOUNT ON
@@ -46,7 +46,7 @@ BEGIN
 	SELECT custID,username 
 	FROM bodb02.dbo.custinfo (NOLOCK)
 	WHERE 
-		custid in (SELECT custid from DBAGE.bodb_AGE.dbo.Acc_CustGroup WITH(nolock) WHERE GroupName = @GroupName)
+		custid in (SELECT custid from bodb02.dbo.Acc_CustGroup WITH(nolock) WHERE GroupName = @GroupName)
 		AND (@custid IS NULL OR custid=@custid)	
 	
 	IF @winlostdate < CAST(DATEADD(DD, -1, GETDATE()) AS DATE)
