@@ -1,4 +1,4 @@
-/*<info serverAlias="DBEAS-bodb_EAS" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCTHAI',--ACCTHAI or ACCINDO
 	@custid			INT = NULL,	
@@ -11,7 +11,7 @@ AS
 	Created by: Dan
 	Date: 2012-10-29
 	Task : Super Winloss Detail
-	DB: DBEAS/bodb_EAS
+	DB: DBAGE/bodb02
 	Original: Acc_Rpt_WinLossDetail_ComEx
 	Revisions:
 		- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS, call to bodb_AGE for Acc_CustGroup, add linked server DBSUM for bodb_Summary
@@ -41,6 +41,7 @@ AS
 		- 20180913@Percy: Bullfighting - Add data into TurnoverNoDraw column [RedmineID: #101288]
 		- 20180914@Percy: Poker Games - Modify GrossComm [RedmineID: #101550]
 		- 20181122@Elodie: DB053/bodb_Age Migration [Redmine:#104770]
+		- 20190418@Kan: DB053/bodb02 Migration, Move sp from DBEAS/bodb_EAS to DB053/bodb02 [Redmine: #111865]
 */
 
 SET NOCOUNT ON
@@ -190,7 +191,7 @@ BEGIN
 	
 	SELECT custid,  srecommend, turnover, TunroverNoDraw as TurnoverNoDraw, winlost, awinlost, mwinlost, swinlost, playercomm, comm, acomm, scomm, grosscomm, sporttype, bettype 
 		INTO #Sum_WinLoss_Old
-	FROM DBSUM.bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK)
+	FROM bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK)
 	WHERE winlostdate BETWEEN @fromdate AND @ToDate			
 		    AND RoleID = 4 
 		    

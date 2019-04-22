@@ -1,4 +1,4 @@
-/*<info serverAlias="DBEAS-bodb_EAS" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDaily_MAg14]
 	@winlostdate		SMALLDATETIME,
 	@custID				INT,
@@ -9,13 +9,14 @@ AS
 	Created by: Dan
 	Date: 2012-10-29
 	Task: Daily WinLoss for Site 
-	DB: DBEAS/bodb_EAS
+	DB: DBAGE/bodb02
 	Original: [Acc_Rpt_WinLossDaily_MAgEx14]
 	
 	Revisions:
 		- 20130121@Dan: Move sp from DB06/bodb02 to DBEAS/bodb_EAS
 		- 20181004@Percy: Add @ExcludeProductIds to exclude some products [RedmineID: #101644]
 		- 20181031@Helen: DB052 Indexes Revolution [RedmineID: 103572]
+		- 20190418@Kan: DB053/bodb02 Migration, Move sp from DBEAS/bodb_EAS to DB053/bodb02 [Redmine: #111865]
 		
 	Param's Explanation:		
 		@custID: Master ID 

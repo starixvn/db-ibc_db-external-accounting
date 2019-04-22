@@ -1,3 +1,4 @@
+/*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDaily_SortingOrder]
 	@GroupName varchar(50)
 AS
@@ -5,12 +6,12 @@ AS
 	Created by: Dan
 	Date: 2012-12-05
 	Task: get exceptional sorting for Daily WinLoss 
-	DB: DBEAS/bodb_EAS
+	DB: DBAGE/bodb02
 	Original: 
-	Revisions:	
+	Revisions:
+		- 20190418@Kan: DB053/bodb02 Migration, Move sp from DBEAS/bodb_EAS to DB053/bodb02 [Redmine: #111865]
 
-	Param's Explanation:		
-		
+	Param's Explanation:
 */
 BEGIN
 	SET NOCOUNT ON
@@ -31,8 +32,4 @@ BEGIN
 		SELECT	1517662 as CustId--'SMT' 
 		
 END
-
 GO
-GRANT EXECUTE ON [dbo].[EAS_Rpt_WinLossDaily_SortingOrder] TO [bodbExtAccNet]
-GO
-GRANT VIEW DEFINITION ON [dbo].[EAS_Rpt_WinLossDaily_SortingOrder] TO [vnteam]
