@@ -1,4 +1,4 @@
-/*<info serverAlias="DBEAS-bodb_EAS" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_MAg]
 	@custid			INT,--mrecommend
 	@Agentid		INT = NULL,
@@ -14,7 +14,7 @@ AS
 Created by: Scott
 Date: 2012-11-13
 Task : Agent Winloss Detail
-DB: DBEAS/bodb_EAS
+DB: DBAGE/bodb02
 Original SP: [Age_Rpt_WinLossDetail_MAg_New]
 Revisions:
 	- 20130121@Dan: Move sp from DB053/bodb02 to DBEAS/bodb_EAS, add linked server DBSUM for bodb_Summary
@@ -38,7 +38,7 @@ Revisions:
 	- 20180913@Percy: Bullfighting - Add data into TurnoverNoDraw column [RedmineID: #101288]
 	- 20180914@Percy: Poker Games - Modify GrossComm [RedmineID: #101550]
 	- 20181031@Helen: DB052 Indexes Revolution [RedmineID: 103572]
-	
+	- 20190418@Kan: DB053/bodb02 Migration, Move sp from DBEAS/bodb_EAS to DB053/bodb02 [Redmine: #111865]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -195,7 +195,7 @@ BEGIN
 			isnull(sum(mwinlost), 0) + isnull(sum(acomm), 0)-sum(comm), --MAgTotal
 			-(isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(acomm), 0) + isnull(sum(winlost), 0))--Company				
 		FROM
-			DBSUM.bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK) INNER JOIN @TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype
+			bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK) INNER JOIN @TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype
 		WHERE
 			winlostdate between @fromdate and @ToDate			
 			and MRecommend=@custid
