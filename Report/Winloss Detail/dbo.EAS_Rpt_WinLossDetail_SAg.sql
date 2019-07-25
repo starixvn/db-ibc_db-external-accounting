@@ -1,4 +1,4 @@
-/*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_SAg]
 	@custid			INT,--srecommend
 	@masterid		INT = NULL,
