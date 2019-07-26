@@ -267,7 +267,7 @@ BEGIN
 			winlostdate, bettype, statusID,
 			SUM(winlost), SUM(actual_stake), SUM(playercomm)
 		FROM dbo.bettrans WITH (NOLOCK)
-		WHERE custid = @CustId
+		WHERE custid = @CustId AND statusID NOT IN (0,1)
 		GROUP BY
 			winlostdate, bettype, statusID
 
@@ -276,21 +276,11 @@ BEGIN
 		WHERE EXISTS (SELECT 1 FROM #SportBettypeMatrix s WHERE b.bettype = s.bettype AND s.RefTable IN (1,2))
 			AND b.winlostdate >= @yesterday
 
-		DELETE b
-		FROM #BalanceInfo b
-		WHERE EXISTS (SELECT 1 FROM #SportBettypeMatrix s WHERE b.bettype = s.bettype)
-			AND b.statusId IN (0,1)
-
 		UPDATE #BalanceInfo
 		SET winlostdate = @yesterday
 		WHERE bettype > 20000 AND winlostdate = @today
 
-		-- translog
-		INSERT INTO #BalanceInfo (winlostdate, bettype, statusId, winlost, actual_stake, playercomm)
-		SELECT @today, -1, 0, 0, SUM(actual_stake), 0
-		FROM dbo.translog WITH (NOLOCK)
-		WHERE custid = @custid
-			AND statusId IN (0,1)
+		DELETE #BalanceInfo WHERE winlostdate > @yesterday
 
 		-- bettransRnG
 		INSERT INTO #BalanceInfo (winlostdate, bettype, statusId, winlost, actual_stake, playercomm)
@@ -298,8 +288,7 @@ BEGIN
 			winlostdate, -2, statusID,
 			SUM(winlost), SUM(actual_stake), SUM(playercomm)
 		FROM dbo.bettransRnG WITH (NOLOCK)
-		WHERE custid = @CustId
-			AND (statusId IN (0,1) OR winlostdate >= @yesterday)
+		WHERE custid = @CustId AND winlostdate = @yesterday AND statusID NOT IN (0,1)
 		GROUP BY
 			winlostdate, statusID
 
@@ -309,19 +298,14 @@ BEGIN
 			winlostdate, -3, statusID,
 			SUM(winlost), SUM(actual_stake), SUM(playercomm)
 		FROM dbo.bettransLC WITH (NOLOCK)
-		WHERE custid = @CustId
-			AND (statusId IN (0,1) OR winlostdate >= @yesterday)
+		WHERE custid = @CustId AND winlostdate = @yesterday AND statusID NOT IN (0,1)
 		GROUP BY
 			winlostdate, statusID
 
 		SELECT
-			@TotalCash				= SUM(CASE WHEN statusId IN (0,1) THEN 0 ELSE winlost - actual_stake + playercomm END),
-			@YesterdayCash			= SUM(CASE WHEN statusId IN (0,1) OR winlostdate > @yesterday THEN 0 ELSE winlost - actual_stake + playercomm END),
-			@Outstanding			= SUM(CASE WHEN statusId IN (0,1) THEN actual_stake ELSE 0 END),
+			@YesterdayCash		= SUM(winlost - actual_stake + playercomm),
 			
-			@TotalBalance			= SUM(CASE WHEN statusId IN (0,1) THEN 0 ELSE winlost - actual_stake + playercomm END),
-			@YesterdayBalance		= SUM(CASE WHEN statusId IN (0,1) OR winlostdate > @yesterday THEN 0 ELSE winlost - actual_stake + playercomm END),
-			@DownlineOutstanding	= SUM(CASE WHEN statusId IN (0,1) THEN actual_stake ELSE 0 END)
+			@YesterdayBalance	= SUM(winlost - actual_stake + playercomm)
 		FROM #BalanceInfo
 	END
 
