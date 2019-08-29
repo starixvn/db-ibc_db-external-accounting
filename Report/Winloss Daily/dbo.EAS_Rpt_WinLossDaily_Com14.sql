@@ -1,4 +1,4 @@
-/*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDaily_Com14]
 	@winlostdate		DATETIME,	
 	@custid				INT = NULL,	
@@ -17,6 +17,7 @@ AS
 		- 20181004@Percy: Add @ExcludeProductIds to exclude some products [RedmineID: #101644]
 		- 20181122@Elodie: DB053/bodb_Age Migration [Redmine:#104770]
 		- 20190417@Kan: DB053/bodb02 Migration, Move sp from DBEAS/bodb_EAS to DB053/bodb02 [Redmine: #111865]
+		- 20190826@Percy: Remove inactive products [RedmineID: #118699]
 
 	Param's Explanation:
 		
@@ -44,11 +45,11 @@ BEGIN
 
 	SELECT	b.SRecommend CustID,
 			t.username,
-			SUM(CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END) totalTO,
-			SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*(1 - b.tpositiontaking)) ComTO,
-			SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.spositiontaking) SAgTO,
-			SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.mpositiontaking) MAgTO,
-			SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.apositiontaking) AgTO,
+			SUM(ABS(b.stake)) totalTO,
+			SUM(ABS(b.stake) * (1 - b.tpositiontaking)) ComTO,
+			SUM(ABS(b.stake) * b.spositiontaking) SAgTO,
+			SUM(ABS(b.stake) * b.mpositiontaking) MAgTO,
+			SUM(ABS(b.stake) * b.apositiontaking) AgTO,
 			
 			-SUM(b.winlost - b.actual_stake + b.awinlost + b.mwinlost + b.swinlost + b.scomm) ComWinlost,
 			SUM(b.swinlost + b.scomm - b.acomm) SAgWinlost,

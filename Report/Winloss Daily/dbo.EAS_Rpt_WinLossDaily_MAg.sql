@@ -1,4 +1,4 @@
-/*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDaily_MAg]
 	@winlostdate		SMALLDATETIME,
 	@custID				INT,
@@ -23,6 +23,7 @@ AS
 		- 20181031@Helen: DB052 Indexes Revolution [RedmineID: 103572]
 		- 20181113@Paul: Enhance performance [RedmineID: #103479]
 		- 20190418@Kan: DB053/bodb02 Migration, Move sp from DBEAS/bodb_EAS to DB053/bodb02 [Redmine: #111865]
+		- 20190826@Percy: Remove inactive products [RedmineID: #118699]
 		
 	Param's Explanation:		
 		@custID: Master ID 
@@ -63,11 +64,11 @@ BEGIN
 					d.AgWinlost
 			FROM (
 					SELECT	b.Recommend CustID,
-						SUM(CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END) totalTO,
-						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*(1 - b.tpositiontaking)) ComTO,
-						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.spositiontaking) SAgTO,
-						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.mpositiontaking) MAgTO,
-						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.apositiontaking) AgTO,
+						SUM(ABS(b.stake)) totalTO,
+						SUM(ABS(b.stake) * (1 - b.tpositiontaking)) ComTO,
+						SUM(ABS(b.stake) * b.spositiontaking) SAgTO,
+						SUM(ABS(b.stake) * b.mpositiontaking) MAgTO,
+						SUM(ABS(b.stake) * b.apositiontaking) AgTO,
 				
 						-SUM(b.winlost - b.actual_stake + b.awinlost + b.mwinlost + b.swinlost + b.scomm) ComWinlost,
 						SUM(b.swinlost + b.scomm - b.acomm) SAgWinlost,
@@ -89,11 +90,11 @@ BEGIN
 						
 			SELECT	b.Recommend CustID,
 				@username_tmp AS username,
-				SUM(CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END) totalTO,
-				SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*(1 - b.tpositiontaking)) ComTO,
-				SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.spositiontaking) SAgTO,
-				SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.mpositiontaking) MAgTO,
-				SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.apositiontaking) AgTO,
+				SUM(ABS(b.stake)) totalTO,
+				SUM(ABS(b.stake) * (1 - b.tpositiontaking)) ComTO,
+				SUM(ABS(b.stake) * b.spositiontaking) SAgTO,
+				SUM(ABS(b.stake) * b.mpositiontaking) MAgTO,
+				SUM(ABS(b.stake) * b.apositiontaking) AgTO,
 				
 				-SUM(b.winlost - b.actual_stake + b.awinlost + b.mwinlost + b.swinlost + b.scomm) ComWinlost,
 				SUM(b.swinlost + b.scomm - b.acomm) SAgWinlost,
@@ -130,11 +131,11 @@ BEGIN
 				SUM(AgWinlost) AS AgWinlost
 			FROM (
 				SELECT	b.Recommend CustID,
-						SUM(CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END) totalTO,
-						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*(1 - b.tpositiontaking)) ComTO,
-						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.spositiontaking) SAgTO,
-						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.mpositiontaking) MAgTO,
-						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.apositiontaking) AgTO,
+						SUM(ABS(b.stake)) totalTO,
+						SUM(ABS(b.stake) * (1 - b.tpositiontaking)) ComTO,
+						SUM(ABS(b.stake) * b.spositiontaking) SAgTO,
+						SUM(ABS(b.stake) * b.mpositiontaking) MAgTO,
+						SUM(ABS(b.stake) * b.apositiontaking) AgTO,
 						
 						-SUM(b.winlost - b.actual_stake + b.awinlost + b.mwinlost + b.swinlost + b.scomm) ComWinlost,
 						SUM(b.swinlost + b.scomm - b.acomm) SAgWinlost,
@@ -210,11 +211,11 @@ BEGIN
 			FROM (
 				SELECT	b.Recommend CustID,
 						@username_tmp AS username,
-						SUM(CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END) totalTO,
-						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*(1 - b.tpositiontaking)) ComTO,
-						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.spositiontaking) SAgTO,
-						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.mpositiontaking) MAgTO,
-						SUM((CASE WHEN b.liveawayscore = 0 AND b.bettype IN (33,43) THEN ABS(b.stake)/2 ELSE ABS(b.stake) END)*b.apositiontaking) AgTO,
+						SUM(ABS(b.stake)) totalTO,
+						SUM(ABS(b.stake) * (1 - b.tpositiontaking)) ComTO,
+						SUM(ABS(b.stake) * b.spositiontaking) SAgTO,
+						SUM(ABS(b.stake) * b.mpositiontaking) MAgTO,
+						SUM(ABS(b.stake) * b.apositiontaking) AgTO,
 						
 						-SUM(b.winlost - b.actual_stake + b.awinlost + b.mwinlost + b.swinlost + b.scomm) ComWinlost,
 						SUM(b.swinlost + b.scomm - b.acomm) SAgWinlost,

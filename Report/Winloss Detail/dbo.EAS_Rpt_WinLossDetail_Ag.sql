@@ -38,6 +38,7 @@ Revisions:
 	- 20180914@Percy: Poker Games - Modify GrossComm [RedmineID: #101550]
 	- 20181031@Helen: DB052 Indexes Revolution [RedmineID: 103572]
 	- 20190418@Kan: DB053/bodb02 Migration, Move sp from DBEAS/bodb_EAS to DB053/bodb02 [Redmine: #111865]
+	- 20190826@Percy: Remove inactive products [RedmineID: #118699]
 */
 BEGIN
 	SET NOCOUNT ON
@@ -71,17 +72,13 @@ BEGIN
 			INSERT INTO @AgWinLossDetails
 			SELECT
 				CustID,
-				sum(case when b.liveawayscore = 0 and b.bettype in(33,43) then ABS(b.stake)/2 else ABS(b.stake) end) as TurnOver,
-				SUM(CASE WHEN b.liveawayscore = 0 and b.bettype in(33,43) THEN ABS(b.stake)/2 
-						WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
-						WHEN b.StatusID = 111 AND s.ProductId IN (1,30) THEN 0 -- Sportsbook, Bullfighting
+				sum(ABS(b.stake)) as TurnOver,
+				SUM(CASE WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
+						WHEN b.StatusID = 111 AND s.ProductId IN (1) THEN 0 -- Sportsbook
 						WHEN s.ProductID = 21 THEN b.oddsspread -- Allbet
 						ELSE ABS(b.stake)
 						END) AS TurnoverNoDraw,
-				SUM(CASE
-					WHEN b.bettype = 1000 THEN oddsspread
-					WHEN b.bettype BETWEEN 1401 AND 1499 THEN comm
-					ELSE CASE WHEN apositiontaking = 1 THEN 0 ELSE comm/(1- apositiontaking) END END) AS GrossComm,
+				SUM(CASE WHEN apositiontaking = 1 THEN 0 ELSE comm/(1- apositiontaking) END) AS GrossComm,
 				sum(winlost-actual_stake), --MemberWinlost
 				sum(playercomm), -- PlayerComm
 				isnull(sum(winlost-actual_stake), 0) + isnull(sum(playercomm), 0), --MemberTotal
@@ -104,17 +101,13 @@ BEGIN
 			INSERT INTO @AgWinLossDetails
 			SELECT
 				CustID,
-				sum(case when b.liveawayscore = 0 and b.bettype in(33,43) then ABS(b.stake)/2 else ABS(b.stake) end) as TurnOver,
-				SUM(CASE WHEN b.liveawayscore = 0 and b.bettype in(33,43) THEN ABS(b.stake)/2 
-						WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
-						WHEN b.StatusID = 111 AND s.ProductId IN (1,30) THEN 0 -- Sportsbook, Bullfighting
+				sum(ABS(b.stake)) as TurnOver,
+				SUM(CASE WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
+						WHEN b.StatusID = 111 AND s.ProductId IN (1) THEN 0 -- Sportsbook
 						WHEN s.ProductID = 21 THEN b.oddsspread -- Allbet
 						ELSE ABS(b.stake)
 						END) AS TurnoverNoDraw,
-				SUM(CASE
-					WHEN b.bettype = 1000 THEN oddsspread
-					WHEN b.bettype BETWEEN 1401 AND 1499 THEN comm
-					ELSE CASE WHEN apositiontaking = 1 THEN 0 ELSE comm/(1- apositiontaking) END END) AS GrossComm,
+				SUM(CASE WHEN apositiontaking = 1 THEN 0 ELSE comm/(1- apositiontaking) END) AS GrossComm,
 				sum(winlost-actual_stake), --MemberWinlost
 				sum(playercomm), -- PlayerComm
 				isnull(sum(winlost-actual_stake), 0) + isnull(sum(playercomm), 0), --MemberTotal
