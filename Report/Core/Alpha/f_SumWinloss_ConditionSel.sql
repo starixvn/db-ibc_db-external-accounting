@@ -1,7 +1,4 @@
-/*<info serverAlias="DBAGE-bodb02" selecters="" viewers="" isFunction="1" isNested="1"></info>*/
-USE [bodb02]
-GO
-
+/*<info serverAlias="DBAGE-bodb02" selecters="" isFunction="1" isNested="1"></info>*/
 ALTER FUNCTION [dbo].[f_SumWinloss_ConditionSel]
 (
 	@ProductID	VARCHAR(500) = ''
@@ -20,6 +17,7 @@ ALTER FUNCTION [dbo].[f_SumWinloss_ConditionSel]
 		- 20170419@Razor: Add Pragmatic [RedmineID: #92647]
 		- 20180717@Louis: Add Poker Games [RedmineID: #97785]
 		- 20190627@Razor: Add CardClub [RedmineID: #115611]
+		- 20190826@Percy: Remove inactive products [RedmineID: #118699]
 		
 	Paramters Explanation:
  		@ProductID: list of products
@@ -30,9 +28,7 @@ RETURN
 	FROM (
 		VALUES	(1, 0, 0), --Sportsbook
 				(6, 251, 71), (6, 208, 0), (6, 209, 0), (6, 210, 0), --RNG Casino
-				(2, 151, 0), --Racing
 				(3, 161, 0), --Number Game
-				(4, 162, 0), --Live Casino
 				(5, 180, 0), --Virtual Sports
 				(8, 202, 0), --Keno
 				(12, 255, 0), --Gold Deluxe
@@ -43,10 +39,7 @@ RETURN
 				(24, 219, 0), --Fishing World
 				(27, 190, 0), --Betradar Virtual Sports
 				(28, 220, 0), -- Keno
-				(26, 160, 0), -- Lucky 3
-				(30, 207, 0), -- Bullfighting
 				(32, 248, 0), -- Pragmatic
-				(33, 163, 0), -- Poker Games
 				(34, 165, 0) -- Card Club
 		) d(ProductID, SportType, BetType)
 	WHERE ',' + @ProductID + ',' LIKE '%,' + CAST(ProductID as varchar(3)) + ',%'

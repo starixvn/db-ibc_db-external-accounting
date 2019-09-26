@@ -42,6 +42,7 @@ AS
 		- 20180914@Percy: Poker Games - Modify GrossComm [RedmineID: #101550]
 		- 20181122@Elodie: DB053/bodb_Age Migration [Redmine:#104770]
 		- 20190418@Kan: DB053/bodb02 Migration, Move sp from DBEAS/bodb_EAS to DB053/bodb02 [Redmine: #111865]
+		- 20190826@Percy: Remove inactive products [RedmineID: #118699]
 */
 
 SET NOCOUNT ON
@@ -83,16 +84,13 @@ BEGIN
     INSERT INTO #ComWinLossDetails
 	    SELECT
 		    SRecommend,			
-			SUM(case when b.liveawayscore = 0 and b.bettype in(33,43) then b.stake/2 else ABS(b.stake) end),	
-			 SUM(CASE WHEN b.liveawayscore = 0 and b.bettype in(33,43) THEN ABS(b.stake)/2 
-					WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
-					WHEN b.StatusID = 111 AND s.ProductId IN (1,30) THEN 0 -- Sportsbook, Bullfighting
+			SUM(ABS(b.stake)),	
+			 SUM(CASE WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
+					WHEN b.StatusID = 111 AND s.ProductId IN (1) THEN 0 -- Sportsbook
 					WHEN s.ProductID = 21 THEN b.oddsspread -- Allbet
 					ELSE ABS(b.stake) 
 					END) AS TurnoverNoDraw,
-		    --sum(case when b.bettype = 1000 THEN oddsspread else case when tpositiontaking=1 then 0 else scomm/(1-tpositiontaking) end end) as GrossComm,
-		    SUM(CASE WHEN b.bettype BETWEEN 1401 AND 1499 THEN scomm
-				ELSE CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END END) AS GrossComm,
+		    SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END) AS GrossComm,
 		    sum(winlost-actual_stake), --MemberWinlost
 		    sum(playercomm), -- PlayerComm
 		    isnull(sum(winlost-actual_stake), 0) + isnull(sum(playercomm), 0), --MemberTotal
@@ -113,45 +111,10 @@ BEGIN
 		    b.winlostdate between @FromDate and @todate and
 		    b.srecommend in (SELECT TOP (@n) custID FROM #tmpSuperList) and
 		    b.ruben = 1 and
-		    b.statusID not in (101, 102, 103) and 
-		    b.bettype <> 1000
+		    b.statusID not in (101, 102, 103)
 	    GROUP BY SRecommend, CASE WHEN b.bettype = 71 OR b.bettype BETWEEN 2101 AND 2399 THEN 71 ELSE b.bettype END
 	    OPTION (OPTIMIZE FOR (@n = 1))
 	    
-	-- seperate P2P to improve performance
-	IF EXISTS (SELECT bettype FROM #SportBettype WHERE ProductID = 9)
-	BEGIN 
-		INSERT INTO #ComWinLossDetails
-	    SELECT
-		    SRecommend,			
-			SUM(ABS(b.stake)) as TurnOver,
-			SUM(ABS(b.stake)) as TurnoverNoDraw,	
-		    sum(case when b.bettype = 1000 THEN oddsspread else case when tpositiontaking=1 then 0 else scomm/(1-tpositiontaking) end end) as GrossComm,
-		    sum(winlost-actual_stake), --MemberWinlost
-		    sum(playercomm), -- PlayerComm
-		    isnull(sum(winlost-actual_stake), 0) + isnull(sum(playercomm), 0), --MemberTotal
-		    sum(awinlost), -- AgWinlost
-		    isnull(sum(comm-playercomm),0), --AgComm
-		    isnull(sum(awinlost+comm-playercomm), 0), --AgTotal			
-		    sum(mwinlost), -- MAgWinlost
-		    sum(acomm)-sum(comm), --MAgComm
-		    isnull(sum(mwinlost), 0) + isnull(sum(acomm), 0)-sum(comm), --MAgTotal
-		    sum(swinlost), -- SAgWinlost
-		    isnull(sum(scomm),0) -isnull(sum(acomm),0), --SAgComm
-		    isnull(sum(swinlost), 0) + isnull(sum(scomm), 0)-sum(acomm), --SAgTotal
-		    -(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost-actual_stake), 0)) --Company				
-	    FROM
-		    bodb02.dbo.bettrans b WITH (NOLOCK) INNER JOIN #SportBettype s ON b.bettype = s.bettype
-	    WHERE
-		    b.winlostdate between @FromDate and @todate and
-		    b.srecommend in (SELECT TOP (@n) custID FROM #tmpSuperList) and
-		    b.ruben = 1 and
-		    b.statusID not in (101, 102, 103) and 
-		    b.bettype = 1000
-	    GROUP BY SRecommend, b.bettype
-	    OPTION (OPTIMIZE FOR (@n = 1))
-	END 
-
 	if @BalanceUpDay < @FromDate
 	    select @BalanceUpDay=@FromDate
 		
