@@ -1,7 +1,4 @@
 /*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" isFunction="0" isNested="0"></info>*/
-USE [bodb02]
-GO
-
 ALTER PROCEDURE [dbo].[EAS_CustomerSelBalanceInfo]
 	@CustId	INT
 AS
@@ -13,13 +10,15 @@ AS
 
 	Revisions:
 		- 20181112@Percy: Initialize SP [RedmineID: #95978]
+		- 20191227@Johnson: get last transdate [redmine:#125894]
 */
 
 BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @RoleId TINYINT, @CurrencyId INT, @Currency NVARCHAR(50), @Credit MONEY, @UsedCredit MONEY
-
+			,@transdate DATETIME, @transid BIGINT
+			
 	SELECT  @RoleId = roleid, @CurrencyId = currency FROM dbo.custInfo WITH (NOLOCK) WHERE custid = @CustId
 
 	IF @RoleId NOT BETWEEN 1 AND 4
@@ -54,6 +53,14 @@ BEGIN
 	-- Super
 	IF @RoleId = 4
 	BEGIN
+		--last txn 
+		SELECT @transid = MAX(transid) FROM bettrans WITH (NOLOCK) 
+		WHERE srecommend = @custid
+			AND bettype NOT IN (20000,19999)
+		OPTION(OPTIMIZE FOR	UNKNOWN)
+		
+		SELECT @transdate = transdate FROM bettrans WITH (NOLOCK) WHERE transid = @transid
+		
 		-- Credit
 		SELECT @UsedCredit = SUM(ISNULL(credit, 0)) FROM DBCUST.CustDB.dbo.custInfo WITH (NOLOCK) WHERE srecommend = @CustId AND roleId = 3
 
@@ -122,6 +129,14 @@ BEGIN
 	END
 	ELSE IF @RoleId = 3
 	BEGIN
+		--last txn 
+		SELECT @transid = MAX(transid) FROM bettrans WITH (NOLOCK) 
+		WHERE mrecommend = @custid
+			AND bettype NOT IN (20000,19999)
+		OPTION(OPTIMIZE FOR	UNKNOWN)
+		
+		SELECT @transdate = transdate FROM bettrans WITH (NOLOCK) WHERE transid = @transid
+		
 		-- Credit
 		SELECT @UsedCredit = SUM(ISNULL(credit, 0)) FROM DBCUST.CustDB.dbo.custInfo WITH (NOLOCK) WHERE mrecommend = @CustId AND roleId = 2
 
@@ -190,6 +205,14 @@ BEGIN
 	END
 	ELSE IF @RoleId = 2
 	BEGIN
+		--last txn 
+		SELECT @transid = MAX(transid) FROM bettrans WITH (NOLOCK) 
+		WHERE recommend = @custid
+			AND bettype NOT IN (20000,19999)
+		OPTION(OPTIMIZE FOR	UNKNOWN)
+		
+		SELECT @transdate = transdate FROM bettrans WITH (NOLOCK) WHERE transid = @transid
+		
 		-- Credit
 		SELECT @UsedCredit = SUM(ISNULL(credit, 0)) FROM DBCUST.CustDB.dbo.custInfo WITH (NOLOCK) WHERE recommend = @CustId AND roleId = 1
 
@@ -258,9 +281,12 @@ BEGIN
 	END
 	ELSE IF @RoleId = 1
 	BEGIN
+		--last txn 		
+		SELECT @transdate = MAX(transdate) FROM bettrans WITH (NOLOCK) WHERE custid = @custid
+		
 		-- Credit
 		SELECT @UsedCredit = ISNULL(@Credit, 0)
-
+		
 		-- bettrans
 		INSERT INTO #BalanceInfo (winlostdate, bettype, statusId, winlost, actual_stake, playercomm)
 		SELECT 
@@ -310,6 +336,7 @@ BEGIN
 	END
 
 	SELECT
+		@transdate 				AS LastTxn,
 		@Credit					AS Credit,
 		@UsedCredit				AS UsedCredit,
 		@CurrencyId				AS CurrencyId,
