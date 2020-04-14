@@ -43,6 +43,7 @@ AS
 		- 20181122@Elodie: DB053/bodb_Age Migration [Redmine:#104770]
 		- 20190418@Kan: DB053/bodb02 Migration, Move sp from DBEAS/bodb_EAS to DB053/bodb02 [Redmine: #111865]
 		- 20190826@Percy: Remove inactive products [RedmineID: #118699]
+		- 20200410@Sophia: Add BBIN, Sexy Gaming, SA Gaming [RedmineId: #131358]
 */
 
 SET NOCOUNT ON
@@ -87,7 +88,7 @@ BEGIN
 			SUM(ABS(b.stake)),	
 			 SUM(CASE WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
 					WHEN b.StatusID = 111 AND s.ProductId IN (1) THEN 0 -- Sportsbook
-					WHEN s.ProductID = 21 THEN b.oddsspread -- Allbet
+					WHEN s.ProductID IN (21, 39, 45, 47)  THEN b.oddsspread -- Allbet, SA Gaming, SexyGaming, BBIN
 					ELSE ABS(b.stake) 
 					END) AS TurnoverNoDraw,
 		    SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END) AS GrossComm,
