@@ -11,7 +11,7 @@ AS
 	Revisions:
 		- 20181112@Percy: Initialize SP [RedmineID: #95978]
 		- 20191227@Johnson: get last transdate [redmine:#125894]
-		- 20200602@Percy: Separate 3rdPendingTransfer to Cash and Balance [RedmineID: #135200]
+		- 20200602@Percy: Separate PendingTransfer3rd to Cash and Balance [RedmineID: #135200]
 */
 
 BEGIN
@@ -39,7 +39,7 @@ BEGIN
 	INSERT INTO #SportBettypeMatrix (bettype, refTable)
 	SELECT DISTINCT bettype, refTable FROM dbo.SportBettypeMatrix WITH (NOLOCK) WHERE refTable <> 0
 
-	DECLARE @TotalCash MONEY, @YesterdayCash MONEY, @Outstanding MONEY, @TotalBalance MONEY, @YesterdayBalance MONEY, @DownlineOutstanding MONEY, @3rdPendingTransfer MONEY
+	DECLARE @TotalCash MONEY, @YesterdayCash MONEY, @Outstanding MONEY, @TotalBalance MONEY, @YesterdayBalance MONEY, @DownlineOutstanding MONEY, @PendingTransfer3rd MONEY
 
 	CREATE TABLE #BalanceInfo
 	(
@@ -123,15 +123,15 @@ BEGIN
 			winlostdate, statusID
 
 		SELECT
-			@TotalCash				= SUM(CASE WHEN bettype <> -10 OR statusId IN (0,1) THEN 0 ELSE CASE WHEN roleId = 4 THEN winlost - actual_stake ELSE swinlost + scomm - acomm END END),
-			@YesterdayCash			= SUM(CASE WHEN bettype <> -10 OR statusId IN (0,1) OR winlostdate > @yesterday THEN 0 ELSE CASE WHEN roleId = 4 THEN winlost - actual_stake ELSE swinlost + scomm - acomm END END),
+			@TotalCash				= SUM(CASE WHEN bettype = -10 OR statusId IN (0,1) THEN 0 ELSE CASE WHEN roleId = 4 THEN winlost - actual_stake ELSE swinlost + scomm - acomm END END),
+			@YesterdayCash			= SUM(CASE WHEN bettype = -10 OR statusId IN (0,1) OR winlostdate > @yesterday THEN 0 ELSE CASE WHEN roleId = 4 THEN winlost - actual_stake ELSE swinlost + scomm - acomm END END),
 			@Outstanding			= SUM(CASE WHEN statusId IN (0,1) THEN actual_stakePT ELSE 0 END),
 			
-			@TotalBalance			= SUM(CASE WHEN bettype <> -10 OR statusId IN (0,1) THEN 0 ELSE winlost - actual_stake + swinlost + mwinlost + awinlost + scomm END),
-			@YesterdayBalance		= SUM(CASE WHEN bettype <> -10 OR statusId IN (0,1) OR winlostdate > @yesterday THEN 0 ELSE winlost - actual_stake + swinlost + mwinlost + awinlost + scomm END),
+			@TotalBalance			= SUM(CASE WHEN bettype = -10 OR statusId IN (0,1) THEN 0 ELSE winlost - actual_stake + swinlost + mwinlost + awinlost + scomm END),
+			@YesterdayBalance		= SUM(CASE WHEN bettype = -10 OR statusId IN (0,1) OR winlostdate > @yesterday THEN 0 ELSE winlost - actual_stake + swinlost + mwinlost + awinlost + scomm END),
 			@DownlineOutstanding	= SUM(CASE WHEN statusId IN (0,1) THEN actual_stake ELSE 0 END),
 
-			@3rdPendingTransfer		= SUM(CASE WHEN bettype = -10 THEN -(winlost-actual_stake) ELSE 0 END)
+			@PendingTransfer3rd		= SUM(CASE WHEN bettype = -10 THEN -(winlost-actual_stake) ELSE 0 END)
 		FROM #BalanceInfo
 	END
 	ELSE IF @RoleId = 3
@@ -205,15 +205,15 @@ BEGIN
 			winlostdate, statusID
 
 		SELECT
-			@TotalCash				= SUM(CASE WHEN bettype <> -10 OR statusId IN (0,1) THEN 0 ELSE CASE WHEN roleId = 3 THEN winlost - actual_stake ELSE mwinlost + acomm - comm END END),
-			@YesterdayCash			= SUM(CASE WHEN bettype <> -10 OR statusId IN (0,1) OR winlostdate > @yesterday THEN 0 ELSE CASE WHEN roleId = 3 THEN winlost - actual_stake ELSE mwinlost + acomm - comm END END),
+			@TotalCash				= SUM(CASE WHEN bettype = -10 OR statusId IN (0,1) THEN 0 ELSE CASE WHEN roleId = 3 THEN winlost - actual_stake ELSE mwinlost + acomm - comm END END),
+			@YesterdayCash			= SUM(CASE WHEN bettype = -10 OR statusId IN (0,1) OR winlostdate > @yesterday THEN 0 ELSE CASE WHEN roleId = 3 THEN winlost - actual_stake ELSE mwinlost + acomm - comm END END),
 			@Outstanding			= SUM(CASE WHEN statusId IN (0,1) THEN actual_stakePT ELSE 0 END),
 			
-			@TotalBalance			= SUM(CASE WHEN bettype <> -10 OR statusId IN (0,1) THEN 0 ELSE winlost - actual_stake + mwinlost + awinlost + acomm END),
-			@YesterdayBalance		= SUM(CASE WHEN bettype <> -10 OR statusId IN (0,1) OR winlostdate > @yesterday THEN 0 ELSE winlost - actual_stake + mwinlost + awinlost + acomm END),
+			@TotalBalance			= SUM(CASE WHEN bettype = -10 OR statusId IN (0,1) THEN 0 ELSE winlost - actual_stake + mwinlost + awinlost + acomm END),
+			@YesterdayBalance		= SUM(CASE WHEN bettype = -10 OR statusId IN (0,1) OR winlostdate > @yesterday THEN 0 ELSE winlost - actual_stake + mwinlost + awinlost + acomm END),
 			@DownlineOutstanding	= SUM(CASE WHEN statusId IN (0,1) THEN actual_stake ELSE 0 END),
 
-			@3rdPendingTransfer		= SUM(CASE WHEN bettype = -10 THEN -(winlost-actual_stake) ELSE 0 END)
+			@PendingTransfer3rd		= SUM(CASE WHEN bettype = -10 THEN -(winlost-actual_stake) ELSE 0 END)
 		FROM #BalanceInfo
 	END
 	ELSE IF @RoleId = 2
@@ -287,15 +287,15 @@ BEGIN
 			winlostdate, statusID
 
 		SELECT
-			@TotalCash				= SUM(CASE WHEN bettype <> -10 OR statusId IN (0,1) THEN 0 ELSE CASE WHEN roleId = 2 THEN winlost - actual_stake ELSE awinlost + comm - playercomm END END),
-			@YesterdayCash			= SUM(CASE WHEN bettype <> -10 OR statusId IN (0,1) OR winlostdate > @yesterday THEN 0 ELSE CASE WHEN roleId = 2 THEN winlost - actual_stake ELSE awinlost + comm - playercomm END END),
+			@TotalCash				= SUM(CASE WHEN bettype = -10 OR statusId IN (0,1) THEN 0 ELSE CASE WHEN roleId = 2 THEN winlost - actual_stake ELSE awinlost + comm - playercomm END END),
+			@YesterdayCash			= SUM(CASE WHEN bettype = -10 OR statusId IN (0,1) OR winlostdate > @yesterday THEN 0 ELSE CASE WHEN roleId = 2 THEN winlost - actual_stake ELSE awinlost + comm - playercomm END END),
 			@Outstanding			= SUM(CASE WHEN statusId IN (0,1) THEN actual_stakePT ELSE 0 END),
 			
-			@TotalBalance			= SUM(CASE WHEN bettype <> -10 OR statusId IN (0,1) THEN 0 ELSE winlost - actual_stake + awinlost + comm END),
-			@YesterdayBalance		= SUM(CASE WHEN bettype <> -10 OR statusId IN (0,1) OR winlostdate > @yesterday THEN 0 ELSE winlost - actual_stake + awinlost + comm END),
+			@TotalBalance			= SUM(CASE WHEN bettype = -10 OR statusId IN (0,1) THEN 0 ELSE winlost - actual_stake + awinlost + comm END),
+			@YesterdayBalance		= SUM(CASE WHEN bettype = -10 OR statusId IN (0,1) OR winlostdate > @yesterday THEN 0 ELSE winlost - actual_stake + awinlost + comm END),
 			@DownlineOutstanding	= SUM(CASE WHEN statusId IN (0,1) THEN actual_stake ELSE 0 END),
 
-			@3rdPendingTransfer		= SUM(CASE WHEN bettype = -10 THEN -(winlost-actual_stake) ELSE 0 END)
+			@PendingTransfer3rd		= SUM(CASE WHEN bettype = -10 THEN -(winlost-actual_stake) ELSE 0 END)
 		FROM #BalanceInfo
 	END
 	ELSE IF @RoleId = 1
@@ -370,7 +370,7 @@ BEGIN
 		@YesterdayBalance		AS YesterdayBalance,
 		@DownlineOutstanding	AS DownlineOutstanding,
 		-----------------------------------------------
-		@3rdPendingTransfer		AS [3rdPendingTransfer]
+		@PendingTransfer3rd		AS PendingTransfer3rd
 
 	DROP TABLE #SportBettypeMatrix
 	DROP TABLE #BalanceInfo
