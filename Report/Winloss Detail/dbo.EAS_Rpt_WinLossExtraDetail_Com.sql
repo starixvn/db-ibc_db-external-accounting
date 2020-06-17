@@ -1,5 +1,5 @@
 /*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" isFunction="0" isNested="0"></info>*/
-CREATE PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com_Extra] 	
+CREATE PROCEDURE [dbo].[EAS_Rpt_WinLossExtraDetail_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCTHAI',--ACCTHAI or ACCINDO
 	@custid			INT = NULL,	
 	@FromDate		SMALLDATETIME,
@@ -92,32 +92,58 @@ BEGIN
 	    OPTION (OPTIMIZE FOR (@n = 1))
 END
 
+--SELECT
+--	w.CustID, 
+--	c.UserName, 
+--	sum(TurnOver) as Turnover,
+--	SUM(TurnoverNoDraw) as TurnoverNoDraw,
+--	sum(GrossComm) as GrossComm,
+--	sum(MemberWinLost) as MemberWinlost,
+--	sum(PlayerComm) as PlayerComm,
+--	sum(MemberTotal) as MemberTotal,
+--	sum(AgWinlost) as AgWinlost,
+--	sum(AgComm) as AgComm,
+--	sum(AgTotal) as AgTotal,
+--	sum(MAgWinlost) as MAgWinlost,
+--	sum(MAgComm) as MAgComm,
+--	sum(MAgTotal) as MAgTotal,
+--	sum(SAgWinlost) as SAgWinlost,
+--	sum(SAgComm) as SAgComm,
+--	sum(SAgTotal) as SAgTotal,
+--	sum(Company) as Company,
+--	sum(ExtWinloss) AS ExtWinloss,
+--	sum(ExtComm) AS ExtComm,
+--	sum(ExtTotal) AS ExtTotal,
+--	sum(NetCompany) AS NetCompany
+--FROM #ComWinLossDetails w INNER JOIN bodb02.dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID 
+--Group by w.CustID, c.UserName
+--order by c.Username
+
+
 SELECT
-	w.CustID, 
-	c.UserName, 
-	sum(TurnOver) as Turnover,
-	SUM(TurnoverNoDraw) as TurnoverNoDraw,
-	sum(GrossComm) as GrossComm,
-	sum(MemberWinLost) as MemberWinlost,
-	sum(PlayerComm) as PlayerComm,
-	sum(MemberTotal) as MemberTotal,
-	sum(AgWinlost) as AgWinlost,
-	sum(AgComm) as AgComm,
-	sum(AgTotal) as AgTotal,
-	sum(MAgWinlost) as MAgWinlost,
-	sum(MAgComm) as MAgComm,
-	sum(MAgTotal) as MAgTotal,
-	sum(SAgWinlost) as SAgWinlost,
-	sum(SAgComm) as SAgComm,
-	sum(SAgTotal) as SAgTotal,
-	sum(Company) as Company,
-	sum(ExtWinloss) AS ExtWinloss,
-	sum(ExtComm) AS ExtComm,
-	sum(ExtTotal) AS ExtTotal,
-	sum(NetCompany) AS NetCompany
-FROM #ComWinLossDetails w INNER JOIN bodb02.dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID 
-Group by w.CustID, c.UserName
-order by c.Username
+	1, 
+	10, 
+	1110000 as Turnover,
+	2000 as TurnoverNoDraw,
+	2000 as GrossComm,
+	2000 as MemberWinlost,
+	2000 as PlayerComm,
+	2000 as MemberTotal,
+	2000 as AgWinlost,
+	2000 as AgComm,
+	2000 as AgTotal,
+	2000 as MAgWinlost,
+	2000 as MAgComm,
+	2000 as MAgTotal,
+	2000 as SAgWinlost,
+	2000 as SAgComm,
+	2000 as SAgTotal,
+	2000 as Company,
+	2000 AS ExtWinloss,
+	2000 AS ExtComm,
+	2000 AS ExtTotal,
+	2000 AS NetCompany
+
 
 DROP TABLE #ComWinLossDetails
 
