@@ -92,32 +92,57 @@ BEGIN
 	    OPTION (OPTIMIZE FOR (@n = 1))
 END
 
+--SELECT
+--	w.CustID AS CustID, 
+--	c.UserName AS Username, 
+--	sum(TurnOver) as Turnover,
+--	SUM(TurnoverNoDraw) as TurnoverNoDraw,
+--	sum(GrossComm) as GrossComm,
+--	sum(MemberWinLost) as MemberWinlost,
+--	sum(PlayerComm) as PlayerComm,
+--	sum(MemberTotal) as MemberTotal,
+--	sum(AgWinlost) as AgWinlost,
+--	sum(AgComm) as AgComm,
+--	sum(AgTotal) as AgTotal,
+--	sum(MAgWinlost) as MAgWinlost,
+--	sum(MAgComm) as MAgComm,
+--	sum(MAgTotal) as MAgTotal,
+--	sum(SAgWinlost) as SAgWinlost,
+--	sum(SAgComm) as SAgComm,
+--	sum(SAgTotal) as SAgTotal,
+--	sum(Company) as Company,
+--	sum(ExtWinloss) AS ExtWinloss,
+--	sum(ExtComm) AS ExtComm,
+--	sum(ExtTotal) AS ExtTotal,
+--	sum(NetCompany) AS NetCompany
+--FROM #ComWinLossDetails w INNER JOIN bodb02.dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID 
+--Group by w.CustID, c.UserName
+--order by c.Username
+
 SELECT
-	w.CustID, 
-	c.UserName, 
-	sum(TurnOver) as Turnover,
-	SUM(TurnoverNoDraw) as TurnoverNoDraw,
-	sum(GrossComm) as GrossComm,
-	sum(MemberWinLost) as MemberWinlost,
-	sum(PlayerComm) as PlayerComm,
-	sum(MemberTotal) as MemberTotal,
-	sum(AgWinlost) as AgWinlost,
-	sum(AgComm) as AgComm,
-	sum(AgTotal) as AgTotal,
-	sum(MAgWinlost) as MAgWinlost,
-	sum(MAgComm) as MAgComm,
-	sum(MAgTotal) as MAgTotal,
-	sum(SAgWinlost) as SAgWinlost,
-	sum(SAgComm) as SAgComm,
-	sum(SAgTotal) as SAgTotal,
-	sum(Company) as Company,
-	sum(ExtWinloss) AS ExtWinloss,
-	sum(ExtComm) AS ExtComm,
-	sum(ExtTotal) AS ExtTotal,
-	sum(NetCompany) AS NetCompany
-FROM #ComWinLossDetails w INNER JOIN bodb02.dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID 
-Group by w.CustID, c.UserName
-order by c.Username
+	123 AS CustID, 
+	'S1' AS Username, 
+	10 AS BetCount,
+	10000 as Turnover,
+	10000 as TurnoverNoDraw,
+	100 as GrossComm,
+	-1000 as MemberWinlost,
+	100 as PlayerComm,
+	-900 as MemberTotal,
+	1 as AgWinlost,
+	1 as AgComm,
+	1 as AgTotal,
+	1 as MAgWinlost,
+	1 as MAgComm,
+	1 as MAgTotal,
+	50 as SAgWinlost,
+	175 as SAgComm,
+	225 as SAgTotal,
+	170 as Company,
+	170 AS ExtWinloss,
+	-175 AS ExtComm,
+	-5 AS ExtTotal,
+	80 AS NetCompany
 
 
 DROP TABLE #ComWinLossDetails
