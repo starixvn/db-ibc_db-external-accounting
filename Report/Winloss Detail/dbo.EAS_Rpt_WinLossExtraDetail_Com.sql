@@ -5,7 +5,7 @@ CREATE PROCEDURE [dbo].[EAS_Rpt_WinLossExtraDetail_Com]
 	@FromDate		SMALLDATETIME,
 	@ToDate			SMALLDATETIME,
 	@ProductIds		VARCHAR(MAX) = '46',
-	@BalanceUpDay	SMALLDATETIME	
+	@MovebetDay     SMALLDATETIME	
 AS
 /*
 	Created by: Malcolm
@@ -47,7 +47,7 @@ SELECT ProductID, Bettype FROM bodb02.dbo.f_SportBettypeMatrixByProduct_Sel(@Pro
 DECLARE @n INT = 2147483647
 	
 
-IF @FromDate > @BalanceUpDay
+IF @ToDate > @MovebetDay
 	BEGIN
 		INSERT INTO #ComWinLossDetails
 		SELECT
@@ -73,7 +73,7 @@ IF @FromDate > @BalanceUpDay
 			-(SUM(swinlost) + SUM(awinlost) + SUM(mwinlost) + SUM(scomm) + SUM(winlost-actual_stake)), --Company,
 			SUM((winlost - actual_stake) * epositiontaking), -- extra win loss
 			-SUM(scomm),--extra comm
-			SUM(winlost + comm),-- extra total
+			SUM((winlost - actual_stake) * epositiontaking - scomm),-- extra total
 			-SUM((winlost - actual_stake) - swinlost - mwinlost - awinlost),-- net company
 			COUNT(1) BetCount
 
@@ -87,8 +87,11 @@ IF @FromDate > @BalanceUpDay
 		OPTION (OPTIMIZE FOR (@n = 1))
 	END
 
+IF @FromDate <= @MovebetDay
+BEGIN
+    SELECT @ToDate = @MovebetDay
 
-INSERT INTO #ComWinLossDetails
+	INSERT INTO #ComWinLossDetails
 	SELECT
 		CustID,			
 		SUM(TurnOver), -- TurnOver
@@ -112,13 +115,13 @@ INSERT INTO #ComWinLossDetails
 		SUM(ExtraWinloss) + SUM(ExtraComm), --ExtraTotal
 		-SUM(WinLoss - SAgWinLoss - MAgWinLoss - AgWinLoss), -- NetCompany
 		SUM(BetCount) --BetCount
-FROM bodb_Summary.dbo.sum_winloss_extra b WITH (NOLOCK) 
-WHERE winlostdate between @FromDate and @todate			
-	and SRecommend IN (SELECT custID FROM #tmpSuperList)
-	and RoleID = 4
-	AND EXISTS(SELECT 1 FROM bodb02.dbo.strSplit(@ProductIds,',') WHERE val = b.ProductId)
-GROUP BY CustID
-
+	FROM bodb_Summary.dbo.sum_winloss_extra b WITH (NOLOCK) 
+	WHERE winlostdate between @FromDate and @todate			
+		and SRecommend IN (SELECT custID FROM #tmpSuperList)
+		and RoleID = 4
+		AND EXISTS(SELECT 1 FROM bodb02.dbo.strSplit(@ProductIds,',') WHERE val = b.ProductId)
+	GROUP BY CustID
+END
 
 SELECT
 	w.CustID				AS CustID, 
