@@ -1,10 +1,10 @@
 /*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" isFunction="0" isNested="0"></info>*/
 CREATE PROCEDURE [dbo].[EAS_Rpt_WinLossExtraDetail_Com] 	
-	@GroupName		VARCHAR(50) = 'ACCTHAI',--ACCTHAI or ACCINDO
+	@GroupName		VARCHAR(50) = 'ACCINDO',--ACCTHAI or ACCINDO
 	@custid			INT = NULL,	
 	@FromDate		SMALLDATETIME,
 	@ToDate			SMALLDATETIME,
-	@ProductIds		VARCHAR(MAX) = '',
+	@ProductIds		VARCHAR(MAX) = '46',
 	@BalanceUpDay	SMALLDATETIME	
 AS
 /*
@@ -71,7 +71,7 @@ IF @FromDate > @BalanceUpDay
 			SUM(scomm) - SUM(acomm), --SAgComm
 			SUM(swinlost) + SUM(scomm) -SUM(acomm), --SAgTotal
 			-(SUM(swinlost) + SUM(awinlost) + SUM(mwinlost) + SUM(scomm) + SUM(winlost-actual_stake)), --Company,
-			SUM(winlost * epositiontaking) - sum(actual_stake * epositiontaking), -- extra win loss
+			SUM((winlost - actual_stake) * epositiontaking), -- extra win loss
 			-SUM(scomm),--extra comm
 			SUM(winlost + comm),-- extra total
 			-SUM((winlost - actual_stake) - swinlost - mwinlost - awinlost),-- net company
@@ -113,10 +113,10 @@ INSERT INTO #ComWinLossDetails
 		-SUM(WinLoss - SAgWinLoss - MAgWinLoss - AgWinLoss), -- NetCompany
 		SUM(BetCount) --BetCount
 FROM bodb_Summary.dbo.sum_winloss_extra b WITH (NOLOCK) 
-		INNER JOIN #SportBettype t ON b.ProductId = t.ProductId AND b.bettype = t.bettype
 WHERE winlostdate between @FromDate and @todate			
 	and SRecommend IN (SELECT custID FROM #tmpSuperList)
 	and RoleID = 4
+	AND EXISTS(SELECT 1 FROM bodb02.dbo.strSplit(@ProductIds,',') WHERE val = b.ProductId)
 GROUP BY CustID
 
 
