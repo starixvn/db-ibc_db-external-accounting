@@ -89,6 +89,7 @@ IF @ToDate > @MovebetDay
 
 IF @FromDate <= @MovebetDay
 BEGIN
+    IF @ToDate > @MovebetDay
     SELECT @ToDate = @MovebetDay
 
 	INSERT INTO #ComWinLossDetails
