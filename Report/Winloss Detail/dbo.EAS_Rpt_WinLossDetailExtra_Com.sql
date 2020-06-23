@@ -62,21 +62,21 @@ IF @ToDate > @MovebetDay
 	BEGIN
 		INSERT INTO #ComWinLossDetails
 		SELECT
-			SRecommend,																		-- CustId		
-			SUM(ABS(b.stake)),																-- Turnover
-			SUM(CASE WHEN s.ProductID = 46 THEN b.oddsspread ELSE 0 END),				    -- TurnoverNoDraw(net Turnover)
-			SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END),   -- GrossComm,
-			SUM(winlost-actual_stake),														-- MemberWinlost
-			SUM(playercomm),																-- PlayerComm
-			SUM(winlost-actual_stake) + sum(playercomm),									-- MemberTotal			
-			SUM(swinlost),																	-- SAgWinlost
-			SUM(scomm) - SUM(acomm),														-- SAgComm
-			SUM(swinlost) + SUM(scomm) -SUM(acomm),											-- SAgTotal
-			SUM((winlost - actual_stake) * epositiontaking),								-- Extra win loss
-			-SUM(scomm),																	-- Extra comm
-			SUM((winlost - actual_stake) * epositiontaking - scomm),						-- Extra total
-			-SUM((winlost - actual_stake) + swinlost + mwinlost + awinlost),				-- Net company
-			COUNT(1)																		-- Bet Count
+			SRecommend,																				-- CustId		
+			SUM(ABS(b.stake)),																		-- Turnover
+			SUM(CASE WHEN s.ProductID = 46 THEN b.oddsspread ELSE 0 END),							-- TurnoverNoDraw(net Turnover)
+			SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END),			-- GrossComm,
+			SUM(winlost-actual_stake),																-- MemberWinlost
+			SUM(playercomm),																		-- PlayerComm
+			SUM(winlost-actual_stake) + sum(playercomm),											-- MemberTotal			
+			SUM(swinlost),																			-- SAgWinlost
+			SUM(scomm) - SUM(acomm),																-- SAgComm
+			SUM(swinlost) + SUM(scomm) -SUM(acomm),													-- SAgTotal
+			SUM((winlost - actual_stake) * epositiontaking),										-- Extra win loss
+			-SUM(scomm),																			-- Extra comm
+			SUM((winlost - actual_stake) * epositiontaking - scomm),								-- Extra total
+			-SUM((winlost - actual_stake) * (1 + epositiontaking) + swinlost + mwinlost + awinlost),-- Net company
+			COUNT(1)																				-- Bet Count
 
 		FROM bodb02.dbo.bettrans b WITH (NOLOCK)
 			INNER JOIN #Product s ON b.bettype = s.Bettype
