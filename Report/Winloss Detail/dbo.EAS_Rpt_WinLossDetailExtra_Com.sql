@@ -64,7 +64,7 @@ IF @ToDate > @MovebetDay
 		SELECT
 			SRecommend,																				-- CustId		
 			SUM(ABS(b.stake)),																		-- Turnover
-			SUM(CASE WHEN s.ProductID = 46 THEN b.oddsspread ELSE ABS(stake) END),							-- TurnoverNoDraw(net Turnover)
+			SUM(CASE WHEN s.ProductID = 46 THEN b.oddsspread ELSE ABS(stake) END),					-- TurnoverNoDraw(net Turnover)
 			SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END),			-- GrossComm,
 			SUM(winlost-actual_stake),																-- MemberWinlost
 			SUM(playercomm),																		-- PlayerComm
