@@ -64,7 +64,7 @@ IF @ToDate > @MovebetDay
 		SELECT
 			SRecommend,																				-- CustId		
 			SUM(ABS(b.stake)),																		-- Turnover
-			SUM(CASE WHEN s.ProductID = 46 THEN b.oddsspread ELSE 0 END),							-- TurnoverNoDraw(net Turnover)
+			SUM(CASE WHEN s.ProductID = 46 THEN b.oddsspread ELSE ABS(stake) END),							-- TurnoverNoDraw(net Turnover)
 			SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END),			-- GrossComm,
 			SUM(winlost-actual_stake),																-- MemberWinlost
 			SUM(playercomm),																		-- PlayerComm
@@ -108,7 +108,7 @@ BEGIN
 		SUM(ExtraWinloss) + SUM(ExtraComm),									--	ExtraTotal
 		-SUM(WinLoss + SAgWinLoss + MAgWinLoss + AgWinLoss + ExtraWinloss),	--	NetCompany
 		SUM(BetCount)														--	BetCount
-	FROM bodb_Summary.dbo.sum_winloss_extra b WITH (NOLOCK) 
+	FROM bodb_Summary.dbo.Sum_Winloss_Extra b WITH (NOLOCK) 
 	WHERE winlostdate between @FromDate and @todate			
 		AND CustId IN (SELECT custID FROM #tmpSuperList)
 		AND RoleID = 4
