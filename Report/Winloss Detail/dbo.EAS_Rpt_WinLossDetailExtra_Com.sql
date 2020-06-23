@@ -95,7 +95,7 @@ BEGIN
 	SELECT
 		CustID,																--	CustId
 		SUM(Turnover),														--	Turnover
-		SUM(TunroverNoDraw),												--	TurnoverNoDraw(net Turnover),
+		SUM(TurnoverNoDraw),												--	TurnoverNoDraw(net Turnover),
 		SUM(GrossComm) ,													--	GrossComm,
 		SUM(WinLoss),														--	MemberWinlost
 		SUM(PlayerComm),													--	PlayerComm
