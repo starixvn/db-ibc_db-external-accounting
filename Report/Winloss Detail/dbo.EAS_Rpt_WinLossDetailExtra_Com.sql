@@ -2,7 +2,7 @@
 CREATE PROCEDURE [dbo].[EAS_Rpt_WinLossDetailExtra_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCINDO',
 	@CustId         INT = NULL,
-	@ProductIds		VARCHAR(MAX) = '',
+	@ProductIds		VARCHAR(MAX) = '46',
 	@FromDate		SMALLDATETIME,
 	@ToDate			SMALLDATETIME,
 	@MovebetDay     SMALLDATETIME	
@@ -63,8 +63,8 @@ IF @ToDate > @MovebetDay
 		INSERT INTO #ComWinLossDetails
 		SELECT
 			SRecommend,																		-- CustId		
-			SUM(ABS(b.stake)),																-- TurnOver
-			SUM(CASE WHEN s.ProductID = 46 THEN b.oddsspread ELSE 0 END),				    -- TurnoverNoDraw(net turnover)
+			SUM(ABS(b.stake)),																-- Turnover
+			SUM(CASE WHEN s.ProductID = 46 THEN b.oddsspread ELSE 0 END),				    -- TurnoverNoDraw(net Turnover)
 			SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END),   -- GrossComm,
 			SUM(winlost-actual_stake),														-- MemberWinlost
 			SUM(playercomm),																-- PlayerComm
@@ -94,8 +94,8 @@ BEGIN
 	INSERT INTO #ComWinLossDetails
 	SELECT
 		CustID,																--	CustId
-		SUM(TurnOver),														--	TurnOver
-		SUM(TunroverNoDraw),												--	TurnoverNoDraw(net turnover),
+		SUM(Turnover),														--	Turnover
+		SUM(TunroverNoDraw),												--	TurnoverNoDraw(net Turnover),
 		SUM(GrossComm) ,													--	GrossComm,
 		SUM(WinLoss),														--	MemberWinlost
 		SUM(PlayerComm),													--	PlayerComm
@@ -120,7 +120,7 @@ SELECT
 	w.CustID				AS CustId, 
 	c.UserName				AS Username, 
 	SUM(Turnover)			AS Turnover,
-	SUM(TurnoverNoDraw)		AS TurnoverNoDraw, --(Net turnover)
+	SUM(TurnoverNoDraw)		AS TurnoverNoDraw, --(Net Turnover)
 	SUM(GrossComm)			AS GrossComm,
 	SUM(MemberWinLost)		AS MemberWinlost,
 	SUM(PlayerComm)			AS PlayerComm,
