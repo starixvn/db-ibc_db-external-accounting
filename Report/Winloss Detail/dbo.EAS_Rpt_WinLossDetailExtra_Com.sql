@@ -1,6 +1,8 @@
 /*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" isFunction="0" isNested="0"></info>*/
 CREATE PROCEDURE [dbo].[EAS_Rpt_WinLossDetailExtra_Com] 	
 	@GroupName		VARCHAR(50) = 'ACCINDO',
+	@CustId         INT = NULL,
+	@ProductIds		VARCHAR(MAX) = '',
 	@FromDate		SMALLDATETIME,
 	@ToDate			SMALLDATETIME,
 	@MovebetDay     SMALLDATETIME	
@@ -18,15 +20,10 @@ SET NOCOUNT ON
 
 CREATE TABLE #tmpSuperList (custID INT PRIMARY KEY)
 
-DECLARE @ProductId	INT = 46
-
-INSERT INTO #tmpSuperList
-(
-	CustID
-)
+INSERT INTO #tmpSuperList(CustID)
 SELECT custID 
 FROM bodb02.dbo.Acc_CustGroup WITH(NOLOCK)
-WHERE GroupName = @GroupName
+WHERE (@custid IS NULL OR custid = @custid) AND GroupName = @GroupName
 
 CREATE TABLE #ComWinLossDetails 
 (	
@@ -59,8 +56,7 @@ CREATE TABLE #Product
 
 INSERT INTO #Product (ProductID, Bettype)
 SELECT DISTINCT ProductID, Bettype 
-FROM bodb02.dbo.SportBettypeMatrix WITH(NOLOCK)
-WHERE ProductID = @ProductId AND IsTest = @isTest
+FROM bodb02.dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @isTest) 
 
 IF @ToDate > @MovebetDay
 	BEGIN
@@ -68,7 +64,7 @@ IF @ToDate > @MovebetDay
 		SELECT
 			SRecommend,																		-- CustId		
 			SUM(ABS(b.stake)),																-- TurnOver
-			SUM(b.oddsspread),																-- TurnoverNoDraw
+			SUM(CASE WHEN s.ProductID = 46 THEN b.oddsspread ELSE 0 END),				    -- TurnoverNoDraw(net turnover)
 			SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END),   -- GrossComm,
 			SUM(winlost-actual_stake),														-- MemberWinlost
 			SUM(playercomm),																-- PlayerComm
@@ -83,7 +79,7 @@ IF @ToDate > @MovebetDay
 			COUNT(1)																		-- Bet Count
 
 		FROM bodb02.dbo.bettrans b WITH (NOLOCK)
-					INNER JOIN #Product s ON b.bettype = s.Bettype
+			INNER JOIN #Product s ON b.bettype = s.Bettype
 		WHERE b.winlostdate BETWEEN @FromDate AND @todate 
 			AND b.srecommend IN (SELECT  custID FROM #tmpSuperList) 
 			AND b.ruben = 1 
@@ -99,7 +95,7 @@ BEGIN
 	SELECT
 		CustID,																--	CustId
 		SUM(TurnOver),														--	TurnOver
-		SUM(TunroverNoDraw),												--	TurnoverNoDraw,
+		SUM(TunroverNoDraw),												--	TurnoverNoDraw(net turnover),
 		SUM(GrossComm) ,													--	GrossComm,
 		SUM(WinLoss),														--	MemberWinlost
 		SUM(PlayerComm),													--	PlayerComm
@@ -114,17 +110,17 @@ BEGIN
 		SUM(BetCount)														--	BetCount
 	FROM bodb_Summary.dbo.sum_winloss_extra b WITH (NOLOCK) 
 	WHERE winlostdate between @FromDate and @todate			
-		and SRecommend IN (SELECT custID FROM #tmpSuperList)
-		and RoleID = 4
-		AND b.ProductId = @ProductId
+		AND CustId IN (SELECT custID FROM #tmpSuperList)
+		AND RoleID = 4
+		AND EXISTS(SELECT 1 FROM bodb02.dbo.strSplit(@ProductIds,',') WHERE val = b.ProductId) 
 	GROUP BY CustID
 END
 
 SELECT
 	w.CustID				AS CustId, 
 	c.UserName				AS Username, 
-	SUM(TurnOver)			AS Turnover,
-	SUM(TurnoverNoDraw)		AS TurnoverNoDraw,
+	SUM(Turnover)			AS Turnover,
+	SUM(TurnoverNoDraw)		AS TurnoverNoDraw, --(Net turnover)
 	SUM(GrossComm)			AS GrossComm,
 	SUM(MemberWinLost)		AS MemberWinlost,
 	SUM(PlayerComm)			AS PlayerComm,
