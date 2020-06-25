@@ -72,10 +72,10 @@ IF @ToDate > @MovebetDay
 			SUM(swinlost),																			-- SAgWinlost
 			SUM(scomm) - SUM(acomm),																-- SAgComm
 			SUM(swinlost) + SUM(scomm) -SUM(acomm),													-- SAgTotal
-			SUM((winlost - actual_stake) * epositiontaking),										-- Extra win loss
+			-SUM((winlost - actual_stake) * epositiontaking),										-- Extra win loss
 			-SUM(scomm),																			-- Extra comm
-			SUM((winlost - actual_stake) * epositiontaking - scomm),								-- Extra total
-			-SUM((winlost - actual_stake) * (1 + epositiontaking) + swinlost + mwinlost + awinlost),-- Net company
+			SUM(-(winlost - actual_stake) * epositiontaking - scomm),								-- Extra total
+			-SUM((winlost - actual_stake) * (1 - epositiontaking) + swinlost + mwinlost + awinlost),-- Net company
 			COUNT(1)																				-- Bet Count
 
 		FROM bodb02.dbo.bettrans b WITH (NOLOCK)
