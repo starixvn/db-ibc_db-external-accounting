@@ -24,6 +24,7 @@ AS
 		- 20181113@Paul: Enhance performance [RedmineID: #103479]
 		- 20190418@Kan: DB053/bodb02 Migration, Move sp from DBEAS/bodb_EAS to DB053/bodb02 [Redmine: #111865]
 		- 20190826@Percy: Remove inactive products [RedmineID: #118699]
+		- 20200629@Malcolm : exclude ProductId = 46 [RedmineID : #135593]
 		
 	Param's Explanation:		
 		@custID: Master ID 
