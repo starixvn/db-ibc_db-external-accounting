@@ -3,7 +3,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDaily_MAg14]
 	@winlostdate		SMALLDATETIME,
 	@custID				INT,
 	@agentID			INT = NULL,
-	@ExcludeProductIds	VARCHAR(MAX) = ''
+	@ExcludeProductIds	VARCHAR(MAX) = '46'
 AS
 /*
 	Created by: Dan

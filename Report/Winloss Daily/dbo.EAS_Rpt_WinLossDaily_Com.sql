@@ -3,7 +3,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDaily_Com]
 	@winlostdate		SMALLDATETIME,
 	@custid				INT = NULL,	
 	@GroupName			VARCHAR(50) = 'ACCTHAI',
-	@ExcludeProductIds	VARCHAR(MAX) = ''
+	@ExcludeProductIds	VARCHAR(MAX) = '46'
 AS
 /*
 	Created by: Dan
