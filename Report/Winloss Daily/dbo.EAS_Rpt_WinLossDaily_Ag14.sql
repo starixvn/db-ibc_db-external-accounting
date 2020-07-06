@@ -3,7 +3,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDaily_Ag14]
 	@winlostdate		SMALLDATETIME,
 	@custID				INT,
 	@memberID			INT = NULL,
-	@ExcludeProductIds	VARCHAR(MAX) = ''
+	@ExcludeProductIds	VARCHAR(MAX) = '46'
 AS
 /*
 	Created by: Dan
@@ -18,6 +18,7 @@ AS
 		- 20181031@Helen: DB052 Indexes Revolution [RedmineID: 103572]
 		- 20190418@Kan: DB053/bodb02 Migration, Move sp from DBEAS/bodb_EAS to DB053/bodb02 [Redmine: #111865]
 		- 20190826@Percy: Remove inactive products [RedmineID: #118699]
+		- 20200629@Malcolm : exclude ProductId = 46 [RedmineID : #135593]
 
 	Param's Explanation:		
 		@custID: Agent ID 

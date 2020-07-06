@@ -3,7 +3,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDaily_Com]
 	@winlostdate		SMALLDATETIME,
 	@custid				INT = NULL,	
 	@GroupName			VARCHAR(50) = 'ACCTHAI',
-	@ExcludeProductIds	VARCHAR(MAX) = ''
+	@ExcludeProductIds	VARCHAR(MAX) = '46'
 AS
 /*
 	Created by: Dan
@@ -27,6 +27,7 @@ AS
 		- 20181122@Elodie: DB053/bodb_Age Migration [Redmine:#104770]
 		- 20190417@Kan: DB053/bodb02 Migration, Move sp from DBEAS/bodb_EAS to DB053/bodb02 [Redmine: #111865]
 		- 20190826@Percy: Remove inactive products [RedmineID: #118699]
+		- 20200629@Malcolm : exclude ProductId = 46 [RedmineID : #135593]
 */
 BEGIN
 	SET NOCOUNT ON
