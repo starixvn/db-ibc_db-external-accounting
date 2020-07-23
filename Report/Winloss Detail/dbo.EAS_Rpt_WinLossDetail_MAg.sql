@@ -42,6 +42,7 @@ Revisions:
 	- 20190826@Percy: Remove inactive products [RedmineID: #118699]
 	- 20200410@Sophia: Add BBIN, Sexy Gaming, SA Gaming [RedmineId: #131358]
 	- 20200422@Sophia: Add IBCBet Live Casino [RedmineId: #130693]
+	- 20200601@Sophia: Add ION [RedmineId: #132325]
 	
 */
 BEGIN
@@ -89,7 +90,7 @@ BEGIN
 				sum(ABS(b.stake)) as TurnOver, 
 				SUM(CASE WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
 						WHEN b.StatusID = 111 AND s.ProductId IN (1) THEN 0 -- Sportsbook
-						WHEN s.ProductID IN (21, 39, 45, 46, 47)  THEN b.oddsspread -- Allbet, SA Gaming, SexyGaming, IBCBet Live Casino, BBIN
+						WHEN s.ProductID IN (21, 39, 45, 46, 47, 52)  THEN b.oddsspread -- Allbet, SA Gaming, SexyGaming, IBCBet Live Casino, BBIN, ION
 						ELSE ABS(b.stake) 
 						END) AS TurnoverNoDraw,
 				SUM(CASE WHEN (apositiontaking + mpositiontaking = 1) THEN 0 ELSE acomm/(1-apositiontaking - mpositiontaking) END) AS GrossComm,		    
