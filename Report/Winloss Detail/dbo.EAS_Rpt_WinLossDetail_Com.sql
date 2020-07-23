@@ -65,7 +65,7 @@ CREATE TABLE #ComWinLossDetails
 	CustID int, Turnover money, TurnoverNoDraw MONEY, GrossComm money, MemberWinLost money, 
 	PlayerComm money, MemberTotal money, AgWinLost money, AgComm money, AgTotal money, 
 	MAgWinLost money, MAgComm money, MAgTotal money, SAgWinLost money, SAgComm money, SAgTotal MONEY,
-	ExtraWinloss MONEY, ExtraComm MONEY, ETotal MONEY, Company MONEY
+	ExtraWinloss MONEY, ExtraComm MONEY, ExtraTotal MONEY, Company MONEY
 )
 
 CREATE TABLE #TmpCondSumWL (sporttype INT, bettype INT)--, PRIMARY KEY NONCLUSTERED (Bettype ASC, sporttype ASC))
@@ -113,85 +113,78 @@ BEGIN
 		    isnull(sum(scomm),0) -isnull(sum(acomm),0), --SAgComm
 		    isnull(sum(swinlost), 0) + isnull(sum(scomm), 0)-sum(acomm), --SAgTotal
 			ISNULL(-1 * SUM(CASE
-						-- Jackpot
-						WHEN b.bettype IN (2198, 2398, 2998, 4297) THEN
-							CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE ISNULL(b.betid/CONVERT(DECIMAL(19,8), 100000000), 0) END
-						WHEN b.bettype IN (2199, 2399, 2999, 4298) THEN 0
-						ELSE CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.winlost - b.actual_stake END
-					END
-					* CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT
-							ELSE ISNULL(b.epositiontaking, 0)
-						END
-			),0) AS ExtraWinloss,
-			ISNULL(-1 * SUM(CASE 
-					/*IBCBet Live Casino*/
-					WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
-					WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298) THEN 0
-					ELSE 
-						CASE 
-							WHEN b.tpositiontaking = 1 THEN 0 
-							ELSE b.scomm / (1 - b.tpositiontaking)
-						END
-				END
-				* CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
-			), 0) AS ExtraComm,
-			-1 * (
-				ISNULL(SUM(CASE
 							-- Jackpot
 							WHEN b.bettype IN (2198, 2398, 2998, 4297) THEN
 								CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE ISNULL(b.betid/CONVERT(DECIMAL(19,8), 100000000), 0) END
 							WHEN b.bettype IN (2199, 2399, 2999, 4298) THEN 0
-							ELSE CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.winlost - b.actual_stake END
-						END
-						* CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT
-								ELSE ISNULL(b.epositiontaking, 0)
+							ELSE 
+								CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.winlost - b.actual_stake END
 							END
-				),0)
-				+
-				ISNULL(SUM(CASE 
-						/*IBCBet Live Casino*/
-						WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
-						WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298) THEN 0
-						ELSE 
-							CASE 
-								WHEN b.tpositiontaking = 1 THEN 0 
-								ELSE b.scomm / (1 - b.tpositiontaking)
-							END
-					END
-					* CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
-				), 0)
-			)
-			AS ETotal,
-		    -(
-				isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost-actual_stake), 0)
-				+ 
-				(
-					ISNULL(SUM(CASE
-								-- Jackpot
-								WHEN b.bettype IN (2198, 2398, 2998, 4297) THEN
-									CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE ISNULL(b.betid/CONVERT(DECIMAL(19,8), 100000000), 0) END
-								WHEN b.bettype IN (2199, 2399, 2999, 4298) THEN 0
-								ELSE CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.winlost - b.actual_stake END
-							END
-							* CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT
-									ELSE ISNULL(b.epositiontaking, 0)
-								END
-					),0)
-					+
-					ISNULL(SUM(CASE 
+							* 
+							CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+							),0) AS ExtraWinloss,
+			ISNULL(-1 * SUM(CASE 
 							/*IBCBet Live Casino*/
 							WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
 							WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298) THEN 0
 							ELSE 
-								CASE 
-									WHEN b.tpositiontaking = 1 THEN 0 
-									ELSE b.scomm / (1 - b.tpositiontaking)
+								CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.scomm / (1 - b.tpositiontaking) END
+							END
+							* 
+							CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+							), 0) AS ExtraComm,
+			-1 * (
+				ISNULL(SUM(CASE 
+							-- Jackpot
+							WHEN b.bettype IN (2198, 2398, 2998, 4297) THEN
+								CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE ISNULL(b.betid/CONVERT(DECIMAL(19,8), 100000000), 0) END
+							WHEN b.bettype IN (2199, 2399, 2999, 4298) THEN 0
+							ELSE 
+								CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.winlost - b.actual_stake END
+							END
+							*	 
+							CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+							),0)
+				+
+				ISNULL(SUM(CASE 
+							/*IBCBet Live Casino*/
+							WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
+							WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298) THEN 0
+							ELSE 
+								CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.scomm / (1 - b.tpositiontaking) END
+							END
+							* 
+							CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+							), 0)
+				) AS ExtraTotal,
+		    -1 * (
+					ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(winlost-actual_stake), 0)
+					+ 
+					(
+						ISNULL(SUM(CASE
+									-- Jackpot
+									WHEN b.bettype IN (2198, 2398, 2998, 4297) THEN
+										CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE ISNULL(b.betid/CONVERT(DECIMAL(19,8), 100000000), 0) END
+									WHEN b.bettype IN (2199, 2399, 2999, 4298) THEN 0
+									ELSE 
+										CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.winlost - b.actual_stake END
+									END
+									* 
+									CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+									),0)
+					+
+					ISNULL(SUM(CASE 
+								/*IBCBet Live Casino*/
+								WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
+								WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298) THEN 0
+								ELSE 
+									CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.scomm / (1 - b.tpositiontaking) END
 								END
-						END
-						* CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
-					), 0)
-				)
-			) --Company				
+								* 
+								CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+								), 0)
+					)
+				) AS Company				
 	    FROM
 		    bodb02.dbo.bettrans b WITH (READPAST)
 			INNER JOIN #SportBettype s ON b.bettype = s.Bettype
@@ -236,7 +229,7 @@ BEGIN
 		    isnull(sum(swinlost), 0) + isnull(sum(scomm), 0)-sum(acomm), --SAgTotal
 			ISNULL(SUM(b.ExtraWinloss), 0) AS ExtraWinloss,
 			ISNULL(SUM(b.ExtraComm), 0) AS ExtraComm,
-			ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0) AS ETotal,
+			ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0) AS ExtraTotal,
 		    -(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost), 0) + ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0)) --Company					
 	    FROM
 		    bodb02.dbo.sum_winloss b WITH (NOLOCK) INNER JOIN #TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype
@@ -280,7 +273,7 @@ BEGIN
 		    isnull(sum(swinlost), 0) + isnull(sum(scomm), 0)-sum(acomm), --SAgTotal
 			ISNULL(SUM(b.ExtraWinloss), 0) AS ExtraWinloss,
 			ISNULL(SUM(b.ExtraComm), 0) AS ExtraComm,
-			ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0) AS ETotal,
+			ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0) AS ExtraTotal,
 		    -(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost), 0) + ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0)) --Company								
 	    FROM
 		    #Sum_WinLoss_Old b WITH(NOLOCK) INNER JOIN #TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype
@@ -310,7 +303,7 @@ SELECT
 	sum(SAgTotal) as SAgTotal,
 	SUM(w.ExtraWinloss) AS ExtraWinloss,
 	SUM(w.ExtraComm) AS ExtraComm,
-	SUM(w.ETotal) AS eTotal,
+	SUM(w.ExtraTotal) AS ExtraTotal,
 	sum(Company) as Company	
 FROM #ComWinLossDetails w INNER JOIN bodb02.dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID 
 Group by w.CustID, c.UserName
