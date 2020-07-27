@@ -160,7 +160,7 @@ BEGIN
 		    -1 * (
 					ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(winlost-actual_stake), 0)
 					+ 
-					(
+					-1 * (
 						ISNULL(SUM(CASE
 									-- Jackpot
 									WHEN b.bettype IN (2198, 2398, 2998, 4297) THEN
