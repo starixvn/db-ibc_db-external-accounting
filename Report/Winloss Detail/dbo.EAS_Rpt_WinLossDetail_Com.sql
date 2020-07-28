@@ -128,10 +128,11 @@ BEGIN
 							WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
 							WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298) THEN 0
 							ELSE 
-								CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.scomm / (1 - b.tpositiontaking) END
+								CASE 
+									WHEN b.tpositiontaking = 1 THEN 0 
+									ELSE b.scomm / (1 - b.tpositiontaking) 
+								END * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 							END
-							* 
-							CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 							), 0) AS ExtraComm,
 			-1 * (
 				ISNULL(SUM(CASE 
@@ -151,10 +152,11 @@ BEGIN
 							WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
 							WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298) THEN 0
 							ELSE 
-								CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.scomm / (1 - b.tpositiontaking) END
+								CASE 
+									WHEN b.tpositiontaking = 1 THEN 0 
+									ELSE b.scomm / (1 - b.tpositiontaking) 
+								END * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 							END
-							* 
-							CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 							), 0)
 				) AS ExtraTotal,
 		    -1 * (
@@ -172,16 +174,17 @@ BEGIN
 									* 
 									CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 									),0)
-					+
-					ISNULL(SUM(CASE 
-								/*IBCBet Live Casino*/
-								WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
-								WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298) THEN 0
-								ELSE 
-									CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.scomm / (1 - b.tpositiontaking) END
-								END
-								* 
-								CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+						+
+						ISNULL(SUM(CASE 
+									/*IBCBet Live Casino*/
+									WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
+									WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298) THEN 0
+									ELSE 
+										CASE 
+											WHEN b.tpositiontaking = 1 THEN 0 
+											ELSE b.scomm / (1 - b.tpositiontaking) 
+										END * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+									END
 								), 0)
 					)
 				) AS Company				
