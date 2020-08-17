@@ -18,7 +18,7 @@ BEGIN
 
 	DECLARE @currDate DATE = CAST(GETDATE() AS DATE) 
 
-	IF @GroupName = 'ACCYEN789' OR @GroupName = 'ACCYEN889' OR @GroupName = 'ACCUT'
+	IF @GroupName = 'ACCYEN789' OR @GroupName = 'ACCYEN889' OR @GroupName = 'ACCUT' OR @GroupName = 'ACCUUS' OR @GroupName = 'ACCTEST'
 	BEGIN
 		;WITH rs AS 
 		(
