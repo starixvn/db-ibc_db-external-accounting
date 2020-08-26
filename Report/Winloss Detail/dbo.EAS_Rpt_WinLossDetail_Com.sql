@@ -47,6 +47,7 @@ AS
 		- 20200422@Sophia: Add IBCBet Live Casino [RedmineId: #130693]
 		- 20200601@Sophia: Add ION [RedmineId: #132325]
 		- 20200708@Sol: Add new columns to the report for Extra PT - Redmine: [#136320]
+		- 20200826@Sol: Add new column to the report for Extra PT - Redmine: [#140389]
 
 */
 
@@ -65,7 +66,7 @@ CREATE TABLE #ComWinLossDetails
 	CustID int, Turnover money, TurnoverNoDraw MONEY, GrossComm money, MemberWinLost money, 
 	PlayerComm money, MemberTotal money, AgWinLost money, AgComm money, AgTotal money, 
 	MAgWinLost money, MAgComm money, MAgTotal money, SAgWinLost money, SAgComm money, SAgTotal MONEY,
-	ExtraWinloss MONEY, ExtraComm MONEY, ExtraTotal MONEY, Company MONEY
+	ExtraWinloss MONEY, ExtraComm MONEY, ExtraTotal MONEY, Company MONEY, CompanyAfterExtraPT MONEY
 )
 
 CREATE TABLE #TmpCondSumWL (sporttype INT, bettype INT)--, PRIMARY KEY NONCLUSTERED (Bettype ASC, sporttype ASC))
@@ -159,6 +160,7 @@ BEGIN
 							END
 							), 0)
 				) AS ExtraTotal,
+			-(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost-actual_stake), 0)), --Company				
 		    -1 * (
 					ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(winlost-actual_stake), 0)
 					+ 
@@ -187,7 +189,7 @@ BEGIN
 									END
 								), 0)
 					)
-				) AS Company				
+				) AS CompanyAfterExtraPT				
 	    FROM
 		    bodb02.dbo.bettrans b WITH (READPAST)
 			INNER JOIN #SportBettype s ON b.bettype = s.Bettype
@@ -233,7 +235,8 @@ BEGIN
 			ISNULL(SUM(b.ExtraWinloss), 0) AS ExtraWinloss,
 			ISNULL(SUM(b.ExtraComm), 0) AS ExtraComm,
 			ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0) AS ExtraTotal,
-		    -(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost), 0) + ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0)) --Company					
+			-(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost), 0)), --Company
+		    -(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost), 0) + ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0)) --Company after extra pt					
 	    FROM
 		    bodb02.dbo.sum_winloss b WITH (NOLOCK) INNER JOIN #TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype
 	    WHERE
@@ -277,7 +280,8 @@ BEGIN
 			ISNULL(SUM(b.ExtraWinloss), 0) AS ExtraWinloss,
 			ISNULL(SUM(b.ExtraComm), 0) AS ExtraComm,
 			ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0) AS ExtraTotal,
-		    -(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost), 0) + ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0)) --Company								
+			-(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost), 0)), --Company
+		    -(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost), 0) + ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0)) --Company after extra pt							
 	    FROM
 		    #Sum_WinLoss_Old b WITH(NOLOCK) INNER JOIN #TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype
 	    WHERE
@@ -307,7 +311,8 @@ SELECT
 	SUM(w.ExtraWinloss) AS ExtraWinloss,
 	SUM(w.ExtraComm) AS ExtraComm,
 	SUM(w.ExtraTotal) AS ExtraTotal,
-	sum(Company) as Company	
+	SUM(w.Company) AS Company,
+	SUM(w.CompanyAfterExtraPT) as CompanyAfterExtraPT	
 FROM #ComWinLossDetails w INNER JOIN bodb02.dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID 
 Group by w.CustID, c.UserName
 order by c.Username
