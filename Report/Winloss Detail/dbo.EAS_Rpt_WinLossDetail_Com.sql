@@ -48,7 +48,7 @@ AS
 		- 20200601@Sophia: Add ION [RedmineId: #132325]
 		- 20200708@Sol: Add new columns to the report for Extra PT - Redmine: [#136320]
 		- 20200826@Sol: Add new column to the report for Extra PT - Redmine: [#140389]
-		- 20200828@Sol: enhance sp to prevent deadlock - Redmine: [#140531]
+		- 20200828@Sol: enhance sp to prevent deadlock, increase maxdop to use parallelism - Redmine: [#140531]
 
 */
 
@@ -210,7 +210,7 @@ BEGIN
 		    b.ruben = 1 and
 		    b.statusID not in (101, 102, 103)
 	    GROUP BY SRecommend, CASE WHEN b.bettype = 71 OR b.bettype BETWEEN 2101 AND 2399 THEN 71 ELSE b.bettype END
-	    OPTION (OPTIMIZE FOR (@n = 1))
+	    OPTION (OPTIMIZE FOR (@n = 10), MAXDOP 8)
 	    
 	if @BalanceUpDay < @FromDate
 	    select @BalanceUpDay=@FromDate
