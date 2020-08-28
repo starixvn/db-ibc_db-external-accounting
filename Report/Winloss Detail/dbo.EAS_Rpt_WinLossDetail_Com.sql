@@ -48,6 +48,7 @@ AS
 		- 20200601@Sophia: Add ION [RedmineId: #132325]
 		- 20200708@Sol: Add new columns to the report for Extra PT - Redmine: [#136320]
 		- 20200826@Sol: Add new column to the report for Extra PT - Redmine: [#140389]
+		- 20200828@Sol: enhance sp to prevent deadlock - Redmine: [#140531]
 
 */
 
@@ -191,7 +192,7 @@ BEGIN
 					)
 				) AS CompanyAfterExtraPT				
 	    FROM
-		    bodb02.dbo.bettrans b WITH (READPAST)
+		    bodb02.dbo.bettrans b WITH (NOLOCK)
 			INNER JOIN #SportBettype s ON b.bettype = s.Bettype
 			OUTER APPLY 
 			(
