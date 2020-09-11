@@ -113,12 +113,6 @@ BEGIN
 			, t.c.value('(@Bettype)[1]', 'SMALLINT') AS Bettype
 		FROM @__ProductDetails.nodes('ROOT/ProductDetail') t(c)
 	END
-	
-	SELECT @ProductIds = STUFF((SELECT ',' + f.val
-								FROM f_StringSplit(@ProductIds,',') f
-								WHERE EXISTS(SELECT 1 FROM @ExistingProductDetails e WHERE f.val = e.ProductId)
-									OR NOT EXISTS(SELECT 1 FROM f_GetProductDetail() g WHERE g.ProductId = f.val)
-								FOR XML PATH('')),1,1,'')
 		
 	DECLARE @TmpCondSumWL TABLE(sporttype INT, bettype INT)
 	INSERT INTO @TmpCondSumWL (sporttype, bettype)
@@ -155,7 +149,7 @@ BEGIN
 		IF @ToDate > @MoveBetsDay
 		BEGIN
 			IF @MoveBetsDay > @FromDate
-				SELECT @FDate = @MoveBetsDay
+				SELECT @FDate = DATEADD(DD, 1, @MoveBetsDay)
 
 			IF @masterID IS NULL
 			BEGIN
