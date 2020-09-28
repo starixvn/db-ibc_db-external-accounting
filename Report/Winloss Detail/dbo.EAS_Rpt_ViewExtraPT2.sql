@@ -26,7 +26,7 @@ BEGIN
 
 	;WITH rs AS 
 	(
-		SELECT		DISTINCT agepp.ProductID, agepp.ExtraPT 
+		SELECT		agepp.ProductID, agepp.ExtraPT 
 		FROM		Acc_GroupExtraPT2_Product agepp WITH(NOLOCK)
 		LEFT JOIN	#f_GroupProduct gp ON agepp.ProductID = gp.ProductId AND gp.ProductId <> gp.GroupProductId
 		WHERE		@currDate BETWEEN agepp.FromDate AND agepp.ToDate
