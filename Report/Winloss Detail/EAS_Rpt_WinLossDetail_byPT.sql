@@ -169,7 +169,7 @@ BEGIN
 
 END
 
-INSERT INTO #ComWinLossDetailsByPT(CustID,,Name,Turnover,GrossComm,MAgTotal,SAgWinLost,SAgComm,SAgTotal,Company,BetCount,DisplayOrder)
+INSERT INTO #ComWinLossDetailsByPT(CustID,Name,Turnover,GrossComm,MAgTotal,SAgWinLost,SAgComm,SAgTotal,Company,BetCount,DisplayOrder)
 SELECT	w.CustID AS CustId, 
 		c.UserName, 
 		SUM(TurnOver) as Turnover,
