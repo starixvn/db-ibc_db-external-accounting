@@ -161,7 +161,7 @@ BEGIN
 					sum(ABS(b.stake)) as TurnOver,
 					SUM(CASE WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
 							WHEN b.StatusID = 111 AND s.ProductId IN (1) THEN 0 -- Sportsbook
-							WHEN s.ProductID IN (21, 39, 45, 46, 47, 52)  THEN b.oddsspread -- Allbet, SA Gaming, SexyGaming, IBCBet Live Casino, BBIN, ION
+							WHEN s.ProductID IN (21, 39, 45, 46, 47, 51 ,52)  THEN b.oddsspread -- Allbet, SA Gaming, SexyGaming, IBCBet Live Casino, BBIN, WM ,ION
 							ELSE ABS(b.stake)
 							END) AS TurnoverNoDraw,
 					SUM(CASE WHEN apositiontaking = 1 THEN 0 ELSE comm/(1- apositiontaking) END) AS GrossComm,
@@ -189,7 +189,7 @@ BEGIN
 					sum(ABS(b.stake)) as TurnOver,
 					SUM(CASE WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
 							WHEN b.StatusID = 111 AND s.ProductId IN (1) THEN 0 -- Sportsbook
-							WHEN s.ProductID IN (21, 39, 45, 46, 47, 52)  THEN b.oddsspread -- Allbet, SA Gaming, SexyGaming, IBCBet Live Casino, BBIN, ION
+							WHEN s.ProductID IN (21, 39, 45, 46, 47, 51, 52)  THEN b.oddsspread -- Allbet, SA Gaming, SexyGaming, IBCBet Live Casino, BBIN, WM, ION
 							ELSE ABS(b.stake)
 							END) AS TurnoverNoDraw,
 					SUM(CASE WHEN apositiontaking = 1 THEN 0 ELSE comm/(1- apositiontaking) END) AS GrossComm,
