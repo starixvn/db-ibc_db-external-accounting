@@ -45,6 +45,7 @@ Revisions:
 	- 20200422@Sophia: Add IBCBet Live Casino [RedmineId: #130693]
 	- 20200601@Sophia: Add ION [RedmineId: #132325]
 	- 20200909@Malcolm : Report Enhancement for Jackpot Product [RedmineID : #139575]
+	- 20200915@Malcolm : Add WM Live Casino [Redmine : #131584]
 	
 	Param's Explanation:
 	 @ProductDetails:		

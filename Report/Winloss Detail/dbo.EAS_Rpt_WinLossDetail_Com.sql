@@ -52,6 +52,7 @@ AS
 		- 20200826@Sol: Add new column to the report for Extra PT - Redmine: [#140389]
 		- 20200828@Sol: enhance sp to prevent deadlock, increase maxdop to use parallelism - Redmine: [#140531]
 		- 20200909@Malcolm : Report Enhancement for Jackpot Product [RedmineID : #139575]
+		- 20200915@Malcolm : Add WM Live Casino [Redmine : #131584]
 	
 	Param's Explanation:
 	 @ProductDetails:		
