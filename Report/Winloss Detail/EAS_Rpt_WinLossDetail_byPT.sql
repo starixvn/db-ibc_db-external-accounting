@@ -295,17 +295,18 @@ SET NOCOUNT ON
 
 	IF @TotalRecords = 0  
 	BEGIN  
-		--INSERT INTO #ComWinLossDetailsSuperList(CustID,Name)
-		--SELECT	w.CustID, c.UserName  	
-		--FROM #ComWinLossDetails w 	
-		--INNER JOIN dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID
-		--GROUP BY w.CustID, c.UserName 
-		
-		--SELECT @TotalRecords = count(CustID)
-		--FROM #ComWinLossDetailsSuperList;
+	
+		INSERT INTO #ComWinLossDetailsSuperList(CustID,Name)
+		SELECT	w.CustID, c.UserName  	
+		FROM #ComWinLossDetails w 	
+		INNER JOIN dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID
+		GROUP BY w.CustID, c.UserName 
 
-		SELECT @TotalRecords = count(distinct CustID)
-		FROM #ComWinLossDetails;
+		SELECT @TotalRecords = count(CustID)
+		FROM #ComWinLossDetailsSuperList;
+
+		--SELECT @TotalRecords = count(distinct CustID)
+		--FROM #ComWinLossDetails;
 
 	END
 
@@ -340,28 +341,28 @@ SET NOCOUNT ON
 		GROUP BY w.CustID,c.UserName,w.ProductID, p.ProductName
 		ORDER BY c.UserName
 
-		--SELECT	NULL AS CustId,
-		--		'Total' AS UserName,
-		--		NULL AS  ProductID,
-		--		NULL AS  ProductName,
-		--		SUM(Turnover) Turnover,
-		--		SUM(TurnoverNoDraw) TurnoverNoDraw,
-		--		SUM(GrossComm) GrossComm, 
-		--		SUM(MemberWinLost) MemberWinLost,
-		--		SUM(PlayerComm) PlayerComm,
-		--		SUM(MemberTotal) MemberTotal,
-		--		SUM(AgWinLost) AgWinLost,
-		--		SUM(AgComm) AgComm,
-		--		SUM(AgTotal) AgTotal,
-		--		SUM(MAgWinLost) MAgWinLost,
-		--		SUM(MAgComm) MAgComm	,
-		--		SUM(MAgTotal) MAgTotal,
-		--		SUM(SAgWinLost) SAgWinLost, 
-		--		SUM(SAgComm) SAgComm	, 
-		--		SUM(SAgTotal) SAgTotal, 
-		--		SUM(Company) Company,
-		--		SUM(BetCount) BetCount
-		--FROM	#ComWinLossDetails;
+		SELECT	NULL AS CustId,
+				'Total' AS UserName,
+				NULL AS  ProductID,
+				NULL AS  ProductName,
+				SUM(Turnover) Turnover,
+				SUM(TurnoverNoDraw) TurnoverNoDraw,
+				SUM(GrossComm) GrossComm, 
+				SUM(MemberWinLost) MemberWinLost,
+				SUM(PlayerComm) PlayerComm,
+				SUM(MemberTotal) MemberTotal,
+				SUM(AgWinLost) AgWinLost,
+				SUM(AgComm) AgComm,
+				SUM(AgTotal) AgTotal,
+				SUM(MAgWinLost) MAgWinLost,
+				SUM(MAgComm) MAgComm	,
+				SUM(MAgTotal) MAgTotal,
+				SUM(SAgWinLost) SAgWinLost, 
+				SUM(SAgComm) SAgComm	, 
+				SUM(SAgTotal) SAgTotal, 
+				SUM(Company) Company,
+				SUM(BetCount) BetCount
+		FROM	#ComWinLossDetails;
 
 		
 		RETURN
@@ -410,28 +411,28 @@ SET NOCOUNT ON
 
 
 	
-		--SELECT	NULL AS CustId,
-		--		'Total' AS UserName,
-		--		NULL AS  ProductID,
-		--		NULL AS  ProductName,
-		--		SUM(Turnover) Turnover,
-		--		SUM(TurnoverNoDraw) TurnoverNoDraw,
-		--		SUM(GrossComm) GrossComm, 
-		--		SUM(MemberWinLost) MemberWinLost,
-		--		SUM(PlayerComm) PlayerComm,
-		--		SUM(MemberTotal) MemberTotal,
-		--		SUM(AgWinLost) AgWinLost,
-		--		SUM(AgComm) AgComm,
-		--		SUM(AgTotal) AgTotal,
-		--		SUM(MAgWinLost) MAgWinLost,
-		--		SUM(MAgComm) MAgComm	,
-		--		SUM(MAgTotal) MAgTotal,
-		--		SUM(SAgWinLost) SAgWinLost, 
-		--		SUM(SAgComm) SAgComm	, 
-		--		SUM(SAgTotal) SAgTotal, 
-		--		SUM(Company) Company,
-		--		SUM(BetCount) BetCount
-		--FROM	#ComWinLossDetails;
+		SELECT	NULL AS CustId,
+				'Total' AS UserName,
+				NULL AS  ProductID,
+				NULL AS  ProductName,
+				SUM(Turnover) Turnover,
+				SUM(TurnoverNoDraw) TurnoverNoDraw,
+				SUM(GrossComm) GrossComm, 
+				SUM(MemberWinLost) MemberWinLost,
+				SUM(PlayerComm) PlayerComm,
+				SUM(MemberTotal) MemberTotal,
+				SUM(AgWinLost) AgWinLost,
+				SUM(AgComm) AgComm,
+				SUM(AgTotal) AgTotal,
+				SUM(MAgWinLost) MAgWinLost,
+				SUM(MAgComm) MAgComm	,
+				SUM(MAgTotal) MAgTotal,
+				SUM(SAgWinLost) SAgWinLost, 
+				SUM(SAgComm) SAgComm	, 
+				SUM(SAgTotal) SAgTotal, 
+				SUM(Company) Company,
+				SUM(BetCount) BetCount
+		FROM	#ComWinLossDetails;
 
 DROP TABLE #TmpCondSumWL
 DROP TABLE #ComWinLossDetails
