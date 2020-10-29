@@ -296,6 +296,7 @@ SET NOCOUNT ON
 
 	IF ((@PageSize <= 0) AND (@PageIndex <= 0))
 	BEGIN
+
 		SELECT 	w.CustID,
 				c.UserName,
 				w.ProductID,
@@ -346,6 +347,7 @@ SET NOCOUNT ON
 				SUM(BetCount) BetCount
 		FROM	#ComWinLossDetails;
 
+		
 		RETURN
 	END
 
