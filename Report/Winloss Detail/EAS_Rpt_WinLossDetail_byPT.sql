@@ -18,7 +18,7 @@ AS
 	Task : Implement new report details win/lost by PT 
 	DB: DBAGE/bodb02
 	Revisions:
-		- 20201013@Danny: intiate SPs [RedmineID : #139937]
+		- 20201013@Danny: Initialize SPs [RedmineID : #139937]
 */
 
 SET NOCOUNT ON
@@ -96,8 +96,6 @@ SET NOCOUNT ON
 		LEFT JOIN @ExistingProductDetails e ON f.ProductID = e.ProductId
 	WHERE e.ProductId IS NULL OR (e.Bettype = f.BetType)
 
-
-
 	CREATE TABLE #ComWinLossDetails 
 	(	
 		CustID			INT, 
@@ -121,15 +119,11 @@ SET NOCOUNT ON
 		BetCount		INT
 	);
 
-
 	CREATE TABLE #ComWinLossDetailsSuperList
 	(
 		CustID			INT, 
 		Name			NVARCHAR(100)
 	);
-
-
-
 
 	--Avoid Parameter Sniffing for bettrans and sum_winloss
 	DECLARE @FDate	SMALLDATETIME,
@@ -229,7 +223,7 @@ SET NOCOUNT ON
 			   ISNULL(SUM(scomm),0) - ISNULL(SUM(acomm),0),
 			   SUM(swinlost) +  ISNULL(SUM(scomm),0) -  ISNULL(SUM(acomm),0),
 			   	-(SUM(swinlost)+ SUM(mwinlost) +SUM(awinlost) + SUM(winlost)  + SUM(scomm)),
-				SUM(betcount)
+			 SUM(betcount)
 
 		FROM dbo.SUM_winloss b WITH(NOLOCK)
 			INNER JOIN #TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype
@@ -260,7 +254,7 @@ SET NOCOUNT ON
 			WHERE winlostdate < @TDate
 		)
 		INSERT INTO #ComWinLossDetails(CustID, ProductID,Turnover,TurnoverNoDraw,GrossComm, MemberWinLost,PlayerComm,MemberTotal,AgWinLost,AgComm,AgTotal,MAgWinLost,MAgComm,MAgTotal,SAgWinLost, SAgComm, SAgTotal, Company,BetCount)
-			SELECT b.CustID,
+		SELECT b.CustID,
 			   w.ProductID,
 			   SUM(Turnover),
 			   SUM(TunroverNoDraw),
@@ -291,8 +285,6 @@ SET NOCOUNT ON
 		OPTION (MAXRECURSION 0);
 	END
 
-
-
 	IF @TotalRecords = 0  
 	BEGIN  
 	
@@ -309,7 +301,6 @@ SET NOCOUNT ON
 		--FROM #ComWinLossDetails;
 
 	END
-
 
 	IF ((@PageSize <= 0) AND (@PageIndex <= 0))
 	BEGIN
@@ -364,13 +355,8 @@ SET NOCOUNT ON
 				SUM(BetCount) BetCount
 		FROM	#ComWinLossDetails;
 
-		
 		RETURN
 	END
-
-
-	
-	
 
 
 	;WITH CTE_filter(CustID) AS
@@ -411,28 +397,28 @@ SET NOCOUNT ON
 
 
 	
-		SELECT	NULL AS CustId,
-				'Total' AS UserName,
-				NULL AS  ProductID,
-				NULL AS  ProductName,
-				SUM(Turnover) Turnover,
-				SUM(TurnoverNoDraw) TurnoverNoDraw,
-				SUM(GrossComm) GrossComm, 
-				SUM(MemberWinLost) MemberWinLost,
-				SUM(PlayerComm) PlayerComm,
-				SUM(MemberTotal) MemberTotal,
-				SUM(AgWinLost) AgWinLost,
-				SUM(AgComm) AgComm,
-				SUM(AgTotal) AgTotal,
-				SUM(MAgWinLost) MAgWinLost,
-				SUM(MAgComm) MAgComm	,
-				SUM(MAgTotal) MAgTotal,
-				SUM(SAgWinLost) SAgWinLost, 
-				SUM(SAgComm) SAgComm	, 
-				SUM(SAgTotal) SAgTotal, 
-				SUM(Company) Company,
-				SUM(BetCount) BetCount
-		FROM	#ComWinLossDetails;
+	SELECT	NULL AS CustId,
+			'Total' AS UserName,
+			NULL AS  ProductID,
+			NULL AS  ProductName,
+			SUM(Turnover) Turnover,
+			SUM(TurnoverNoDraw) TurnoverNoDraw,
+			SUM(GrossComm) GrossComm, 
+			SUM(MemberWinLost) MemberWinLost,
+			SUM(PlayerComm) PlayerComm,
+			SUM(MemberTotal) MemberTotal,
+			SUM(AgWinLost) AgWinLost,
+			SUM(AgComm) AgComm,
+			SUM(AgTotal) AgTotal,
+			SUM(MAgWinLost) MAgWinLost,
+			SUM(MAgComm) MAgComm	,
+			SUM(MAgTotal) MAgTotal,
+			SUM(SAgWinLost) SAgWinLost, 
+			SUM(SAgComm) SAgComm	, 
+			SUM(SAgTotal) SAgTotal, 
+			SUM(Company) Company,
+			SUM(BetCount) BetCount
+	FROM	#ComWinLossDetails;
 
 DROP TABLE #TmpCondSumWL
 DROP TABLE #ComWinLossDetails
