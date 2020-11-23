@@ -91,9 +91,10 @@ SET NOCOUNT ON
 	);
 
 	INSERT INTO #TmpCondSumWL(SportType, BetType,ProductID) 
-	SELECT f.SportType, f.BetType, f.ProductID
+	SELECT f.SportType, f.BetType, ISNULL(p.GroupProductId, f.ProductID) 
 	FROM dbo.f_SumWinloss_ConditionSel(@ProductIds) f
 		LEFT JOIN @ExistingProductDetails e ON f.ProductID = e.ProductId
+		LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
 	WHERE e.ProductId IS NULL OR (e.Bettype = f.BetType)
 
 	CREATE TABLE #ComWinLossDetails 
