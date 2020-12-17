@@ -53,6 +53,7 @@ AS
 		- 20200828@Sol: enhance sp to prevent deadlock, increase maxdop to use parallelism - Redmine: [#140531]
 		- 20200909@Malcolm : Report Enhancement for Jackpot Product [RedmineID : #139575]
 		- 20200915@Malcolm : Add WM Live Casino [Redmine : #131584]
+		- 20201201@Malcolm : Add Gold Diamond Gaming [Redmine : #144110]
 	
 	Param's Explanation:
 	 @ProductDetails:		
@@ -172,7 +173,7 @@ BEGIN
 			SUM(ABS(b.stake)),	
 			 SUM(CASE WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
 					WHEN b.StatusID = 111 AND s.ProductId IN (1) THEN 0 -- Sportsbook
-					WHEN s.ProductID IN (21, 39, 45, 46, 47, 51, 52)  THEN b.oddsspread -- Allbet, SA Gaming, SexyGaming, IBCBet Live Casino, BBIN, WM, ION
+					WHEN s.ProductID IN (21, 39, 45, 46, 47, 51, 52, 59)  THEN b.oddsspread -- Allbet, SA Gaming, SexyGaming, IBCBet Live Casino, BBIN, WM, ION, GDG
 					ELSE ABS(b.stake) 
 					END) AS TurnoverNoDraw,
 		    SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END) AS GrossComm,

@@ -19,6 +19,7 @@ AS
 	DB: DBAGE/bodb02
 	Revisions:
 		- 20201013@Danny: Initialize SPs [RedmineID : #139937]
+		- 20201201@Malcolm : Add Gold Diamond Gaming [Redmine : #144110]
 */
 
 SET NOCOUNT ON
@@ -150,7 +151,7 @@ SET NOCOUNT ON
 			SUM(CASE
 						WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
 						WHEN b.StatusID = 111 AND s.ProductId IN (1) THEN 0 -- Sportsbook
-						WHEN s.ProductID IN (21, 39, 45, 46, 47, 51, 52)  THEN b.oddsspread -- Allbet, SA Gaming, SexyGaming, IBCBet Live Casino, BBIN, ION
+						WHEN s.ProductID IN (21, 39, 45, 46, 47, 51, 52, 59)  THEN b.oddsspread -- Allbet, SA Gaming, SexyGaming, IBCBet Live Casino, BBIN, ION, GDG
 						ELSE ABS(b.stake) 
 				END) AS TurnoverNoDraw,
 			SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END),										
