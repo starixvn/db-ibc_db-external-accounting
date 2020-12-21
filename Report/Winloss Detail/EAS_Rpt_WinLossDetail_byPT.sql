@@ -20,6 +20,7 @@ AS
 	Revisions:
 		- 20201013@Danny: Initialize SPs [RedmineID : #139937]
 		- 20201201@Malcolm : Add Gold Diamond Gaming [Redmine : #144110]
+		- 20201221@Danny : Enhance performance [Redmine : #147331]
 */
 
 SET NOCOUNT ON
@@ -245,16 +246,23 @@ SET NOCOUNT ON
 			SELECT @TDate = DATEADD(dd, -1, @BalanceUpDay);
 		END
 
-		-- using cte to remove predicate when seek on sum_winloss_old
-		;WITH CTE_Winlostdate (winlostdate, sporttype, bettype, ProductID) AS
+		DECLARE @winlostdateTable TABLE (winlostdate smalldatetime)
+
+		;WITH CTE_Winlostdate (winlostdate ) AS
 		(
-			SELECT @FDate AS winlostdate, SportType, BetType, ProductID
-			FROM #TmpCondSumWL
+			SELECT @FDate AS winlostdate
 			UNION ALL
-			SELECT DATEADD(DAY, 1, winlostdate), SportType, BetType, ProductID
+			SELECT DATEADD(DAY, 1, winlostdate)
 			FROM CTE_Winlostdate
 			WHERE winlostdate < @TDate
 		)
+		INSERT INTO @winlostdateTable(winlostdate)
+		select * from CTE_Winlostdate
+		OPTION (MAXRECURSION 0)
+
+
+
+		-- using cte to remove predicate when seek on sum_winloss_old
 		INSERT INTO #ComWinLossDetails(CustID, ProductID,Turnover,TurnoverNoDraw,GrossComm, MemberWinLost,PlayerComm,MemberTotal,AgWinLost,AgComm,AgTotal,MAgWinLost,MAgComm,MAgTotal,SAgWinLost, SAgComm, SAgTotal, Company,BetCount)
 		SELECT b.CustID,
 			   w.ProductID,
@@ -277,7 +285,11 @@ SET NOCOUNT ON
 				SUM(betcount)
 
 		FROM bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK)
-		CROSS APPLY CTE_Winlostdate w
+		CROSS APPLY (
+				SELECT  t.winlostdate, u.SportType, u.BetType, u.ProductID
+				FROM #TmpCondSumWL u
+				cross join @winlostdateTable t
+		) w
 		WHERE b.winlostdate = w.winlostdate
 			AND b.custid  IN (SELECT tmp.custID FROM #tmpSuperList tmp) 
 			AND b.RoleID = 4
