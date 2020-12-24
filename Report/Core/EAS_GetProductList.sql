@@ -11,6 +11,7 @@ AS
 	Revisions:
 		- 20191106@Percy: Initialize SP [Redmine: #118699]
 		- 20200922@Danny: re-order products and filter by @GroupId [Redmine : #141832]
+		- 20201224@Malcolm: re-order products and filter by @GroupId [Redmine : #142459]
 */
 
 BEGIN
@@ -33,6 +34,7 @@ BEGIN
 	IF @GroupID IS NULL
 		SELECT	 ProductID, ProductName, OrderNo, [Type]	
 		FROM 	 #ProductList
+		ORDER BY OrderNo, Type
 	ELSE
 		BEGIN
 			CREATE TABLE #tmpProducts
@@ -47,7 +49,7 @@ BEGIN
 			SELECT		p.ProductID, p.ProductName, p.OrderNo, p.[Type]	 
 			FROM		#ProductList p
 			INNER JOIN	#tmpProducts  t ON p.ProductID = t.ProductID
-
+			ORDER BY p.OrderNo, p.Type
 			DROP TABLE #tmpProducts
 		END
 
