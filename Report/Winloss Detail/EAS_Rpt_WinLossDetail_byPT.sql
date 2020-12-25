@@ -295,8 +295,7 @@ SET NOCOUNT ON
 			AND b.RoleID = 4
 			AND b.sporttype = w.sporttype
 			AND b.bettype = w.bettype
-		GROUP BY b.CustID,  w.ProductID
-		OPTION (MAXRECURSION 0);
+		GROUP BY b.CustID,  w.ProductID;
 	END
 
 	IF @TotalRecords = 0  
