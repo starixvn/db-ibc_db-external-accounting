@@ -3,9 +3,9 @@ CREATE PROCEDURE dbo.EAS_Bonus_Ins
 	@Usernames VARCHAR(MAX)
 	,@Amount	MONEY
 	,@GroupName VARCHAR(50)
-	,@Error		INT
-	, @ErrorCode VARCHAR(100)
 	,@UserId INT
+	,@ErrCode INT = 0 OUTPUT
+	,@ErrMsg NVARCHAR(200) = '' OUTPUT	
 )
 AS
 BEGIN
@@ -14,29 +14,36 @@ BEGIN
 
 	DECLARE @Member TABLE (Username VARCHAR(30), CustId INT, Recommend INT, Mrecommend INT, Srecommend INT, RoleId TINYINT)
 
-	DECLARE @LogSPData VARCHAR(MAX), @StartRun DATETIME = GETDATE(), @EndRun DATETIME, @Duration INT 
+	DECLARE @LogSPData VARCHAR(MAX), @StartRun DATETIME = GETDATE(), @EndRun DATETIME, @Duration INT, @NumberOfMember INT
 	-- Check validation
 	SELECT @Usernames = ISNULL(@Usernames, ''), @Amount= ISNULL(@Amount, 0)
 
 	IF @Usernames = ''
 	BEGIN
-		SELECT @Error = 100, @ErrorCode = 'This field is required.'
+		SELECT @ErrCode = 100, @ErrMsg = 'This field is required.'
 		RETURN
 	END
 
 	IF @Usernames LIKE '%\%'
 	BEGIN
-		SELECT @Error = 101, @ErrorCode = 'You are not allowed to input backslash ''\'' into the Username field.'
+		SELECT @ErrCode = 101, @ErrMsg = 'You are not allowed to input backslash ''\'' into the Username field.'
 		RETURN
 	END
 
 	IF @Amount <= 0
 	BEGIN
-		SELECT @Error = 102, @ErrorCode = 'Amount must be a whole positive number.'
+		SELECT @ErrCode = 102, @ErrMsg = 'Amount must be a whole positive number.'
 	END
 
 	INSERT INTO @Member (Username)
 	SELECT f.val AS Username FROM dbo.f_SplitString(@Usernames, ',') f OPTION (maxrecursion 0)
+
+	SELECT @NumberOfMember = COUNT(*) FROM @Member
+
+	IF @NumberOfMember > 100
+	BEGIN
+		SELECT @ErrCode = 105, @ErrMsg = 'The function can only add up to 100 accounts per request'
+	END
 
 	UPDATE m
 		SET m.CustId = l.custid, m.RoleId = m.RoleId
@@ -50,15 +57,15 @@ BEGIN
 
 	IF EXISTS(SELECT 1 FROM @Member m LEFT JOIN @Super s ON m.Srecommend  = s.CustId WHERE s.CustId IS NULL)
 	BEGIN	
-		SELECT @ErrorCode = STUFF(
-									  (SELECT ',' + m.Username 
-									   FROM @Member m 
-								   			LEFT JOIN @Super s ON m.Srecommend  = s.CustId 
-									   WHERE s.CustId IS NULL OR m.CustId IS NULL OR m.RoleId <> 1
-									   FOR XML PATH('')),1,1,''
-								  )	
-
-		SELECT @Error = 104
+		SELECT @ErrMsg = STUFF(
+						 		  (SELECT ',' + m.Username 
+						 		   FROM @Member m 
+						 	   			LEFT JOIN @Super s ON m.Srecommend  = s.CustId 
+						 		   WHERE s.CustId IS NULL OR m.CustId IS NULL OR m.RoleId <> 1
+						 		   FOR XML PATH('')),1,1,''
+						 	  )	
+						 
+			 ,@ErrCode = 104
 		RETURN
 	END
 

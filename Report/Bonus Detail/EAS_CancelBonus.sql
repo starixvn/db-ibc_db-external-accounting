@@ -1,4 +1,4 @@
-CREATE PROCEDURE dbo.EAS_Bonus_Ins
+CREATE PROCEDURE dbo.EAS_CancelBonus
 (
 	@TransId BIGINT
 	,@ErrCode INT = 0 OUTPUT
