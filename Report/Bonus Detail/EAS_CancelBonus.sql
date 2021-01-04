@@ -6,6 +6,8 @@ CREATE PROCEDURE dbo.EAS_CancelBonus
 )
 AS
 BEGIN
+	SET NOCOUNT ON;
+	
 	DECLARE @Time INT
 
 	SELECT @Time = (DATEDIFF(SECOND, CreationDate, GETDATE()) - 48 * 60 * 60) FROM dbo.BonusTrans WITH(NOLOCK) WHERE TransId = @TransId

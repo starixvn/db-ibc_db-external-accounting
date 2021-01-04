@@ -89,7 +89,7 @@ BEGIN
 	WHILE 1 = 1
 	BEGIN
 		IF NOT EXISTS(SELECT TOP 1 1 FROM @Member m WHERE m.ID = @ID)
-			RETURN
+			BREAK
 
 		SELECT @CustId = m.CustId, @LogSPData = '<EAS_Bonus_Ins RefNo="'+ CONVERT(VARCHAR(30), TransId) +'" Member="' +Username+ '" Amount="'+CONVERT(VARCHAR(30), Amount)+'"/>'
 		FROM @Member m
@@ -102,7 +102,5 @@ BEGIN
 			     @TrackingValue = @LogSPData,
 				 @duration = @duration
 	END
-	
-
 END
 GO
