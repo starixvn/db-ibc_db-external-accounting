@@ -22,6 +22,8 @@ BEGIN
 	
 	DECLARE @Super TABLE (Username VARCHAR(30), CustId INT)
 
+	SELECT *
+	FROM DBCust.CustDB.dbo.
 	DECLARE @Member TABLE (ID INT IDENTITY(1,1), TransId BIGINT, Username VARCHAR(30), CustId INT, Recommend INT, Mrecommend INT, Srecommend INT, RoleId TINYINT, Amount MONEY)
 
 	DECLARE @LogSPData VARCHAR(MAX), @StartRun DATETIME = GETDATE(), @EndRun DATETIME, @Duration INT, @NumberOfMember INT, @ID INT, @CustId INT
