@@ -12,9 +12,9 @@ BEGIN
 	
 	DECLARE @Super TABLE (Username VARCHAR(30), CustId INT)
 
-	DECLARE @Member TABLE (Username VARCHAR(30), CustId INT, Recommend INT, Mrecommend INT, Srecommend INT, RoleId TINYINT)
+	DECLARE @Member TABLE (ID INT IDENTITY(1,1), TransId BIGINT, Username VARCHAR(30), CustId INT, Recommend INT, Mrecommend INT, Srecommend INT, RoleId TINYINT, Amount MONEY)
 
-	DECLARE @LogSPData VARCHAR(MAX), @StartRun DATETIME = GETDATE(), @EndRun DATETIME, @Duration INT, @NumberOfMember INT
+	DECLARE @LogSPData VARCHAR(MAX), @StartRun DATETIME = GETDATE(), @EndRun DATETIME, @Duration INT, @NumberOfMember INT, @ID INT, @CustId INT
 	-- Check validation
 	SELECT @Usernames = ISNULL(@Usernames, ''), @Amount= ISNULL(@Amount, 0)
 
@@ -36,7 +36,7 @@ BEGIN
 	END
 
 	INSERT INTO @Member (Username)
-	SELECT f.val AS Username FROM dbo.f_SplitString(@Usernames, ',') f OPTION (maxrecursion 0)
+	SELECT DISTINCT f.val AS Username FROM dbo.f_SplitString(@Usernames, ',') f WHERE f.Val <> '' OPTION (maxrecursion 0)
 
 	SELECT @NumberOfMember = COUNT(*) FROM @Member
 
@@ -63,25 +63,46 @@ BEGIN
 						 	   			LEFT JOIN @Super s ON m.Srecommend  = s.CustId 
 						 		   WHERE s.CustId IS NULL OR m.CustId IS NULL OR m.RoleId <> 1
 						 		   FOR XML PATH('')),1,1,''
-						 	  )	
-						 
+						 	  )						 
 			 ,@ErrCode = 104
 		RETURN
 	END
 
 	INSERT INTO dbo.BonusTrans(CustID, Recommend, Mrecommend, Srecommend, Amount, StatusId, Creator, CreationDate, PaymentDate, IsComplained)
+	OUTPUT inserted.TransId, NULL, inserted.CustID, inserted.Recommend, inserted.Mrecommend, inserted.Srecommend, NULL, inserted.Amount
+		INTO @Member
 	SELECT CustId, Recommend, Mrecommend, Srecommend, @Amount, 0, @UserId, GETDATE(), NULL, NULL
 	FROM @Member
+
+	UPDATE m
+		SET m.Username = tr.Username, m.RoleId = tr.RoleId, m.Amount = @Amount
+	FROM @Member m
+	CROSS APPLY (SELECT  r.RoleId, r.Username FROM @Member r WHERE r.TransId IS NULL AND r.CustId = m.CustId) AS tr
+	WHERE m.TransId IS NOT NULL
+
+	DELETE @Member WHERE TransId IS NULL
+
+	SELECT @ID = MIN(ID) FROM @Member
  
-	SET @EndRun = GETDATE()
+	SELECT @EndRun = GETDATE(), @Duration = DATEDIFF(MILLISECOND, @StartRun, @EndRun)
 
-	SET @Duration = DATEDIFF(MILLISECOND, @StartRun, @EndRun)
+	WHILE 1 = 1
+	BEGIN
+		IF NOT EXISTS(SELECT TOP 1 1 FROM @Member m WHERE m.ID = @ID)
+			RETURN
 
-	EXEC  DBLOG.bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP
+		SELECT @CustId = m.CustId, @LogSPData = '<EAS_Bonus_Ins RefNo="'+ CONVERT(VARCHAR(30), TransId) +'" Member="' +Username+ '" Amount="'+CONVERT(VARCHAR(30), Amount)+'"/>'
+		FROM @Member m
+		WHERE ID = @ID
+
+		EXEC  DBLOG.bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP
 				 @UserID = @UserID, 
-				 @ActionID = 0,
+				 @CustId = @CustId,
+				 @ActionID = 95038,
 			     @TrackingValue = @LogSPData,
 				 @duration = @duration
+	END
+	
 
 END
 GO

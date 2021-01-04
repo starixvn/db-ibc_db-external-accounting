@@ -1,4 +1,4 @@
-CREATE PROCEDURE dbo.EAS_CancelBonus
+CREATE PROCEDURE dbo.EAS_Bonus_Sel
 (
 	@Username		VARCHAR(30) = ''
 	,@FromDate		DATETIME
@@ -40,23 +40,14 @@ BEGIN
 	FROM 
 		(
 			SELECT ID,
-				   ROW_NUMBER() OVER(ORDER BY CreatedDate, SuperName, CASE WHEN IsComplained IS NULL THEN 0.5 ELSE IsComplained END DESC, CASE WHEN StatusId = 1 THEN 10 ELSE StatusId END ASC) AS NewRowNum
+				   ROW_NUMBER() OVER(ORDER BY CreatedDate, SuperName, CASE WHEN IsComplained IS NULL THEN 0.5 ELSE IsComplained END DESC, StatusId ASC) AS NewRowNum
 			FROM #Result r
 		) r
 
 	DELETE #Result WHERE ID < @RowEnd OR ID > @RowEnd
 
-	SELECT 
-		CreatedDate
-		,TransId 
-		,SuperId 
-		,SuperName
-		,CustId
-		,Username
-		,PaymentDate
-		,StatusId
-		,IsComplained
-	FROM #Result
+	SELECT CreatedDate, TransId, SuperId, SuperName, CustId, Username, PaymentDate, StatusId, IsComplained 
+	FROM #Result 
 	ORDER BY ID ASC
 
 	DROP TABLE #Result
