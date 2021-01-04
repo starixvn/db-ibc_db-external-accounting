@@ -1,3 +1,4 @@
+/*<info serverAlias="DBTXN-bodb02" executers="bodbDownlineNet,bodbDownlineNetView" isFunction="0" isNested="0"></info>*/
 CREATE PROCEDURE dbo.EAS_Bonus_Sel
 (
 	@Username		VARCHAR(30) = ''
@@ -10,6 +11,15 @@ CREATE PROCEDURE dbo.EAS_Bonus_Sel
 	,@TotalRows		INT = 0 OUTPUT
 )
 AS
+/*
+Created: 
+Task : Set up Bonus feature for IBCIndo
+DB: DBTXN/bodb02
+
+Revisions:
+	- 20200104@Malcolm: Set up Bonus feature for IBCIndo [RedmineID: #147430]
+
+*/
 BEGIN
 	SET NOCOUNT ON
 
