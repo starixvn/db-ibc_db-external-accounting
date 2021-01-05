@@ -1,16 +1,28 @@
-CREATE PROCEDURE dbo.EAS_CancelBonus
+/*<info serverAlias="DBTXN-bodb02" executers="bodbExtAccNet" viewers="" isFunction="0" isNested="0"></info>*/
+ALTER PROCEDURE dbo.EAS_CancelBonus
 (
-	@TransId BIGINT
-	,@ErrCode INT = 0 OUTPUT
-	,@ErrMsg NVARCHAR(200) = '' OUTPUT
+	@TransId	BIGINT
+	,@UserID	INT
+	,@LoginIP	NVARCHAR(20) = ''
+	,@ErrCode	INT = 0 OUTPUT
+	,@ErrMsg	NVARCHAR(200) = '' OUTPUT
 )
 AS
+/*
+Created: 
+Task : Set up Bonus feature for IBCIndo
+DB: DBTXN/bodb02
+
+Revisions:
+	- 20210104@Malcolm: Set up Bonus feature for IBCIndo [RedmineID: #147430]
+
+*/
 BEGIN
 	SET NOCOUNT ON;
 	
-	DECLARE @Time INT
+	DECLARE @Time INT, @CustId INT, @LogSPData VARCHAR(MAX), @StartRun DATETIME = GETDATE(), @EndRun DATETIME, @Duration INT
 
-	SELECT @Time = (DATEDIFF(SECOND, CreationDate, GETDATE()) - 48 * 60 * 60) FROM dbo.BonusTrans WITH(NOLOCK) WHERE TransId = @TransId
+	SELECT @Time = (DATEDIFF(SECOND, CreatedDate, GETDATE()) - 48 * 60 * 60) FROM dbo.BonusTrans WITH(NOLOCK) WHERE TransId = @TransId
 
 	IF @Time > 0
 	BEGIN
@@ -19,7 +31,7 @@ BEGIN
 	END
 
 	UPDATE b WITH(ROWLOCK)
-		SET b.StatusId = 2
+		SET b.StatusId = 1
 	FROM dbo.BonusTrans b 
 	WHERE TransId = @TransId AND StatusId = 0
 
@@ -29,5 +41,17 @@ BEGIN
 		RETURN
 	END
 
+	SELECT @CustId = CustID FROM dbo.BonusTrans WITH(NOLOCK) WHERE TransId = @TransId
+
+	SELECT @LogSPData = '<EAS_CancelBonus RefNo="'+ CONVERT(VARCHAR(30), @TransId) +'" IP="'+@LoginIP+'"/>'
+
+	SELECT @EndRun = GETDATE(), @Duration = DATEDIFF(MILLISECOND, @StartRun, @EndRun)
+
+	EXEC  DBLOG.bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP
+				 @UserID = @UserID, 
+				 @CustId = @CustId,
+				 @ActionID = 95040,
+			     @TrackingValue = @LogSPData,
+				 @duration = @duration
 END
 GO
