@@ -12,7 +12,7 @@ ALTER PROCEDURE dbo.EAS_Bonus_Ins
 )
 AS
 /*
-Created: 
+Created: 20210104@Malcolm
 Task : Set up Bonus feature for IBCIndo
 DB: DBTXN/bodb02
 
@@ -61,9 +61,9 @@ BEGIN
 	END
 
 	INSERT INTO dbo.BonusTrans(CustID, Recommend, Mrecommend, Srecommend, Amount, StatusId, Creator, CreatedDate, PaymentDate, IsComplained)
-	OUTPUT inserted.TransId, NULL, inserted.CustID, inserted.Recommend, inserted.Mrecommend, inserted.Srecommend, NULL, inserted.Amount
+	OUTPUT inserted.BonusTransId, NULL, inserted.CustID, inserted.Recommend, inserted.Mrecommend, inserted.Srecommend, NULL, inserted.Amount
 		INTO @Member
-	SELECT CustId, Recommend, Mrecommend, Srecommend, @Amount, 0, @UserId, GETDATE(), NULL, NULL
+	SELECT CustId, Recommend, Mrecommend, Srecommend, @Amount, 0, @UserId, GETDATE(), NULL, 0
 	FROM @Member
 
 	UPDATE m
@@ -90,7 +90,7 @@ BEGIN
 		EXEC  DBLOG.bodb_CustomerLog.dbo.WriteLog_UserLog_RunSP
 				 @UserID = @UserID, 
 				 @CustId = @CustId,
-				 @ActionID = 95038,
+				 @ActionID = 20401,
 			     @TrackingValue = @LogSPData,
 				 @duration = @duration
 
