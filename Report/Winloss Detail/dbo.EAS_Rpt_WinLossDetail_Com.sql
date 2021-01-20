@@ -300,7 +300,7 @@ BEGIN
 						ISNULL(SUM(CASE
 									-- Jackpot
 									WHEN b.bettype IN (2198, 2398, 2998, 4297) THEN
-										CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE ISNULL(b.betid/CONVERT(DECIMAL(19,8), 100000000), 0) END
+										CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.betid END
 									WHEN b.bettype IN (2199, 2399, 2999, 4298) THEN 0
 									ELSE 
 										CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.MemberWinlost END
