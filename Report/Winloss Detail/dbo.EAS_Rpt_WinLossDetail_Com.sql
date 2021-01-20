@@ -211,7 +211,8 @@ BEGIN
 		    sum(swinlost), -- SAgWinlost
 		    isnull(sum(scomm),0) -isnull(sum(acomm),0), --SAgComm
 			SUM(ISNULL(b.betid/CONVERT(DECIMAL(19,8), 100000000), 0)),   
-			SUM(ISNULL(b.epositiontaking, 0)), 
+			--ISNULL(b.epositiontaking, 0), 
+			epositiontaking,
 			Winlostdate
 
 	    FROM bodb02.dbo.bettrans b WITH (NOLOCK)
@@ -219,7 +220,7 @@ BEGIN
 		    b.winlostdate between @FDate and @TDate 
 		    and b.srecommend in (SELECT custID FROM #tmpSuperList) 
 		    and b.statusID IN (111,112,113)
-	    GROUP BY SRecommend, bettype, StatusID, MOdds, tpositiontaking,Winlostdate
+	    GROUP BY SRecommend, bettype, StatusID, MOdds, tpositiontaking,Winlostdate, epositiontaking
 	    OPTION (MAXDOP 8)
 
 		INSERT INTO #ComWinLossDetails
@@ -253,7 +254,7 @@ BEGIN
 								CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.MemberWinlost END
 							END
 							* 
-							CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE b.epositiontaking END
+							CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 							),0) AS ExtraWinloss,
 			ISNULL(-1 * SUM(CASE 
 							/*IBCBet Live Casino*/
@@ -263,7 +264,7 @@ BEGIN
 								CASE 
 									WHEN b.tpositiontaking = 1 THEN 0 
 									ELSE b.scomm / (1 - b.tpositiontaking) 
-								END * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE b.epositiontaking END
+								END * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 							END
 							), 0) AS ExtraComm,
 			-1 * (
@@ -276,7 +277,7 @@ BEGIN
 								CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.MemberWinlost END
 							END
 							*	 
-							CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE b.epositiontaking END
+							CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 							),0)
 				+
 				ISNULL(SUM(CASE 
@@ -316,7 +317,7 @@ BEGIN
 										CASE 
 											WHEN b.tpositiontaking = 1 THEN 0 
 											ELSE b.scomm / (1 - b.tpositiontaking) 
-										END * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE b.epositiontaking END
+										END * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 									END
 								), 0)
 					)
