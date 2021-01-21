@@ -188,7 +188,7 @@ BEGIN
 			SAgWinlost money, 
 			SAgComm MONEY,
 			betid MONEY, 
-			epositiontaking MONEY,
+			epositiontaking Smallmoney,
 			Winlostdate Smalldatetime
 		)
 
