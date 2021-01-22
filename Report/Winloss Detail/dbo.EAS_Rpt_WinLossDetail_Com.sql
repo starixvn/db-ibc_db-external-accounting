@@ -189,7 +189,8 @@ BEGIN
 			SAgComm MONEY,
 			betid MONEY, 
 			epositiontaking Smallmoney,
-			Winlostdate Smalldatetime
+			Winlostdate Smalldatetime,
+			GrossComm MONEY
 		)
 
 		INSERT #ComWinLossDetails_bettrans
@@ -213,7 +214,8 @@ BEGIN
 			SUM(ISNULL(b.betid/CONVERT(DECIMAL(19,8), 100000000), 0)),   
 			--ISNULL(b.epositiontaking, 0), 
 			epositiontaking,
-			Winlostdate
+			Winlostdate,
+			SUM(scomm/(1-tpositiontaking)) 
 
 	    FROM bodb02.dbo.bettrans b WITH (NOLOCK)
 	    WHERE
@@ -232,7 +234,7 @@ BEGIN
 					WHEN s.ProductID IN (21, 39, 45, 46, 47, 51, 52, 57, 59)  THEN b.oddsspread -- Allbet, SA Gaming, SexyGaming, IBCBet Live Casino, BBIN, WM, ION, BG, GDG
 					ELSE ABS(b.stake) 
 					END) AS TurnoverNoDraw,
-		    SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END) AS GrossComm,
+		    SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE b.GrossComm END) AS GrossComm,
 		    sum(MemberWinlost), --MemberWinlost
 		    sum(playercomm), -- PlayerComm
 		    SUM(isnull(MemberWinlost, 0)) + SUM(isnull(playercomm, 0)), --MemberTotal
@@ -263,7 +265,7 @@ BEGIN
 							ELSE 
 								CASE 
 									WHEN b.tpositiontaking = 1 THEN 0 
-									ELSE b.scomm / (1 - b.tpositiontaking) 
+									ELSE b.GrossComm
 								END * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 							END
 							), 0) AS ExtraComm,
@@ -287,7 +289,7 @@ BEGIN
 							ELSE 
 								CASE 
 									WHEN b.tpositiontaking = 1 THEN 0 
-									ELSE b.scomm / (1 - b.tpositiontaking) 
+									ELSE b.GrossComm
 								END * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 							END
 							), 0)
@@ -316,7 +318,7 @@ BEGIN
 									ELSE 
 										CASE 
 											WHEN b.tpositiontaking = 1 THEN 0 
-											ELSE b.scomm / (1 - b.tpositiontaking) 
+											ELSE b.GrossComm
 										END * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 									END
 								), 0)
