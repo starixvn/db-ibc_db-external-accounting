@@ -71,7 +71,7 @@ BEGIN
 	WHERE b.CreatedDate >= @FromDate 
 		AND b.CreatedDate < (@ToDate + 1)		
 		AND (b.StatusId = @StatusId OR @StatusId IS NULL)
-		AND (b.IsComplained = @IsComplained OR @IsComplained IS NULL)
+		AND (b.IsComplained = @IsComplained AND (b.PaymentDate IS NOT NULL OR @IsComplained = 1) OR @IsComplained IS NULL)
 		AND (c.username LIKE (@Username + '%') OR @Username = '')
 
 	UPDATE r
