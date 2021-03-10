@@ -56,6 +56,7 @@ AS
 		- 20201201@Malcolm : Add Gold Diamond Gaming [Redmine : #144110]
 		- 20201210@Malcolm: Add Big Gaming [RedmineId : #142459]
 		- 20201230@Danny : Enhance peformance [Redmine : #147836]
+		- 20210310@Malcolm: Add Pragmatic Live Casino [RedmineId : #133717]
 	
 	Param's Explanation:
 	 @ProductDetails:		
@@ -230,7 +231,7 @@ BEGIN
 			SUM(ABS(b.stake)),	
 			 SUM(CASE WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
 					WHEN b.StatusID = 111 AND s.ProductId IN (1) THEN 0 -- Sportsbook
-					WHEN s.ProductID IN (21, 39, 45, 46, 47, 51, 52, 57, 59)  THEN b.oddsspread -- Allbet, SA Gaming, SexyGaming, IBCBet Live Casino, BBIN, WM, ION, BG, GDG
+					WHEN s.ProductID IN (21, 39, 45, 46, 47, 51, 52, 57, 59, 65)  THEN b.oddsspread -- Allbet, SA Gaming, SexyGaming, IBCBet Live Casino, BBIN, WM, ION, BG, GDG, PPL
 					ELSE ABS(b.stake) 
 					END) AS TurnoverNoDraw,
 		    SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE b.GrossComm END) AS GrossComm,

@@ -22,6 +22,7 @@ AS
 		- 20201201@Malcolm : Add Gold Diamond Gaming [Redmine : #144110]
 		- 20201221@Danny : Enhance performance [Redmine : #147331]
 		- 20201210@Malcolm: Add Big Gaming [RedmineId : #142459]
+		- 20210310@Malcolm: Add Pragmatic Live Casino [RedmineId : #133717]
 */
 
 SET NOCOUNT ON
@@ -153,7 +154,7 @@ SET NOCOUNT ON
 			SUM(CASE
 						WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
 						WHEN b.StatusID = 111 AND s.ProductId IN (1) THEN 0 -- Sportsbook
-						WHEN s.ProductID IN (21, 39, 45, 46, 47, 51, 52, 57, 59)  THEN b.oddsspread -- Allbet, SA Gaming, SexyGaming, IBCBet Live Casino, BBIN, ION, BG, GDG
+						WHEN s.ProductID IN (21, 39, 45, 46, 47, 51, 52, 57, 59, 65)  THEN b.oddsspread -- Allbet, SA Gaming, SexyGaming, IBCBet Live Casino, BBIN, ION, BG, GDG, PPL
 						ELSE ABS(b.stake) 
 				END) AS TurnoverNoDraw,
 			SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END),										
