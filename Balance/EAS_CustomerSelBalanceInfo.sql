@@ -12,6 +12,7 @@ AS
 		- 20181112@Percy: Initialize SP [RedmineID: #95978]
 		- 20191227@Johnson: get last transdate [redmine:#125894]
 		- 20200602@Percy: Separate PendingTransfer3rd to Cash and Balance [RedmineID: #135200]
+		- 20210505@Sol: NAP - Alpha - Allow more time for transfer - [Redmine: #149927]
 */
 
 BEGIN
@@ -24,6 +25,15 @@ BEGIN
 
 	IF @RoleId NOT BETWEEN 1 AND 4
 		RETURN
+
+	-- get move bet date
+	DECLARE @balanceUpDay SMALLDATETIME, @moveBetsDay SMALLDATETIME
+	DECLARE @tblMoveBetBalanceUp AS TABLE (BalanceUpDay SMALLDATETIME, MoveBetsDay SMALLDATETIME)
+
+	INSERT INTO @tblMoveBetBalanceUp(BalanceUpDay,MoveBetsDay)
+	EXEC bodb02.dbo.Age_SelBalanceUpDay
+
+	SELECT @balanceUpDay = BalanceUpDay, @moveBetsDay = MoveBetsDay FROM @tblMoveBetBalanceUp
 
 	SELECT  @Currency = currency FROM dbo.Exchange WITH (NOLOCK) WHERE exchangeId = @CurrencyId
 
@@ -72,6 +82,10 @@ BEGIN
 			SUM(winlost), SUM(actual_stake), SUM(swinlost), SUM(mwinlost), SUM(awinlost), SUM(scomm), SUM(acomm), SUM(ABS(actual_stake) * spositiontaking)
 		FROM dbo.bettrans WITH (NOLOCK)
 		WHERE srecommend = @CustId
+			AND 1 = CASE 
+						WHEN bettype = 19999 and winlostdate > @moveBetsDay THEN 0 --> get data from ticket detail
+						WHEN bettype < 19999 and winlostdate <= @moveBetsDay THEN 0 --> get data from sum record
+					ELSE 1 END
 		GROUP BY
 			winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 4 ELSE 0 END
 
@@ -154,6 +168,10 @@ BEGIN
 			SUM(winlost), SUM(actual_stake), SUM(mwinlost), SUM(awinlost), SUM(acomm), SUM(comm), SUM(ABS(actual_stake) * mpositiontaking)
 		FROM dbo.bettrans WITH (NOLOCK)
 		WHERE mrecommend = @CustId
+			AND 1 = CASE 
+						WHEN bettype = 19999 and winlostdate > @moveBetsDay THEN 0 --> get data from ticket detail
+						WHEN bettype < 19999 and winlostdate <= @moveBetsDay THEN 0 --> get data from sum record
+					ELSE 1 END
 		GROUP BY
 			winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 3 ELSE 0 END
 
@@ -236,6 +254,10 @@ BEGIN
 			SUM(winlost), SUM(actual_stake), SUM(awinlost), SUM(comm), SUM(playercomm), SUM(ABS(actual_stake) * apositiontaking)
 		FROM dbo.bettrans WITH (NOLOCK)
 		WHERE recommend = @CustId
+			AND 1 = CASE 
+						WHEN bettype = 19999 and winlostdate > @moveBetsDay THEN 0 --> get data from ticket detail
+						WHEN bettype < 19999 and winlostdate <= @moveBetsDay THEN 0 --> get data from sum record
+					ELSE 1 END
 		GROUP BY
 			winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 2 ELSE 0 END
 
@@ -314,6 +336,10 @@ BEGIN
 		FROM dbo.bettrans WITH (NOLOCK)
 		WHERE custid = @CustId AND statusID NOT IN (0,1)
 			AND bettype NOT IN (21008, 21009) -- BBIN Transfer
+			AND 1 = CASE 
+						WHEN bettype = 19999 and winlostdate > @moveBetsDay THEN 0 --> get data from ticket detail
+						WHEN bettype < 19999 and winlostdate <= @moveBetsDay THEN 0 --> get data from sum record
+					ELSE 1 END
 		GROUP BY
 			winlostdate, bettype, statusID
 
