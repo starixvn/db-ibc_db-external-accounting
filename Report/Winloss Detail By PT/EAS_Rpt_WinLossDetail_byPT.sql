@@ -23,6 +23,7 @@ AS
 		- 20201221@Danny : Enhance performance [Redmine : #147331]
 		- 20201210@Malcolm: Add Big Gaming [RedmineId : #142459]
 		- 20210310@Malcolm: Add Pragmatic Live Casino [RedmineId : #133717]
+		- 20210617@Sol: changed how to calc net turn over - [RedmineId : #156653]
 */
 
 SET NOCOUNT ON
@@ -151,11 +152,14 @@ SET NOCOUNT ON
 			SRecommend,																																																	
 			s.ProductID,																									
 			SUM(ABS(b.stake)),	
-			SUM(CASE
-						WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
-						WHEN b.StatusID = 111 AND s.ProductId IN (1) THEN 0 -- Sportsbook
-						WHEN s.ProductID IN (21, 39, 45, 46, 47, 51, 52, 57, 59, 65)  THEN b.oddsspread -- Allbet, SA Gaming, SexyGaming, IBCBet Live Casino, BBIN, ION, BG, GDG, PPL
-						ELSE ABS(b.stake) 
+			SUM(CASE WHEN cont.ContributionBettype IS NULL THEN
+						CASE
+							WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
+							WHEN b.StatusID = 111 AND s.ProductId IN (1) THEN 0 -- Sportsbook
+							WHEN s.IsUsingOddsSpread = 1 THEN b.oddsspread -- LC and RNG
+							ELSE ABS(b.stake) 
+						END
+					ELSE 0
 				END) AS TurnoverNoDraw,
 			SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END),										
 			SUM(winlost - actual_stake) ,
@@ -174,22 +178,33 @@ SET NOCOUNT ON
 			COUNT(1)																										
 
 		FROM bodb02.dbo.bettrans b WITH (NOLOCK)
-		INNER JOIN (
-						SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
-						FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
-							LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
-							LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
-						WHERE EXISTS(SELECT 1
-									 WHERE e.ProductId IS NULL 
-										OR 
-											(
-												e.Bettype = f.BetType 
-													  OR (
-															e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g)
-													     )
-											)
-									)												
-						) s ON b.bettype = s.Bettype
+			INNER JOIN (
+							SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType,
+									CASE 
+										WHEN f.RefTable IN (1, 2) OR f.ProductID = 47 THEN 1 
+										ELSE 0 
+									END AS IsUsingOddsSpread
+							FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
+								LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
+								LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
+							WHERE EXISTS(SELECT 1
+										 WHERE e.ProductId IS NULL 
+											OR 
+												(
+													e.Bettype = f.BetType 
+														  OR (
+																e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g)
+															 )
+												)
+										)												
+							) s ON b.bettype = s.Bettype
+			OUTER APPLY 
+			(
+				SELECT f.Bettype AS ContributionBettype
+				FROM dbo.f_BettypePrizeGroup() f
+				WHERE f.BettypeGroup = 'Contribution'
+					AND f.Bettype = b.bettype
+			) cont
 		WHERE b.winlostdate BETWEEN @FDate AND @Tdate
 			AND b.srecommend IN (SELECT custID FROM #tmpSuperList) 
 			AND b.statusID IN (111, 112, 113) 
