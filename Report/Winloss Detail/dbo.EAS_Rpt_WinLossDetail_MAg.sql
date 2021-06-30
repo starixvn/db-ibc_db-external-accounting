@@ -173,15 +173,12 @@ BEGIN
 			SELECT
 				Recommend,			
 				sum(ABS(b.stake)) as TurnOver, 
-				SUM(CASE WHEN cont.ContributionBettype IS NULL 
-							THEN
-								CASE 
-									WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
-									WHEN b.StatusID = 111 AND s.ProductId IN (1) THEN 0 -- Sportsbook
-									WHEN s.IsUsingOddsSpread = 1 THEN b.oddsspread -- LC and RNG
-									ELSE ABS(b.stake) 
-								END
-						ELSE 0
+				SUM(
+					CASE 
+						WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
+						WHEN b.StatusID = 111 AND s.ProductId IN (1) THEN 0 -- Sportsbook
+						WHEN s.IsUsingOddsSpread = 1 THEN CASE WHEN cont.ContributionBettype IS NULL THEN b.oddsspread ELSE 0 END-- LC and RNG
+						ELSE ABS(b.stake) 
 					END
 				) AS TurnoverNoDraw,
 				SUM(CASE WHEN (apositiontaking + mpositiontaking = 1) THEN 0 ELSE acomm/(1-apositiontaking - mpositiontaking) END) AS GrossComm,		    
