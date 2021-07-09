@@ -30,10 +30,14 @@ SET NOCOUNT ON
 
 	DECLARE @RowStart	INT,
 			@RowEnd		INT
+	DECLARE @cutoffDate SMALLDATETIME
 
 	SELECT	@PageIndex = @PageIndex - 1,
 			@RowStart = @PageSize * @PageIndex + 1,
 			@RowEnd = @RowStart + @PageSize - 1;
+	SELECT @cutoffDate = CutoffDate
+	FROM dbo.f_GetCutoffDate() f
+	WHERE f.TypeName = 'NetTO'
 
 	CREATE TABLE #tmpSuperList (custID INT PRIMARY KEY)
 
@@ -156,7 +160,8 @@ SET NOCOUNT ON
 				CASE
 					WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
 					WHEN b.StatusID = 111 AND s.ProductId IN (1) THEN 0 -- Sportsbook
-					WHEN s.IsUsingOddsSpread = 1 THEN CASE WHEN cont.ContributionBettype IS NULL THEN b.oddsspread ELSE 0 END-- LC and RNG
+					WHEN b.winlostdate < @cutoffDate AND s.ProductID IN (21, 39, 45, 46, 47, 51, 52, 57, 59, 65) THEN b.oddsspread
+					WHEN b.winlostdate >= @cutoffDate AND s.IsUsingOddsSpread = 1 THEN CASE WHEN cont.ContributionBettype IS NULL THEN b.oddsspread ELSE 0 END-- LC and RNG
 					ELSE ABS(b.stake) 
 				END
 				) AS TurnoverNoDraw,
