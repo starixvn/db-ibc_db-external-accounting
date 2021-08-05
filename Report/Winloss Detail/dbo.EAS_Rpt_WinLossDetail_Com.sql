@@ -57,6 +57,7 @@ AS
 		- 20201210@Malcolm: Add Big Gaming [RedmineId : #142459]
 		- 20201230@Danny : Enhance peformance [Redmine : #147836]
 		- 20210310@Malcolm: Add Pragmatic Live Casino [RedmineId : #133717]
+		- 20210617@Sol: changed how to calc net turn over - [RedmineId : #156653]
 	
 	Param's Explanation:
 	 @ProductDetails:		
@@ -72,10 +73,13 @@ SET NOCOUNT ON
 CREATE TABLE #tmpSuperList (custID INT PRIMARY KEY)
 
 DECLARE @ExistingProductDetails TABLE (ProductId INT,Sporttype INT,Bettype INT)
-
 DECLARE @iDoc INT, @FDate SMALLDATETIME, @TDate SMALLDATETIME, @__ProductDetails XML;
+DECLARE @cutoffDate SMALLDATETIME
 
 SELECT @FDate = @FromDate, @TDate = @ToDate
+SELECT @cutoffDate = CutoffDate
+	FROM dbo.f_GetCutOffDate() f
+	WHERE f.TypeName = 'NetTO'
 
 INSERT INTO #tmpSuperList(CustID)
 SELECT custID 
@@ -140,7 +144,7 @@ END
 DECLARE @isTest BIT = 0
 SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
 
-CREATE TABLE #SportBettype (ProductID INT, Bettype INT, PRIMARY KEY NONCLUSTERED (Bettype ASC, ProductID ASC))
+CREATE TABLE #SportBettype (ProductID INT, Bettype INT, IsUsingOddsSpread INT, PRIMARY KEY NONCLUSTERED (Bettype ASC, ProductID ASC))
 
 INSERT INTO #TmpCondSumWL (sporttype, bettype)
 SELECT f.sporttype, f.bettype
@@ -148,8 +152,13 @@ FROM bodb02.dbo.f_SumWinloss_ConditionSel(@ProductIds) f
 LEFT JOIN @ExistingProductDetails e ON f.ProductID = e.ProductId
 	WHERE e.ProductId IS NULL OR (e.Bettype = f.BetType)
 
-INSERT INTO #SportBettype (ProductID, Bettype)
-SELECT f.ProductID, f.Bettype FROM bodb02.dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @isTest) f
+INSERT INTO #SportBettype (ProductID, Bettype, IsUsingOddsSpread)
+SELECT f.ProductID, f.Bettype,
+		CASE 
+			WHEN f.RefTable IN (1, 2) OR f.ProductID = 47 THEN 1 
+			ELSE 0 
+		END AS IsUsingOddsSpread
+FROM bodb02.dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @isTest) f
 	LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID
 WHERE EXISTS(SELECT 1
 			 WHERE e.ProductId IS NULL 
@@ -229,11 +238,15 @@ BEGIN
 	    SELECT
 		    SRecommend,			
 			SUM(ABS(b.stake)),	
-			 SUM(CASE WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
+			 SUM(
+				CASE 
+					WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
 					WHEN b.StatusID = 111 AND s.ProductId IN (1) THEN 0 -- Sportsbook
-					WHEN s.ProductID IN (21, 39, 45, 46, 47, 51, 52, 57, 59, 65)  THEN b.oddsspread -- Allbet, SA Gaming, SexyGaming, IBCBet Live Casino, BBIN, WM, ION, BG, GDG, PPL
+					WHEN b.Winlostdate < @cutoffDate AND s.ProductID IN (21, 39, 45, 46, 47, 51, 52, 57, 59, 65) THEN b.oddsspread
+					WHEN b.Winlostdate >= @cutoffDate AND s.IsUsingOddsSpread = 1 THEN CASE WHEN cont.ContributionBettype IS NULL THEN b.oddsspread ELSE 0 END-- LC and RNG
 					ELSE ABS(b.stake) 
-					END) AS TurnoverNoDraw,
+				END
+			) AS TurnoverNoDraw,
 		    SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE b.GrossComm END) AS GrossComm,
 		    sum(MemberWinlost), --MemberWinlost
 		    sum(playercomm), -- PlayerComm
@@ -326,6 +339,13 @@ BEGIN
 						AND ISNULL(expt2.SubProduct,'') = ''
 						AND expt2.Sporttype = 0
 			) tbl
+			OUTER APPLY 
+			(
+				SELECT f.Bettype AS ContributionBettype
+				FROM dbo.f_BettypePrizeGroup() f
+				WHERE f.BettypeGroup = 'Contribution'
+					AND f.Bettype = b.bettype
+			) cont
 	    GROUP BY SRecommend 
 		DROP TABLE #ComWinLossDetails_bettrans
 	END
