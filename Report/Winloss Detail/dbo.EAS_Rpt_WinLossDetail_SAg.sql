@@ -75,6 +75,7 @@ BEGIN
 	DECLARE @SAgWinLossDetails TABLE(CustID int, TurnOver money, TurnoverNoDraw MONEY, GrossComm money, MemberWinLost money, 
 		PlayerComm money, MemberTotal money, AgWinLost money, AgComm money, AgTotal money, 
 		MAgWinLost money, MAgComm money, MAgTotal money, SAgWinLost money, SAgComm money, SAgTotal money, Company money)
+	DECLARE @GrossComm TABLE (CustId INT, TurnoverNoDraw MONEY, GrossComm MONEY)
 
 	SELECT @ProductIds = bodb02.dbo.f_AddRelatedProducts(@ProductIds)
 
@@ -195,7 +196,9 @@ BEGIN
 					AND b.statusID IN (111,112,113)
 				GROUP BY MRecommend
 
-				;WITH CTE_NetTO_GrossComm AS (
+				IF EXISTS (SELECT 1 FROM @SportBettype WHERE RefTable = 1) -- bettransRnG
+				BEGIN
+					INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
 					SELECT b.mrecommend AS CustId
 						,SUM(CASE WHEN s.IsContributionBettype = 0 THEN b.BetStake ELSE 0 END) AS TurnoverNoDraw
 						,SUM(b.BetStake * b.sdiscount) AS GrossComm
@@ -205,8 +208,11 @@ BEGIN
 						AND statusID IN (111, 112, 113) 
 						AND srecommend = @custid
 					GROUP BY b.mrecommend
+				END
 
-					UNION ALL
+				IF EXISTS (SELECT 1 FROM @SportBettype WHERE RefTable = 2) -- bettransLC
+				BEGIN
+					INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
 					SELECT b.mrecommend AS CustId
 						,SUM(CASE WHEN s.IsContributionBettype = 0 THEN b.NetStake ELSE 0 END) AS TurnoverNoDraw
 						,SUM(b.NetStake * b.sdiscount) AS GrossComm
@@ -216,14 +222,18 @@ BEGIN
 						AND statusID IN (111, 112, 113) 
 						AND srecommend = @custid
 					GROUP BY b.mrecommend
-				)
-				UPDATE t
-				SET t.TurnoverNoDraw = ISNULL(t.TurnoverNoDraw, 0) + ISNULL(c.TurnoverNoDraw, 0)
-					,t.GrossComm = ISNULL(t.GrossComm, 0) + ISNULL(c.GrossComm, 0)
-				FROM @SAgWinLossDetails t
-					INNER JOIN (
-						SELECT CustId, SUM(GrossComm) AS GrossComm, SUM(TurnoverNoDraw) AS TurnoverNoDraw FROM CTE_NetTO_GrossComm GROUP BY CustId
-					) c ON t.CustId = c.CustId
+				END
+				
+				IF EXISTS (SELECT 1 FROM @GrossComm)
+				BEGIN
+					UPDATE t
+					SET t.TurnoverNoDraw = ISNULL(t.TurnoverNoDraw, 0) + ISNULL(c.TurnoverNoDraw, 0)
+						,t.GrossComm = ISNULL(t.GrossComm, 0) + ISNULL(c.GrossComm, 0)
+					FROM @SAgWinLossDetails t
+						INNER JOIN (
+							SELECT CustId, SUM(GrossComm) AS GrossComm, SUM(TurnoverNoDraw) AS TurnoverNoDraw FROM @GrossComm GROUP BY CustId
+						) c ON t.CustId = c.CustId
+				END
 			END
 			ELSE
 			BEGIN

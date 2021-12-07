@@ -341,32 +341,41 @@ BEGIN
 
 		TRUNCATE TABLE #ComWinLossDetails_bettrans
 
-		INSERT INTO #ComWinLossDetails_bettrans (SRecommend, bettype, stake, GrossComm) -- use stake for Net Stake
-		SELECT b.srecommend, b.gameID, SUM(b.BetStake), SUM(b.BetStake * b.sdiscount)
-		FROM dbo.bettransRnG b WITH (NOLOCK)
-		WHERE b.winlostdate BETWEEN @FDate AND @TDate 
-		    AND b.srecommend IN (SELECT custID FROM #tmpSuperList) 
-		    and b.statusID IN (111, 112, 113)
-		GROUP BY b.srecommend, b.gameID
+		IF EXISTS (SELECT 1 FROM #SportBettype WHERE RefTable = 1) -- bettransRnG
+		BEGIN
+			INSERT INTO #ComWinLossDetails_bettrans (SRecommend, bettype, stake, GrossComm) -- use stake for Net Stake
+			SELECT b.srecommend, b.gameID, SUM(b.BetStake), SUM(b.BetStake * b.sdiscount)
+			FROM dbo.bettransRnG b WITH (NOLOCK)
+			WHERE b.winlostdate BETWEEN @FDate AND @TDate 
+				AND b.srecommend IN (SELECT custID FROM #tmpSuperList) 
+				and b.statusID IN (111, 112, 113)
+			GROUP BY b.srecommend, b.gameID
+		END
 
-		INSERT INTO #ComWinLossDetails_bettrans (SRecommend, bettype, stake, GrossComm) -- use stake for Net Stake
-		SELECT b.srecommend, b.gameID, SUM(b.NetStake), SUM(b.NetStake * b.sdiscount)
-		FROM dbo.bettransLC b WITH (NOLOCK)
-		WHERE b.winlostdate BETWEEN @FDate AND @TDate 
-		    AND b.srecommend IN (SELECT custID FROM #tmpSuperList) 
-		    and b.statusID IN (111, 112, 113)
-		GROUP BY b.srecommend, b.gameID
+		IF EXISTS (SELECT 1 FROM #SportBettype WHERE RefTable = 2) -- bettransLC
+		BEGIN
+			INSERT INTO #ComWinLossDetails_bettrans (SRecommend, bettype, stake, GrossComm) -- use stake for Net Stake
+			SELECT b.srecommend, b.gameID, SUM(b.NetStake), SUM(b.NetStake * b.sdiscount)
+			FROM dbo.bettransLC b WITH (NOLOCK)
+			WHERE b.winlostdate BETWEEN @FDate AND @TDate 
+				AND b.srecommend IN (SELECT custID FROM #tmpSuperList) 
+				and b.statusID IN (111, 112, 113)
+			GROUP BY b.srecommend, b.gameID
+		END
 
-		UPDATE t
-		SET t.TurnoverNoDraw = ISNULL(t.TurnoverNoDraw, 0) + ISNULL(c.TurnoverNoDraw, 0)
-			,t.GrossComm = ISNULL(t.GrossComm, 0) + ISNULL(c.GrossComm, 0)
-		FROM #ComWinLossDetails t
-			INNER JOIN (
-				SELECT b.srecommend, SUM(GrossComm) AS GrossComm, SUM(stake) AS TurnoverNoDraw
-				FROM #ComWinLossDetails_bettrans b
-					INNER JOIN #SportBettype s ON b.bettype = s.Bettype AND s.RefTable IN (1, 2)
-				GROUP BY b.srecommend
-			) c ON t.CustId = c.srecommend
+		IF EXISTS (SELECT 1 FROM #ComWinLossDetails_bettrans)
+		BEGIN
+			UPDATE t
+			SET t.TurnoverNoDraw = ISNULL(t.TurnoverNoDraw, 0) + ISNULL(c.TurnoverNoDraw, 0)
+				,t.GrossComm = ISNULL(t.GrossComm, 0) + ISNULL(c.GrossComm, 0)
+			FROM #ComWinLossDetails t
+				INNER JOIN (
+					SELECT b.srecommend, SUM(GrossComm) AS GrossComm, SUM(stake) AS TurnoverNoDraw
+					FROM #ComWinLossDetails_bettrans b
+						INNER JOIN #SportBettype s ON b.bettype = s.Bettype AND s.RefTable IN (1, 2)
+					GROUP BY b.srecommend
+				) c ON t.CustId = c.srecommend
+		END
 		
 		DROP TABLE #ComWinLossDetails_bettrans
 	END

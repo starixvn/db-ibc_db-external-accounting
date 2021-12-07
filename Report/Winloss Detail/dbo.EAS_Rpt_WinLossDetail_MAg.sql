@@ -74,6 +74,7 @@ BEGIN
 	DECLARE @MAgWinLossDetails TABLE(CustID int, TurnOver money, TurnoverNoDraw MONEY, GrossComm money, MemberWinLost money, 
 		PlayerComm money, MemberTotal money, AgWinLost money, AgComm money, AgTotal money, 
 		MAgWinLost money, MAgComm money, MAgTotal money, Company money)
+	DECLARE @GrossComm TABLE (CustId INT, TurnoverNoDraw MONEY, GrossComm MONEY)
 
 	DECLARE @tmpAg AS TABLE (CustID INT PRIMARY KEY)
 	IF @Agentid IS NULL
@@ -199,8 +200,10 @@ BEGIN
 				AND b.statusID IN (111,112,113)
 			GROUP BY Recommend
 
-			;WITH CTE_NetTO_GrossComm AS (
-				SELECT b.mrecommend AS CustId
+			IF EXISTS (SELECT 1 FROM @SportBettype WHERE RefTable = 1) -- bettransRnG
+			BEGIN
+				INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
+				SELECT b.recommend AS CustId
 					,SUM(CASE WHEN s.IsContributionBettype = 0 THEN b.BetStake ELSE 0 END) AS TurnoverNoDraw
 					,SUM(b.BetStake * b.adiscount) AS GrossComm
 				FROM dbo.bettransRnG b WITH(NOLOCK)
@@ -208,10 +211,13 @@ BEGIN
 					INNER JOIN @SportBettype s ON b.GameId = s.Bettype AND s.RefTable = 1
 				WHERE winlostdate BETWEEN @FDate AND @TDate
 					AND statusID IN (111, 112, 113) 
-				GROUP BY b.mrecommend
+				GROUP BY b.recommend
+			END
 
-				UNION ALL
-				SELECT b.mrecommend AS CustId
+			IF EXISTS (SELECT 1 FROM @SportBettype WHERE RefTable = 2) -- bettransLC
+			BEGIN
+				INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
+				SELECT b.recommend AS CustId
 					,SUM(CASE WHEN s.IsContributionBettype = 0 THEN b.NetStake ELSE 0 END) AS TurnoverNoDraw
 					,SUM(b.NetStake * b.adiscount) AS GrossComm
 				FROM dbo.bettransLC b WITH(NOLOCK)
@@ -219,15 +225,19 @@ BEGIN
 					INNER JOIN @SportBettype s ON b.GameId = s.Bettype AND s.RefTable = 2
 				WHERE winlostdate BETWEEN @FDate AND @TDate
 					AND statusID IN (111, 112, 113) 
-				GROUP BY b.mrecommend
-			)
-			UPDATE t
-			SET t.TurnoverNoDraw = ISNULL(t.TurnoverNoDraw, 0) + ISNULL(c.TurnoverNoDraw, 0)
-				,t.GrossComm = ISNULL(t.GrossComm, 0) + ISNULL(c.GrossComm, 0)
-			FROM @MAgWinLossDetails t
-				INNER JOIN (
-					SELECT CustId, SUM(GrossComm) AS GrossComm, SUM(TurnoverNoDraw) AS TurnoverNoDraw FROM CTE_NetTO_GrossComm GROUP BY CustId
-				) c ON t.CustId = c.CustId
+				GROUP BY b.recommend
+			END
+
+			IF EXISTS (SELECT 1 FROM @GrossComm)
+			BEGIN
+				UPDATE t
+				SET t.TurnoverNoDraw = ISNULL(t.TurnoverNoDraw, 0) + ISNULL(c.TurnoverNoDraw, 0)
+					,t.GrossComm = ISNULL(t.GrossComm, 0) + ISNULL(c.GrossComm, 0)
+				FROM @MAgWinLossDetails t
+					INNER JOIN (
+						SELECT CustId, SUM(GrossComm) AS GrossComm, SUM(TurnoverNoDraw) AS TurnoverNoDraw FROM @GrossComm GROUP BY CustId
+					) c ON t.CustId = c.CustId
+			END
 		END
 		
 		SELECT @FDate = @FromDate

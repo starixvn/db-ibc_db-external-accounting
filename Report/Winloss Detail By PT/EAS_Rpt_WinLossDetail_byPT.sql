@@ -150,6 +150,8 @@ SET NOCOUNT ON
 		Name			NVARCHAR(100)
 	);
 
+	CREATE TABLE #GrossComm (CustId INT, ProductId INT, TurnoverNoDraw MONEY, GrossComm MONEY)
+
 	--Avoid Parameter Sniffing for bettrans and sum_winloss
 	DECLARE @FDate	SMALLDATETIME,
 			@TDate	SMALLDATETIME,
@@ -205,8 +207,10 @@ SET NOCOUNT ON
 			AND b.statusID IN (111, 112, 113) 
 		GROUP BY srecommend, s.ProductID
 
-		;WITH CTE_NetTO_GrossComm AS (
-			SELECT b.mrecommend AS CustId
+		IF EXISTS (SELECT 1 FROM @SportBettype WHERE RefTable = 1) -- bettransRnG
+		BEGIN
+			INSERT INTO #GrossComm (CustId, ProductId, TurnoverNoDraw, GrossComm)
+			SELECT b.srecommend AS CustId, s.ProductId
 				,SUM(CASE WHEN s.IsContributionBettype = 0 THEN b.BetStake ELSE 0 END) AS TurnoverNoDraw
 				,SUM(b.BetStake * b.sdiscount) AS GrossComm
 			FROM dbo.bettransRnG b WITH(NOLOCK)
@@ -214,10 +218,13 @@ SET NOCOUNT ON
 			WHERE winlostdate BETWEEN @FDate AND @TDate
 				AND statusID IN (111, 112, 113) 
 				AND b.srecommend IN (SELECT custID FROM #tmpSuperList)
-			GROUP BY b.mrecommend
+			GROUP BY b.srecommend, s.ProductId
+		END
 
-			UNION ALL
-			SELECT b.mrecommend AS CustId
+		IF EXISTS (SELECT 1 FROM @SportBettype WHERE RefTable = 2) -- bettransLC
+		BEGIN
+			INSERT INTO #GrossComm (CustId, ProductId, TurnoverNoDraw, GrossComm)
+			SELECT b.srecommend AS CustId, s.ProductId
 				,SUM(CASE WHEN s.IsContributionBettype = 0 THEN b.NetStake ELSE 0 END) AS TurnoverNoDraw
 				,SUM(b.NetStake * b.sdiscount) AS GrossComm
 			FROM dbo.bettransLC b WITH(NOLOCK)
@@ -225,16 +232,20 @@ SET NOCOUNT ON
 			WHERE winlostdate BETWEEN @FDate AND @TDate
 				AND statusID IN (111, 112, 113) 
 				AND b.srecommend IN (SELECT custID FROM #tmpSuperList)
-			GROUP BY b.mrecommend
-		)
-		UPDATE t
-		SET t.TurnoverNoDraw = ISNULL(t.TurnoverNoDraw, 0) + ISNULL(c.TurnoverNoDraw, 0)
-			,t.GrossComm = ISNULL(t.GrossComm, 0) + ISNULL(c.GrossComm, 0)
-		FROM #ComWinLossDetails t
-			INNER JOIN (
-				SELECT CustId, SUM(GrossComm) AS GrossComm, SUM(TurnoverNoDraw) AS TurnoverNoDraw FROM CTE_NetTO_GrossComm GROUP BY CustId
-			) c ON t.CustId = c.CustId
+			GROUP BY b.srecommend, s.ProductId
+		END
 
+		IF EXISTS (SELECT 1 FROM #GrossComm)
+		BEGIN
+			UPDATE t
+			SET t.TurnoverNoDraw = ISNULL(t.TurnoverNoDraw, 0) + ISNULL(c.TurnoverNoDraw, 0)
+				,t.GrossComm = ISNULL(t.GrossComm, 0) + ISNULL(c.GrossComm, 0)
+			FROM #ComWinLossDetails t
+				INNER JOIN (
+					SELECT CustId, ProductId, SUM(GrossComm) AS GrossComm, SUM(TurnoverNoDraw) AS TurnoverNoDraw FROM #GrossComm GROUP BY CustId, ProductId
+				) c ON t.CustId = c.CustId AND t.ProductId = c.ProductId
+		END
+		
 		IF @BalanceUpDay < @FromDate
 		BEGIN
 			SET @FDate = @FromDate;
@@ -479,6 +490,6 @@ DROP TABLE #TmpCondSumWL
 DROP TABLE #ComWinLossDetails
 DROP TABLE #ComWinLossDetailsSuperList
 DROP TABLE #tmpSuperList
-
+DROP TABLE #GrossComm
 
 GO
