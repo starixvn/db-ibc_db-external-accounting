@@ -103,24 +103,6 @@ SET NOCOUNT ON
 		LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
 	WHERE e.ProductId IS NULL OR (e.Bettype = f.BetType)
 
-	DECLARE @SportBettype TABLE (ProductId INT, Bettype SMALLINT, RefTable TINYINT, IsContributionBettype BIT)
-	INSERT INTO @SportBettype (ProductId, Bettype, RefTable, IsContributionBettype)
-	SELECT ISNULL(p.GroupProductId, f.ProductID) AS ProductId, f.BetType, f.RefTable, CASE WHEN fc.Bettype IS NOT NULL THEN 1 ELSE 0 END AS IsContributionBettype
-	FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
-		LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
-		LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID
-		LEFT JOIN dbo.f_BettypePrizeGroup() fc ON fc.Bettype = f.bettype AND fc.BettypeGroup = 'Contribution'
-	WHERE EXISTS(SELECT 1
-					WHERE e.ProductId IS NULL 
-					OR 
-						(
-							e.Bettype = f.BetType 
-									OR (
-										e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g)
-										)
-						)
-				)
-
 	CREATE TABLE #ComWinLossDetails 
 	(	
 		CustID			INT, 
@@ -201,39 +183,96 @@ SET NOCOUNT ON
 			COUNT(1)																										
 
 		FROM bodb02.dbo.bettrans b WITH (NOLOCK)
-			INNER JOIN @SportBettype s ON b.bettype = s.Bettype
+			INNER JOIN (
+							SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType, f.RefTable
+							FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
+								LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
+								LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
+							WHERE EXISTS(SELECT 1
+										 WHERE e.ProductId IS NULL 
+											OR 
+												(
+													e.Bettype = f.BetType 
+														  OR (
+																e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g)
+															 )
+												)
+										)												
+							) s ON b.bettype = s.Bettype
 		WHERE b.winlostdate BETWEEN @FDate AND @Tdate
 			AND b.srecommend IN (SELECT custID FROM #tmpSuperList) 
 			AND b.statusID IN (111, 112, 113) 
 		GROUP BY srecommend, s.ProductID
 
-		IF EXISTS (SELECT 1 FROM @SportBettype WHERE RefTable = 1) -- bettransRnG
-		BEGIN
-			INSERT INTO #GrossComm (CustId, ProductId, TurnoverNoDraw, GrossComm)
-			SELECT b.srecommend AS CustId, s.ProductId
-				,SUM(CASE WHEN s.IsContributionBettype = 0 THEN b.BetStake ELSE 0 END) AS TurnoverNoDraw
-				,SUM(b.BetStake * b.sdiscount) AS GrossComm
-			FROM dbo.bettransRnG b WITH(NOLOCK)
-				INNER JOIN @SportBettype s ON b.GameId = s.Bettype AND s.RefTable = 1
-			WHERE winlostdate BETWEEN @FDate AND @TDate
-				AND statusID IN (111, 112, 113) 
-				AND b.srecommend IN (SELECT custID FROM #tmpSuperList)
-			GROUP BY b.srecommend, s.ProductId
-		END
-
-		IF EXISTS (SELECT 1 FROM @SportBettype WHERE RefTable = 2) -- bettransLC
-		BEGIN
-			INSERT INTO #GrossComm (CustId, ProductId, TurnoverNoDraw, GrossComm)
-			SELECT b.srecommend AS CustId, s.ProductId
-				,SUM(CASE WHEN s.IsContributionBettype = 0 THEN b.NetStake ELSE 0 END) AS TurnoverNoDraw
-				,SUM(b.NetStake * b.sdiscount) AS GrossComm
-			FROM dbo.bettransLC b WITH(NOLOCK)
-				INNER JOIN @SportBettype s ON b.GameId = s.Bettype AND s.RefTable = 2
-			WHERE winlostdate BETWEEN @FDate AND @TDate
-				AND statusID IN (111, 112, 113) 
-				AND b.srecommend IN (SELECT custID FROM #tmpSuperList)
-			GROUP BY b.srecommend, s.ProductId
-		END
+		-- bettransRnG
+		INSERT INTO #GrossComm (CustId, ProductId, TurnoverNoDraw, GrossComm)
+		SELECT b.srecommend AS CustId, s.ProductId
+			,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.BetStake ELSE 0 END) AS TurnoverNoDraw
+			,SUM(b.BetStake * b.sdiscount) AS GrossComm
+		FROM dbo.bettransRnG b WITH(NOLOCK)
+			INNER JOIN (
+							SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
+							FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
+								LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
+								LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
+							WHERE EXISTS(SELECT 1
+										 WHERE e.ProductId IS NULL 
+											OR 
+												(
+													e.Bettype = f.BetType 
+														  OR (
+																e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g)
+															 )
+												)
+										)
+								AND f.RefTable = 1
+							) s ON b.gameID = s.Bettype
+			OUTER APPLY 
+			(
+				SELECT f.Bettype AS ContributionBettype
+				FROM dbo.f_BettypePrizeGroup() f
+				WHERE f.BettypeGroup = 'Contribution'
+					AND f.Bettype = b.gameID
+			) cont
+		WHERE winlostdate BETWEEN @FDate AND @TDate
+			AND statusID IN (111, 112, 113) 
+			AND b.srecommend IN (SELECT custID FROM #tmpSuperList)
+		GROUP BY b.srecommend, s.ProductId
+		
+		-- bettransLC
+		INSERT INTO #GrossComm (CustId, ProductId, TurnoverNoDraw, GrossComm)
+		SELECT b.srecommend AS CustId, s.ProductId
+			,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.NetStake ELSE 0 END) AS TurnoverNoDraw
+			,SUM(b.NetStake * b.sdiscount) AS GrossComm
+		FROM dbo.bettransLC b WITH(NOLOCK)
+			INNER JOIN (
+							SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
+							FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
+								LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
+								LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
+							WHERE EXISTS(SELECT 1
+										 WHERE e.ProductId IS NULL 
+											OR 
+												(
+													e.Bettype = f.BetType 
+														  OR (
+																e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g)
+															 )
+												)
+										)
+								AND f.RefTable = 1
+							) s ON b.gameID = s.Bettype
+			OUTER APPLY 
+			(
+				SELECT f.Bettype AS ContributionBettype
+				FROM dbo.f_BettypePrizeGroup() f
+				WHERE f.BettypeGroup = 'Contribution'
+					AND f.Bettype = b.gameID
+			) cont
+		WHERE winlostdate BETWEEN @FDate AND @TDate
+			AND statusID IN (111, 112, 113) 
+			AND b.srecommend IN (SELECT custID FROM #tmpSuperList)
+		GROUP BY b.srecommend, s.ProductId
 
 		IF EXISTS (SELECT 1 FROM #GrossComm)
 		BEGIN

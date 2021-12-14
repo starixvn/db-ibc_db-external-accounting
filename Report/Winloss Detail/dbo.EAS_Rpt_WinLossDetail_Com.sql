@@ -141,7 +141,7 @@ END
 DECLARE @isTest BIT = 0
 SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
 
-CREATE TABLE #SportBettype (ProductID INT, Bettype INT, RefTable TINYINT, IsContributionBettype BIT, PRIMARY KEY NONCLUSTERED (Bettype ASC, ProductID ASC))
+CREATE TABLE #SportBettype (ProductID INT, Bettype INT, RefTable TINYINT, PRIMARY KEY NONCLUSTERED (Bettype ASC, ProductID ASC))
 
 INSERT INTO #TmpCondSumWL (sporttype, bettype)
 SELECT f.sporttype, f.bettype
@@ -149,13 +149,11 @@ FROM bodb02.dbo.f_SumWinloss_ConditionSel(@ProductIds) f
 LEFT JOIN @ExistingProductDetails e ON f.ProductID = e.ProductId
 	WHERE e.ProductId IS NULL OR (e.Bettype = f.BetType)
 
-INSERT INTO #SportBettype (ProductId, BetType, RefTable, IsContributionBettype)
-SELECT ISNULL(p.GroupProductId, f.ProductID), f.BetType, f.RefTable,
-		CASE WHEN fc.Bettype IS NOT NULL THEN 1 ELSE 0 END AS IsContributionBettype
+INSERT INTO #SportBettype (ProductId, BetType, RefTable)
+SELECT ISNULL(p.GroupProductId, f.ProductID), f.BetType, f.RefTable
 FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
 	LEFT JOIN bodb02.dbo.f_GroupProduct() p ON P.ProductId = f.ProductID
 	LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID
-	LEFT JOIN dbo.f_BettypePrizeGroup() fc ON f.BetType = fc.BetType AND fc.BettypeGroup = 'Contribution'
 WHERE EXISTS(SELECT 1
 			WHERE e.ProductId IS NULL 
 				OR 

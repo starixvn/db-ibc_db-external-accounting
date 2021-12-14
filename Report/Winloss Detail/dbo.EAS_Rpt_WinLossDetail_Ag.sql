@@ -132,25 +132,7 @@ BEGIN
 	----Get Sport Bettype Matrix------
 	DECLARE @isTest BIT = 0
 	SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
-
-	DECLARE @SportBettype TABLE(ProductID INT, Bettype INT, RefTable TINYINT, IsContributionBettype BIT)
-
-	INSERT INTO @SportBettype (ProductId, BetType, RefTable, IsContributionBettype)
-	SELECT ISNULL(p.GroupProductId, f.ProductID), f.BetType, f.RefTable,
-			CASE WHEN fc.Bettype IS NOT NULL THEN 1 ELSE 0 END AS IsContributionBettype
-	FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
-		LEFT JOIN bodb02.dbo.f_GroupProduct() p ON P.ProductId = f.ProductID
-		LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID
-		LEFT JOIN dbo.f_BettypePrizeGroup() fc ON f.BetType = fc.BetType AND fc.BettypeGroup = 'Contribution'
-	WHERE EXISTS(SELECT 1
-				WHERE e.ProductId IS NULL 
-					OR 
-						(
-							e.Bettype = f.BetType 
-							OR (e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g))
-						)
-				)
-
+	
 	IF @Todate >= @BalanceUpDay
 	BEGIN
 		IF @ToDate > @MoveBetsDay
@@ -185,40 +167,97 @@ BEGIN
 					-isnull(sum(winlost-actual_stake +awinlost+comm), 0) --Company
 				FROM
 					bodb02.dbo.bettrans b WITH (NOLOCK)
-					INNER JOIN @SportBettype s ON b.bettype = s.Bettype 
+					INNER JOIN (
+									SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType, f.RefTable
+									FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
+										LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
+										LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
+									WHERE EXISTS(SELECT 1
+												 WHERE e.ProductId IS NULL 
+													OR 
+														(
+															e.Bettype = f.BetType 
+																  OR (
+																		e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g)
+																	 )
+														)
+												)												
+									) s ON b.bettype = s.Bettype
 				WHERE	
 					winlostdate between @FDate and @TDate
 					AND b.statusID IN (111,112,113)
 					AND Recommend=@CustID
 				GROUP BY CustID
 
-				IF EXISTS (SELECT 1 FROM @SportBettype WHERE RefTable = 1) -- bettransRnG
-				BEGIN
-					INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
-					SELECT b.CustId
-						,SUM(CASE WHEN s.IsContributionBettype = 0 THEN b.BetStake ELSE 0 END) AS TurnoverNoDraw
-						,SUM(b.BetStake * b.discount) AS GrossComm
-					FROM dbo.bettransRnG b WITH(NOLOCK)
-						INNER JOIN @SportBettype s ON b.GameId = s.Bettype AND s.RefTable = 1
-					WHERE winlostdate BETWEEN @FDate AND @TDate
-						AND statusID IN (111, 112, 113) 
-						AND recommend = @CustID
-					GROUP BY b.CustId
-				END
-
-				IF EXISTS (SELECT 1 FROM @SportBettype WHERE RefTable = 2) -- bettransLC
-				BEGIN
-					INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
-					SELECT b.CustId
-						,SUM(CASE WHEN s.IsContributionBettype = 0 THEN b.NetStake ELSE 0 END) AS TurnoverNoDraw
-						,SUM(b.NetStake * b.discount) AS GrossComm
-					FROM dbo.bettransLC b WITH(NOLOCK)
-						INNER JOIN @SportBettype s ON b.GameId = s.Bettype AND s.RefTable = 2
-					WHERE winlostdate BETWEEN @FDate AND @TDate
-						AND statusID IN (111, 112, 113) 
-						AND recommend = @CustID
-					GROUP BY b.CustId
-				END
+				-- bettransRnG
+				INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
+				SELECT b.CustId
+					,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.BetStake ELSE 0 END) AS TurnoverNoDraw
+					,SUM(b.BetStake * b.discount) AS GrossComm
+				FROM dbo.bettransRnG b WITH(NOLOCK)
+					INNER JOIN (
+									SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
+									FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
+										LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
+										LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
+									WHERE EXISTS(SELECT 1
+												 WHERE e.ProductId IS NULL 
+													OR 
+														(
+															e.Bettype = f.BetType 
+																  OR (
+																		e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g)
+																	 )
+														)
+												)
+										AND f.RefTable = 1
+									) s ON b.gameID = s.Bettype
+					OUTER APPLY 
+					(
+						SELECT f.Bettype AS ContributionBettype
+						FROM dbo.f_BettypePrizeGroup() f
+						WHERE f.BettypeGroup = 'Contribution'
+							AND f.Bettype = b.gameID
+					) cont
+				WHERE winlostdate BETWEEN @FDate AND @TDate
+					AND statusID IN (111, 112, 113) 
+					AND recommend = @CustID
+				GROUP BY b.CustId
+				
+				-- bettransLC
+				INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
+				SELECT b.CustId
+					,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.NetStake ELSE 0 END) AS TurnoverNoDraw
+					,SUM(b.NetStake * b.discount) AS GrossComm
+				FROM dbo.bettransLC b WITH(NOLOCK)
+					INNER JOIN (
+									SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
+									FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
+										LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
+										LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
+									WHERE EXISTS(SELECT 1
+												 WHERE e.ProductId IS NULL 
+													OR 
+														(
+															e.Bettype = f.BetType 
+																  OR (
+																		e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g)
+																	 )
+														)
+												)
+										AND f.RefTable = 2
+									) s ON b.gameID = s.Bettype
+					OUTER APPLY 
+					(
+						SELECT f.Bettype AS ContributionBettype
+						FROM dbo.f_BettypePrizeGroup() f
+						WHERE f.BettypeGroup = 'Contribution'
+							AND f.Bettype = b.gameID
+					) cont
+				WHERE winlostdate BETWEEN @FDate AND @TDate
+					AND statusID IN (111, 112, 113) 
+					AND recommend = @CustID
+				GROUP BY b.CustId
 
 				IF EXISTS (SELECT 1 FROM @GrossComm)
 				BEGIN
@@ -258,42 +297,108 @@ BEGIN
 					-isnull(sum(winlost-actual_stake +awinlost+comm), 0) --Company
 				FROM
 					bodb02.dbo.bettrans b WITH (NOLOCK)
-					INNER JOIN @SportBettype s ON b.bettype = s.Bettype 
+					INNER JOIN (
+									SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType, f.RefTable
+									FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
+										LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
+										LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
+									WHERE EXISTS(SELECT 1
+												 WHERE e.ProductId IS NULL 
+													OR 
+														(
+															e.Bettype = f.BetType 
+																  OR (
+																		e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g)
+																	 )
+														)
+												)												
+									) s ON b.bettype = s.Bettype
 				WHERE	
 					winlostdate between @FDate and @TDate
 					AND b.statusID IN (111,112,113)
 					AND b.custid = @memberID
 				GROUP BY CustID
 
-				;WITH CTE_NetTO_GrossComm AS (
-					SELECT b.CustId
-						,SUM(CASE WHEN s.IsContributionBettype = 0 THEN b.BetStake ELSE 0 END) AS TurnoverNoDraw
-						,SUM(b.BetStake * b.discount) AS GrossComm
-					FROM dbo.bettransRnG b WITH(NOLOCK)
-						INNER JOIN @SportBettype s ON b.GameId = s.Bettype AND s.RefTable = 1
-					WHERE winlostdate BETWEEN @FDate AND @TDate
-						AND statusID IN (111, 112, 113) 
-						AND custid = @memberID
-					GROUP BY b.CustId
-
-					UNION ALL
-					SELECT b.CustId
-						,SUM(CASE WHEN s.IsContributionBettype = 0 THEN b.NetStake ELSE 0 END) AS TurnoverNoDraw
-						,SUM(b.NetStake * b.discount) AS GrossComm
-					FROM dbo.bettransLC b WITH(NOLOCK)
-						INNER JOIN @SportBettype s ON b.GameId = s.Bettype AND s.RefTable = 2
-					WHERE winlostdate BETWEEN @FDate AND @TDate
-						AND statusID IN (111, 112, 113) 
-						AND custid = @memberID
-					GROUP BY b.CustId
-				)
-				UPDATE t
-				SET t.TurnoverNoDraw = ISNULL(t.TurnoverNoDraw, 0) + ISNULL(c.TurnoverNoDraw, 0)
-					,t.GrossComm = ISNULL(t.GrossComm, 0) + ISNULL(c.GrossComm, 0)
-				FROM @AgWinLossDetails t
+				-- bettransRnG
+				INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
+				SELECT b.CustId
+					,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.BetStake ELSE 0 END) AS TurnoverNoDraw
+					,SUM(b.BetStake * b.discount) AS GrossComm
+				FROM dbo.bettransRnG b WITH(NOLOCK)
 					INNER JOIN (
-						SELECT CustId, SUM(GrossComm) AS GrossComm, SUM(TurnoverNoDraw) AS TurnoverNoDraw FROM CTE_NetTO_GrossComm GROUP BY CustId
-					) c ON t.CustId = c.CustId
+									SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
+									FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
+										LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
+										LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
+									WHERE EXISTS(SELECT 1
+												 WHERE e.ProductId IS NULL 
+													OR 
+														(
+															e.Bettype = f.BetType 
+																  OR (
+																		e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g)
+																	 )
+														)
+												)
+										AND f.RefTable = 1
+									) s ON b.gameID = s.Bettype
+					OUTER APPLY 
+					(
+						SELECT f.Bettype AS ContributionBettype
+						FROM dbo.f_BettypePrizeGroup() f
+						WHERE f.BettypeGroup = 'Contribution'
+							AND f.Bettype = b.gameID
+					) cont
+				WHERE winlostdate BETWEEN @FDate AND @TDate
+					AND statusID IN (111, 112, 113) 
+					AND custid = @memberID
+				GROUP BY b.CustId
+				
+				-- bettransLC
+				INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
+				SELECT b.CustId
+					,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.NetStake ELSE 0 END) AS TurnoverNoDraw
+					,SUM(b.NetStake * b.discount) AS GrossComm
+				FROM dbo.bettransLC b WITH(NOLOCK)
+					INNER JOIN (
+								SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
+								FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
+									LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
+									LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
+								WHERE EXISTS(SELECT 1
+											 WHERE e.ProductId IS NULL 
+												OR 
+													(
+														e.Bettype = f.BetType 
+															  OR (
+																	e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g)
+																 )
+													)
+											)
+									AND f.RefTable = 2
+								) s ON b.gameID = s.Bettype
+					OUTER APPLY 
+					(
+						SELECT f.Bettype AS ContributionBettype
+						FROM dbo.f_BettypePrizeGroup() f
+						WHERE f.BettypeGroup = 'Contribution'
+							AND f.Bettype = b.gameID
+					) cont
+				WHERE winlostdate BETWEEN @FDate AND @TDate
+					AND statusID IN (111, 112, 113) 
+					AND custid = @memberID
+				GROUP BY b.CustId
+
+				IF EXISTS (SELECT 1 FROM @GrossComm)
+				BEGIN
+					UPDATE t
+					SET t.TurnoverNoDraw = ISNULL(t.TurnoverNoDraw, 0) + ISNULL(c.TurnoverNoDraw, 0)
+						,t.GrossComm = ISNULL(t.GrossComm, 0) + ISNULL(c.GrossComm, 0)
+					FROM @AgWinLossDetails t
+						INNER JOIN (
+							SELECT CustId, SUM(GrossComm) AS GrossComm, SUM(TurnoverNoDraw) AS TurnoverNoDraw FROM @GrossComm GROUP BY CustId
+						) c ON t.CustId = c.CustId
+				END
 			END 
 		END	
 

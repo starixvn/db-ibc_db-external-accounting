@@ -139,25 +139,7 @@ BEGIN
 	----Get Sport Bettype Matrix------
 	DECLARE @isTest BIT = 0
 	SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
-
-	DECLARE @SportBettype TABLE(ProductID INT, Bettype INT, RefTable TINYINT, IsContributionBettype BIT)
-
-	INSERT INTO @SportBettype (ProductId, BetType, RefTable, IsContributionBettype)
-	SELECT ISNULL(p.GroupProductId, f.ProductID), f.BetType, f.RefTable,
-			CASE WHEN fc.Bettype IS NOT NULL THEN 1 ELSE 0 END AS IsContributionBettype
-	FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
-		LEFT JOIN bodb02.dbo.f_GroupProduct() p ON P.ProductId = f.ProductID
-		LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID
-		LEFT JOIN dbo.f_BettypePrizeGroup() fc ON f.BetType = fc.BetType AND fc.BettypeGroup = 'Contribution'
-	WHERE EXISTS(SELECT 1
-				WHERE e.ProductId IS NULL 
-					OR 
-						(
-							e.Bettype = f.BetType 
-							OR (e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g))
-						)
-				)
-
+	
 	IF @Todate >= @BalanceUpDay
 	BEGIN 
 		IF @ToDate > @MoveBetsDay
@@ -194,39 +176,96 @@ BEGIN
 			FROM
 				bodb02.dbo.bettrans b WITH (NOLOCK)--, INDEX = CIX_recommend_matchid_bettype)
 				INNER JOIN @tmpAg Ag ON b.recommend = Ag.CustID
-				INNER JOIN @SportBettype s ON b.bettype = s.Bettype
+				INNER JOIN (
+								SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType, f.RefTable
+								FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
+									LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
+									LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
+								WHERE EXISTS(SELECT 1
+											 WHERE e.ProductId IS NULL 
+												OR 
+													(
+														e.Bettype = f.BetType 
+															  OR (
+																	e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g)
+																 )
+													)
+											)												
+								) s ON b.bettype = s.Bettype
 			WHERE	
 				winlostdate BETWEEN @FDate AND @TDate
 				AND b.statusID IN (111,112,113)
 			GROUP BY Recommend
 
-			IF EXISTS (SELECT 1 FROM @SportBettype WHERE RefTable = 1) -- bettransRnG
-			BEGIN
-				INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
-				SELECT b.recommend AS CustId
-					,SUM(CASE WHEN s.IsContributionBettype = 0 THEN b.BetStake ELSE 0 END) AS TurnoverNoDraw
-					,SUM(b.BetStake * b.adiscount) AS GrossComm
-				FROM dbo.bettransRnG b WITH(NOLOCK)
-					INNER JOIN @tmpAg Ag ON b.recommend = Ag.CustID
-					INNER JOIN @SportBettype s ON b.GameId = s.Bettype AND s.RefTable = 1
-				WHERE winlostdate BETWEEN @FDate AND @TDate
-					AND statusID IN (111, 112, 113) 
-				GROUP BY b.recommend
-			END
-
-			IF EXISTS (SELECT 1 FROM @SportBettype WHERE RefTable = 2) -- bettransLC
-			BEGIN
-				INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
-				SELECT b.recommend AS CustId
-					,SUM(CASE WHEN s.IsContributionBettype = 0 THEN b.NetStake ELSE 0 END) AS TurnoverNoDraw
-					,SUM(b.NetStake * b.adiscount) AS GrossComm
-				FROM dbo.bettransLC b WITH(NOLOCK)
-					INNER JOIN @tmpAg Ag ON b.recommend = Ag.CustID
-					INNER JOIN @SportBettype s ON b.GameId = s.Bettype AND s.RefTable = 2
-				WHERE winlostdate BETWEEN @FDate AND @TDate
-					AND statusID IN (111, 112, 113) 
-				GROUP BY b.recommend
-			END
+			-- bettransRnG
+			INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
+			SELECT b.recommend AS CustId
+				,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.BetStake ELSE 0 END) AS TurnoverNoDraw
+				,SUM(b.BetStake * b.adiscount) AS GrossComm
+			FROM dbo.bettransRnG b WITH(NOLOCK)
+				INNER JOIN @tmpAg Ag ON b.recommend = Ag.CustID
+				INNER JOIN (
+								SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
+								FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
+									LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
+									LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
+								WHERE EXISTS(SELECT 1
+											 WHERE e.ProductId IS NULL 
+												OR 
+													(
+														e.Bettype = f.BetType 
+															  OR (
+																	e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g)
+																 )
+													)
+											)
+									AND f.RefTable = 1
+								) s ON b.gameID = s.Bettype
+				OUTER APPLY 
+				(
+					SELECT f.Bettype AS ContributionBettype
+					FROM dbo.f_BettypePrizeGroup() f
+					WHERE f.BettypeGroup = 'Contribution'
+						AND f.Bettype = b.gameID
+				) cont
+			WHERE winlostdate BETWEEN @FDate AND @TDate
+				AND statusID IN (111, 112, 113) 
+			GROUP BY b.recommend
+			
+			-- bettransLC
+			INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
+			SELECT b.recommend AS CustId
+				,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.NetStake ELSE 0 END) AS TurnoverNoDraw
+				,SUM(b.NetStake * b.adiscount) AS GrossComm
+			FROM dbo.bettransLC b WITH(NOLOCK)
+				INNER JOIN @tmpAg Ag ON b.recommend = Ag.CustID
+				INNER JOIN (
+								SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
+								FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
+									LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
+									LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
+								WHERE EXISTS(SELECT 1
+											 WHERE e.ProductId IS NULL 
+												OR 
+													(
+														e.Bettype = f.BetType 
+															  OR (
+																	e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g)
+																 )
+													)
+											)
+									AND f.RefTable = 2
+								) s ON b.gameID = s.Bettype
+				OUTER APPLY 
+				(
+					SELECT f.Bettype AS ContributionBettype
+					FROM dbo.f_BettypePrizeGroup() f
+					WHERE f.BettypeGroup = 'Contribution'
+						AND f.Bettype = b.gameID
+				) cont
+			WHERE winlostdate BETWEEN @FDate AND @TDate
+				AND statusID IN (111, 112, 113) 
+			GROUP BY b.recommend
 
 			IF EXISTS (SELECT 1 FROM @GrossComm)
 			BEGIN
