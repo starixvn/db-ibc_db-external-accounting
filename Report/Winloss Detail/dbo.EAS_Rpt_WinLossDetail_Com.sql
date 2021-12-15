@@ -59,6 +59,7 @@ AS
 		- 20210310@Malcolm: Add Pragmatic Live Casino [RedmineId : #133717]
 		- 20210617@Sol: changed how to calc net turn over - [RedmineId : #156653]
 		- 20211122@Percy: Enhance gross comm formula [RedmineID: #164479]
+		- 20211215@Percy: Exclude stake of contribution bettypes from Net TO [RedmineID: #166116]
 	
 	Param's Explanation:
 	 @ProductDetails:		
@@ -368,9 +369,16 @@ BEGIN
 				,t.GrossComm = ISNULL(t.GrossComm, 0) + ISNULL(c.GrossComm, 0)
 			FROM #ComWinLossDetails t
 				INNER JOIN (
-					SELECT b.srecommend, SUM(GrossComm) AS GrossComm, SUM(stake) AS TurnoverNoDraw
+					SELECT b.srecommend, SUM(b.GrossComm) AS GrossComm, SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.stake ELSE 0 END) AS TurnoverNoDraw
 					FROM #ComWinLossDetails_bettrans b
 						INNER JOIN #SportBettype s ON b.bettype = s.Bettype AND s.RefTable IN (1, 2)
+						OUTER APPLY 
+						(
+							SELECT f.Bettype AS ContributionBettype
+							FROM dbo.f_BettypePrizeGroup() f
+							WHERE f.BettypeGroup = 'Contribution'
+								AND f.Bettype = b.bettype
+						) cont
 					GROUP BY b.srecommend
 				) c ON t.CustId = c.srecommend
 		END
