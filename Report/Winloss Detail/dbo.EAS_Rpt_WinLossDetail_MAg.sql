@@ -51,6 +51,7 @@ Revisions:
 	- 20201210@Malcolm: Add Big Gaming [RedmineId : #142459]
 	- 20210310@Malcolm: Add Pragmatic Live Casino [RedmineId : #133717]
 	- 20210617@Sol: changed how to calc net turn over - [RedmineId : #156653]
+	- 20211122@Percy: Enhance gross comm formula [RedmineID: #164479]
 	
 	Param's Explanation:
 	 @ProductDetails:		
@@ -64,12 +65,8 @@ BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @RowStart int, @RowEnd int, @iDoc INT, @FDate SMALLDATETIME, @TDate SMALLDATETIME, @__ProductDetails XML;
-	DECLARE @cutoffDate SMALLDATETIME
 
 	SELECT @FDate = @FromDate, @TDate = @ToDate
-	SELECT @cutoffDate = CutoffDate
-	FROM dbo.f_GetCutOffDate() f
-	WHERE f.TypeName = 'NetTO'
 
 	SELECT @PageIndex = @PageIndex - 1, @RowStart = @PageSize * @PageIndex + 1, @RowEnd = @RowStart + @PageSize - 1
 
@@ -77,6 +74,7 @@ BEGIN
 	DECLARE @MAgWinLossDetails TABLE(CustID int, TurnOver money, TurnoverNoDraw MONEY, GrossComm money, MemberWinLost money, 
 		PlayerComm money, MemberTotal money, AgWinLost money, AgComm money, AgTotal money, 
 		MAgWinLost money, MAgComm money, MAgTotal money, Company money)
+	DECLARE @GrossComm TABLE (CustId INT, TurnoverNoDraw MONEY, GrossComm MONEY)
 
 	DECLARE @tmpAg AS TABLE (CustID INT PRIMARY KEY)
 	IF @Agentid IS NULL
@@ -141,31 +139,7 @@ BEGIN
 	----Get Sport Bettype Matrix------
 	DECLARE @isTest BIT = 0
 	SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
-
-	DECLARE @SportBettype TABLE(ProductID INT, Bettype INT, IsUsingOddsSpread INT)
-
-	INSERT INTO @SportBettype(
-	    ProductId
-		,BetType
-		,IsUsingOddsSpread
-	)
-	SELECT ISNULL(p.GroupProductId, f.ProductID), f.BetType, 
-			CASE 
-				WHEN f.RefTable IN (1, 2) OR f.ProductID = 47 THEN 1 
-				ELSE 0 
-			END AS IsUsingOddsSpread
-	FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
-		LEFT JOIN bodb02.dbo.f_GroupProduct() p ON P.ProductId = f.ProductID
-	LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID
-	WHERE EXISTS(SELECT 1
-				WHERE e.ProductId IS NULL 
-					OR 
-						(
-							e.Bettype = f.BetType 
-							OR (e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g))
-						)
-				)		
-
+	
 	IF @Todate >= @BalanceUpDay
 	BEGIN 
 		IF @ToDate > @MoveBetsDay
@@ -177,16 +151,18 @@ BEGIN
 			SELECT
 				Recommend,			
 				sum(ABS(b.stake)) as TurnOver, 
-				SUM(
-					CASE 
-						WHEN b.StatusID IN (112,113) AND b.MOdds IN (-0.25, 0.25) AND s.ProductId = 1 THEN ABS(b.stake)/2
-						WHEN b.StatusID = 111 AND s.ProductId IN (1) THEN 0 -- Sportsbook
-						WHEN b.winlostdate < @cutoffDate AND s.ProductID IN (21, 39, 45, 46, 47, 51, 52, 57, 59, 65) THEN b.oddsspread
-						WHEN b.winlostdate >= @cutoffDate AND s.IsUsingOddsSpread = 1 THEN CASE WHEN cont.ContributionBettype IS NULL THEN b.oddsspread ELSE 0 END-- LC and RNG
-						ELSE ABS(b.stake) 
-					END
-				) AS TurnoverNoDraw,
-				SUM(CASE WHEN (apositiontaking + mpositiontaking = 1) THEN 0 ELSE acomm/(1-apositiontaking - mpositiontaking) END) AS GrossComm,		    
+				SUM(CASE
+						WHEN s.RefTable IN (1, 2) THEN 0 -- bettransRnG/bettransLC
+						WHEN s.ProductId = 47 THEN b.oddsspread -- BBIN
+						WHEN s.ProductId = 1 AND b.statusId = 111 THEN 0 -- SB draw
+						WHEN s.ProductId = 1 AND b.StatusId IN (112, 113) AND b.modds IN (-0.25, 0.25) THEN ABS(b.stake)/2 -- SB half won/lose
+						ELSE ABS(b.stake)
+					END) AS TurnoverNoDraw,
+				SUM(CASE
+						WHEN s.RefTable IN (1, 2) THEN 0
+						WHEN apositiontaking + mpositiontaking = 1 THEN 0
+						ELSE acomm/(1 - apositiontaking - mpositiontaking)
+					END) AS GrossComm,
 				sum(winlost-actual_stake), --MemberWinlost
 				sum(playercomm), -- PlayerComm
 				isnull(sum(winlost-actual_stake), 0) + isnull(sum(playercomm), 0), --MemberTotal
@@ -200,18 +176,107 @@ BEGIN
 			FROM
 				bodb02.dbo.bettrans b WITH (NOLOCK)--, INDEX = CIX_recommend_matchid_bettype)
 				INNER JOIN @tmpAg Ag ON b.recommend = Ag.CustID
-				INNER JOIN @SportBettype s ON b.bettype = s.Bettype
+				INNER JOIN (
+								SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType, f.RefTable
+								FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
+									LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
+									LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
+								WHERE EXISTS(SELECT 1
+											 WHERE e.ProductId IS NULL 
+												OR 
+													(
+														e.Bettype = f.BetType 
+															  OR (
+																	e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g)
+																 )
+													)
+											)												
+								) s ON b.bettype = s.Bettype
+			WHERE	
+				winlostdate BETWEEN @FDate AND @TDate
+				AND b.statusID IN (111,112,113)
+			GROUP BY Recommend
+
+			-- bettransRnG
+			INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
+			SELECT b.recommend AS CustId
+				,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.BetStake ELSE 0 END) AS TurnoverNoDraw
+				,SUM(b.BetStake * b.adiscount) AS GrossComm
+			FROM dbo.bettransRnG b WITH(NOLOCK)
+				INNER JOIN @tmpAg Ag ON b.recommend = Ag.CustID
+				INNER JOIN (
+								SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
+								FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
+									LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
+									LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
+								WHERE EXISTS(SELECT 1
+											 WHERE e.ProductId IS NULL 
+												OR 
+													(
+														e.Bettype = f.BetType 
+															  OR (
+																	e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g)
+																 )
+													)
+											)
+									AND f.RefTable = 1
+								) s ON b.gameID = s.Bettype
 				OUTER APPLY 
 				(
 					SELECT f.Bettype AS ContributionBettype
 					FROM dbo.f_BettypePrizeGroup() f
 					WHERE f.BettypeGroup = 'Contribution'
-						AND f.Bettype = b.bettype
+						AND f.Bettype = b.gameID
 				) cont
-			WHERE	
-				winlostdate BETWEEN @FDate AND @TDate
-				AND b.statusID IN (111,112,113)
-			GROUP BY Recommend
+			WHERE winlostdate BETWEEN @FDate AND @TDate
+				AND statusID IN (111, 112, 113) 
+			GROUP BY b.recommend
+			
+			-- bettransLC
+			INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
+			SELECT b.recommend AS CustId
+				,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.NetStake ELSE 0 END) AS TurnoverNoDraw
+				,SUM(b.NetStake * b.adiscount) AS GrossComm
+			FROM dbo.bettransLC b WITH(NOLOCK)
+				INNER JOIN @tmpAg Ag ON b.recommend = Ag.CustID
+				INNER JOIN (
+								SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
+								FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
+									LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
+									LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
+								WHERE EXISTS(SELECT 1
+											 WHERE e.ProductId IS NULL 
+												OR 
+													(
+														e.Bettype = f.BetType 
+															  OR (
+																	e.Bettype = 0 AND f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g)
+																 )
+													)
+											)
+									AND f.RefTable = 2
+								) s ON b.gameID = s.Bettype
+				OUTER APPLY 
+				(
+					SELECT f.Bettype AS ContributionBettype
+					FROM dbo.f_BettypePrizeGroup() f
+					WHERE f.BettypeGroup = 'Contribution'
+						AND f.Bettype = b.gameID
+				) cont
+			WHERE winlostdate BETWEEN @FDate AND @TDate
+				AND statusID IN (111, 112, 113) 
+			GROUP BY b.recommend
+
+			IF EXISTS (SELECT 1 FROM @GrossComm)
+			BEGIN
+				UPDATE t
+				SET t.TurnoverNoDraw = ISNULL(t.TurnoverNoDraw, 0) + ISNULL(c.TurnoverNoDraw, 0)
+					,t.GrossComm = ISNULL(t.GrossComm, 0) + ISNULL(c.GrossComm, 0)
+				FROM @MAgWinLossDetails t
+					INNER JOIN (
+						SELECT CustId, SUM(GrossComm) AS GrossComm, SUM(TurnoverNoDraw) AS TurnoverNoDraw FROM @GrossComm GROUP BY CustId
+					) c ON t.CustId = c.CustId
+			END
 		END
 		
 		SELECT @FDate = @FromDate

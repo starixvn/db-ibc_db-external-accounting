@@ -14,6 +14,7 @@ AS
 	DB: DBAGE/bodb02
 	Revisions:
 		- 20130121@Malcolm: intiate SPs [RedmineID : #135593]
+		- 20211122@Percy: Enhance gross comm formula [RedmineID: #164479]
 */
 
 SET NOCOUNT ON
@@ -64,8 +65,8 @@ IF @ToDate > @MovebetDay
 		SELECT
 			SRecommend,																				-- CustId		
 			SUM(ABS(b.stake)),																		-- Turnover
-			SUM(CASE WHEN s.ProductID = 46 THEN b.oddsspread ELSE ABS(stake) END),					-- TurnoverNoDraw(net Turnover)
-			SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END),			-- GrossComm,
+			0,																						-- TurnoverNoDraw(net Turnover)
+			0,																						-- GrossComm,
 			SUM(winlost-actual_stake),																-- MemberWinlost
 			SUM(playercomm),																		-- PlayerComm
 			SUM(winlost-actual_stake) + sum(playercomm),											-- MemberTotal			
@@ -85,6 +86,23 @@ IF @ToDate > @MovebetDay
 			AND b.ruben = 1 
 			AND b.statusID NOT IN (101, 102, 103)
 		GROUP BY srecommend
+
+		;WITH CTE_NetTO_GrossComm AS (
+			SELECT b.srecommend AS CustID
+				,SUM(b.BetStake) AS TunroverNoDraw
+				,SUM(b.BetStake * b.sdiscount) AS GrossComm
+			FROM bodb02.dbo.bettransRnG b WITH (NOLOCK)
+				INNER JOIN #Product s ON b.gameID = s.Bettype
+			WHERE b.winlostdate BETWEEN @FromDate AND @ToDate
+				AND b.srecommend IN (SELECT  custID FROM #tmpSuperList)
+				AND b.statusID IN (111, 112, 113)
+			GROUP BY b.srecommend
+		)
+		UPDATE t
+		SET t.TurnoverNoDraw = ISNULL(c.TunroverNoDraw, 0)
+			,t.GrossComm = ISNULL(c.GrossComm, 0)
+		FROM #ComWinLossDetails t
+			INNER JOIN CTE_NetTO_GrossComm c ON t.CustId = c.CustId
 	END
 
 IF @FromDate <= @MovebetDay
