@@ -260,7 +260,7 @@ SET NOCOUNT ON
 															 )
 												)
 										)
-								AND f.RefTable = 1
+								AND f.RefTable = 2
 							) s ON b.gameID = s.Bettype
 			OUTER APPLY 
 			(
