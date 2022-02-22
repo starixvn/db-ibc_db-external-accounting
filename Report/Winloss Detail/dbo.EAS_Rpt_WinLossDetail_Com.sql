@@ -60,6 +60,7 @@ AS
 		- 20210617@Sol: changed how to calc net turn over - [RedmineId : #156653]
 		- 20211122@Percy: Enhance gross comm formula [RedmineID: #164479]
 		- 20211215@Percy: Exclude stake of contribution bettypes from Net TO [RedmineID: #166116]
+		- 20220106@Evan: Add SG Jackpot - [Redmine: #166685]	
 	
 	Param's Explanation:
 	 @ProductDetails:		
@@ -259,9 +260,9 @@ BEGIN
 			sum(SAgWinlost + SAgComm), --SAgTotal
 			ISNULL(-1 * SUM(CASE
 							-- Jackpot
-							WHEN b.bettype IN (2198, 2398, 2998, 4297) THEN
+							WHEN b.bettype IN (2198, 2398, 2998, 4297, 4599) THEN
 								CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.betid END
-							WHEN b.bettype IN (2199, 2399, 2999, 4298) THEN 0
+							WHEN b.bettype IN (2199, 2399, 2999, 4298, 4600) THEN 0
 							ELSE 
 								CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.MemberWinlost END
 							END
@@ -271,16 +272,16 @@ BEGIN
 			ISNULL(-1 * SUM(CASE 
 							/*IBCBet Live Casino*/
 							WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
-							WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298) THEN 0
+							WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298, 4599, 4600) THEN 0
 							ELSE  b.GrossComm * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 							END
 							), 0) AS ExtraComm,
 			-1 * (
 				ISNULL(SUM(CASE 
 							-- Jackpot
-							WHEN b.bettype IN (2198, 2398, 2998, 4297) THEN
+							WHEN b.bettype IN (2198, 2398, 2998, 4297, 4599) THEN
 								CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.betid END
-							WHEN b.bettype IN (2199, 2399, 2999, 4298) THEN 0
+							WHEN b.bettype IN (2199, 2399, 2999, 4298, 4600) THEN 0
 							ELSE 
 								CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.MemberWinlost END
 							END
@@ -291,7 +292,7 @@ BEGIN
 				ISNULL(SUM(CASE 
 							/*IBCBet Live Casino*/
 							WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
-							WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298) THEN 0
+							WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298, 4599, 4600) THEN 0
 							ELSE b.GrossComm * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 							END
 							), 0)
@@ -303,9 +304,9 @@ BEGIN
 					-1 * (
 						ISNULL(SUM(CASE
 									-- Jackpot
-									WHEN b.bettype IN (2198, 2398, 2998, 4297) THEN
+									WHEN b.bettype IN (2198, 2398, 2998, 4297, 4599) THEN
 										CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.betid END
-									WHEN b.bettype IN (2199, 2399, 2999, 4298) THEN 0
+									WHEN b.bettype IN (2199, 2399, 2999, 4298, 4600) THEN 0
 									ELSE 
 										CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.MemberWinlost END
 									END
@@ -316,7 +317,7 @@ BEGIN
 						ISNULL(SUM(CASE 
 									/*IBCBet Live Casino*/
 									WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
-									WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298) THEN 0
+									WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298, 4599, 4600) THEN 0
 									ELSE b.GrossComm* CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 									END
 								), 0)
