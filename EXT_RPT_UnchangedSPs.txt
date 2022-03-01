@@ -1,4 +1,6 @@
 Report\Winloss Detail\dbo.EAS_Rpt_WinLossDetail_Ag.sql
 Report\Winloss Detail\dbo.EAS_Rpt_WinLossDetail_MAg.sql
 Report\Winloss Detail\dbo.EAS_Rpt_WinLossDetail_SAg.sql
+Report\Winloss Detail\dbo.EAS_Rpt_WinLossDetail_Com.sql
 Report\Winloss Detail By PT\EAS_Rpt_WinLossDetail_byPT.sql
+Report\Winloss Detail By Subgroup\EAS_Rpt_WinLossDetail_bySubGroup.sql
