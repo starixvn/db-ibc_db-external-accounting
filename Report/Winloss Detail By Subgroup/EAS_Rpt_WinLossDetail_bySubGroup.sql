@@ -148,6 +148,14 @@ BEGIN
 		BetCount		INT
 	);
 
+	CREATE TABLE #ComWinLossDetailsSubGroupList
+	(
+		CustID				INT, 
+		SubGroup			VARCHAR(50),
+		UserName			NVARCHAR(100)
+	);
+
+
 	CREATE TABLE #GrossComm (CustId INT, TurnoverNoDraw MONEY, GrossComm MONEY)
 
 	--Avoid Parameter Sniffing for bettrans and sum_winloss
@@ -401,14 +409,22 @@ BEGIN
 
 	IF @TotalRecords = 0  
 	BEGIN  
-		SELECT @TotalRecords = COUNT(a.CustID)
-		FROM (	SELECT w.CustID 
-				FROM #ComWinLossDetails w 
-				OUTER APPLY (	SELECT GroupName 
-								FROM Acc_CustGroup g WITH (NOLOCK) 
-								WHERE w.CustID = g.CustID and g.GroupName in (SELECT SubGroup FROM @ListSubGroup)) d
-				GROUP BY w.CustID,d.GroupName
+
+		INSERT INTO #ComWinLossDetailsSubGroupList(CustID,SubGroup,UserName)
+		SELECT	CustID	,GroupName,username
+		FROM (	SELECT w.CustID,d.GroupName  ,c.username   
+				FROM #ComWinLossDetails w   
+				INNER JOIN dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID
+				OUTER APPLY (	SELECT GroupName   
+								FROM Acc_CustGroup g WITH (NOLOCK)   
+								WHERE c.CustID = g.CustID and g.GroupName in (SELECT SubGroup FROM @ListSubGroup) 
+							) d  
+				GROUP BY w.CustID,d.GroupName,c.username   
 			) a
+
+		SELECT @TotalRecords = COUNT(CustID)
+		FROM #ComWinLossDetailsSubGroupList;
+
 	END
 
 	IF ((@PageSize <= 0) AND (@PageIndex <= 0))
@@ -466,37 +482,38 @@ BEGIN
 		RETURN
 	END
 
-	SELECT 	*
-	FROM (
-			SELECT w.CustID,
-					d.GroupName AS SubGroup,
-					c.UserName,
-					SUM(Turnover) Turnover,
-					SUM(TurnoverNoDraw) TurnoverNoDraw,
-					SUM(GrossComm) GrossComm, 
-					SUM(MemberWinLost) MemberWinLost,
-					SUM(PlayerComm) PlayerComm,
-					SUM(MemberTotal) MemberTotal,
-					SUM(AgWinLost) AgWinLost,
-					SUM(AgComm) AgComm,
-					SUM(AgTotal) AgTotal,
-					SUM(MAgWinLost) MAgWinLost,
-					SUM(MAgComm) MAgComm	,
-					SUM(MAgTotal) MAgTotal,
-					SUM(SAgWinLost) SAgWinLost, 
-					SUM(SAgComm) SAgComm	, 
-					SUM(SAgTotal) SAgTotal, 
-					SUM(Company) Company,
-					SUM(BetCount) BetCount,
-					ROW_NUMBER() OVER(ORDER BY COALESCE(GroupName,'zzzz'),c.UserName) as RowNum
-			FROM #ComWinLossDetails w
-			INNER JOIN dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID
-			OUTER APPLY (	SELECT GroupName 
-							FROM Acc_CustGroup g WITH (NOLOCK)
-							WHERE w.CustID = g.CustID and g.GroupName in (SELECT SubGroup FROM @ListSubGroup)) d
-			GROUP BY w.CustID, c.UserName,d.GroupName
-		)rs
-		WHERE rs.RowNum BETWEEN @RowStart AND @RowEnd;
+	;WITH CTE_Filter(CustID,SubGroup,UserName) AS
+	(	SELECT CustID,SubGroup,UserName FROM
+		(
+			SELECT CustID, SubGroup,UserName,  ROW_NUMBER() OVER(ORDER BY COALESCE(SubGroup,'zzzz'),UserName) as RowNum
+			FROM #ComWinLossDetailsSubGroupList 
+		) sort
+		WHERE sort.rownum BETWEEN @RowStart AND @RowEnd
+	)
+   SELECT w.CustID,  
+     f.SubGroup,  
+     f.UserName,  
+     SUM(Turnover) Turnover,  
+     SUM(TurnoverNoDraw) TurnoverNoDraw,  
+     SUM(GrossComm) GrossComm,   
+     SUM(MemberWinLost) MemberWinLost,  
+     SUM(PlayerComm) PlayerComm,  
+     SUM(MemberTotal) MemberTotal,  
+     SUM(AgWinLost) AgWinLost,  
+     SUM(AgComm) AgComm,  
+     SUM(AgTotal) AgTotal,  
+     SUM(MAgWinLost) MAgWinLost,  
+     SUM(MAgComm) MAgComm ,  
+     SUM(MAgTotal) MAgTotal,  
+     SUM(SAgWinLost) SAgWinLost,   
+     SUM(SAgComm) SAgComm ,   
+     SUM(SAgTotal) SAgTotal,   
+     SUM(Company) Company,  
+     SUM(BetCount) BetCount
+   FROM #ComWinLossDetails w  
+		INNER JOIN CTE_Filter f ON f.CustID = w.CustID
+   GROUP BY w.CustID, f.SubGroup, f.UserName
+   ORDER BY COALESCE(f.SubGroup,'zzzz'), f.UserName
 	
 	SELECT	NULL AS CustId,
 			'Total' AS UserName,
@@ -523,5 +540,7 @@ BEGIN
 	DROP TABLE #ComWinLossDetails
 	DROP TABLE #tmpSuperList
 	DROP TABLE #GrossComm	
+	DROP TABLE #ComWinLossDetailsSubGroupList   
+
 END
 GO
