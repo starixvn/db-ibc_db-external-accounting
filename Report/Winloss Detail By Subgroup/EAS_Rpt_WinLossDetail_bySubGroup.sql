@@ -1,5 +1,5 @@
 /*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" isFunction="0" isNested="0"></info>*/
-CREATE PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_bySubGroup] 	
+ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_bySubGroup] 	
 	@FromDate		SMALLDATETIME,
 	@ToDate			SMALLDATETIME,
 	@ProductIds		VARCHAR(MAX) = '46',
@@ -41,20 +41,23 @@ BEGIN
 			@RowEnd = @RowStart + @PageSize - 1;
 
 	CREATE TABLE #tmpSuperList (custID INT PRIMARY KEY)
+
 	DECLARE @ParentID INT
+
 	SELECT @ParentID = GroupID FROM DBCUST.NAP_UserControl.dbo.eaGroup WITH(NOLOCK) WHERE GroupName = @GroupName
 
 	-- Get list of subgroup
-	DECLARE @ListSubGroup TABLE (SubGroup Varchar(50))
-
-	INSERT INTO @ListSubGroup
-	SELECT GroupName
-	FROM DBCUST.NAP_UserControl.dbo.eaGroup WITH(NOLOCK)
-	WHERE ParentID = @ParentID
-		AND GroupName = ISNULL(@SubGroup,GroupName);
+	CREATE TABLE #tmpSubGroup (SubGroup VARCHAR(50))
 	
+	INSERT INTO #tmpSubGroup
+	SELECT	GroupName
+	FROM	DBCUST.NAP_UserControl.dbo.eaGroup WITH(NOLOCK)
+	WHERE	ParentID = @ParentID
+			AND GroupName = ISNULL(@SubGroup,GroupName);
+
 	-- Get list of super, avoid case SubGroup not belong to MainGroup
-	IF EXISTS (	SELECT TOP 1 1 FROM @ListSubGroup)
+
+	IF EXISTS (	SELECT TOP 1 1 FROM #tmpSubGroup)
 		INSERT INTO #tmpSuperList(CustID)
 		SELECT custID 
 		FROM bodb02.dbo.Acc_CustGroup WITH(NOLOCK)
@@ -69,7 +72,7 @@ BEGIN
 	DECLARE @ExistingProductDetails TABLE (ProductId INT,Sporttype INT,Bettype INT)
 	DECLARE @isTest BIT, @__ProductDetails XML;
 
-	SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID);	
+	SELECT @isTest = dbo.f_CheckSPVersion(@@PROCID);	
 	SELECT @ProductIds = dbo.f_AddRelatedProducts(@ProductIds);
 
 	IF ISNULL(@ProductDetails,'') = ''
@@ -151,10 +154,8 @@ BEGIN
 	CREATE TABLE #ComWinLossDetailsSubGroupList
 	(
 		CustID				INT, 
-		SubGroup			VARCHAR(50),
-		UserName			NVARCHAR(100)
+		SubGroup			VARCHAR(50)
 	);
-
 
 	CREATE TABLE #GrossComm (CustId INT, TurnoverNoDraw MONEY, GrossComm MONEY)
 
@@ -202,7 +203,7 @@ BEGIN
 			SUM(swinlost) + SUM(scomm) -SUM(acomm) AS SAgTotal,																			
 			-(SUM(swinlost) +SUM(awinlost)+ SUM(winlost-actual_stake) + SUM(mwinlost) + SUM(scomm)) AS Company ,						
 			COUNT(1) AS BetCount																										
-		FROM bodb02.dbo.bettrans b WITH (NOLOCK)
+		FROM	bodb02.dbo.bettrans b WITH (NOLOCK)
 			INNER JOIN (
 						SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType, f.RefTable
 						FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
@@ -410,18 +411,17 @@ BEGIN
 	IF @TotalRecords = 0  
 	BEGIN  
 
-		INSERT INTO #ComWinLossDetailsSubGroupList(CustID,SubGroup,UserName)
-		SELECT	CustID	,GroupName,username
-		FROM (	SELECT w.CustID,d.GroupName  ,c.username   
+		INSERT INTO #ComWinLossDetailsSubGroupList(CustID,SubGroup)
+		SELECT	CustID	,GroupName
+		FROM (	SELECT w.CustID,d.GroupName   
 				FROM #ComWinLossDetails w   
-				INNER JOIN dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID
 				OUTER APPLY (	SELECT GroupName   
 								FROM Acc_CustGroup g WITH (NOLOCK)   
-								WHERE c.CustID = g.CustID and g.GroupName in (SELECT SubGroup FROM @ListSubGroup) 
+								WHERE w.CustID = g.CustID AND g.GroupName IN (SELECT SubGroup FROM #tmpSubGroup) 
 							) d  
-				GROUP BY w.CustID,d.GroupName,c.username   
+				GROUP BY w.CustID,d.GroupName
 			) a
-
+		
 		SELECT @TotalRecords = COUNT(CustID)
 		FROM #ComWinLossDetailsSubGroupList;
 
@@ -454,7 +454,7 @@ BEGIN
 		INNER JOIN dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID
 		OUTER APPLY (	SELECT GroupName 
 						FROM Acc_CustGroup g WITH (NOLOCK)
-						WHERE w.CustID = g.CustID and g.GroupName in (SELECT SubGroup FROM @ListSubGroup)) d
+						WHERE w.CustID = g.CustID and g.GroupName IN (SELECT SubGroup FROM #tmpSubGroup)) d
 		GROUP BY w.CustID, c.UserName,d.GroupName
 		ORDER BY COALESCE(d.GroupName,'zzzz'),c.username;
 
@@ -482,38 +482,40 @@ BEGIN
 		RETURN
 	END
 
-	;WITH CTE_Filter(CustID,SubGroup,UserName) AS
-	(	SELECT CustID,SubGroup,UserName FROM
-		(
-			SELECT CustID, SubGroup,UserName,  ROW_NUMBER() OVER(ORDER BY COALESCE(SubGroup,'zzzz'),UserName) as RowNum
-			FROM #ComWinLossDetailsSubGroupList 
-		) sort
+	;WITH CTE_Filter(CustID,SubGroup,username) AS
+	(	
+		SELECT	CustID,SubGroup,username 
+		FROM	(
+					SELECT c.CustID, SubGroup, c.username, ROW_NUMBER() OVER(ORDER BY COALESCE(SubGroup,'zzzz'),c.username) as RowNum
+					FROM #ComWinLossDetailsSubGroupList w 
+						INNER JOIN dbo.custinfo c WITH(NOLOCK) ON c.custid = w.CustID
+				) sort
 		WHERE sort.rownum BETWEEN @RowStart AND @RowEnd
 	)
    SELECT w.CustID,  
-     f.SubGroup,  
-     f.UserName,  
-     SUM(Turnover) Turnover,  
-     SUM(TurnoverNoDraw) TurnoverNoDraw,  
-     SUM(GrossComm) GrossComm,   
-     SUM(MemberWinLost) MemberWinLost,  
-     SUM(PlayerComm) PlayerComm,  
-     SUM(MemberTotal) MemberTotal,  
-     SUM(AgWinLost) AgWinLost,  
-     SUM(AgComm) AgComm,  
-     SUM(AgTotal) AgTotal,  
-     SUM(MAgWinLost) MAgWinLost,  
-     SUM(MAgComm) MAgComm ,  
-     SUM(MAgTotal) MAgTotal,  
-     SUM(SAgWinLost) SAgWinLost,   
-     SUM(SAgComm) SAgComm ,   
-     SUM(SAgTotal) SAgTotal,   
-     SUM(Company) Company,  
-     SUM(BetCount) BetCount
+		 f.SubGroup,  
+		 f.UserName,  
+		 SUM(Turnover) Turnover,  
+		 SUM(TurnoverNoDraw) TurnoverNoDraw,  
+		 SUM(GrossComm) GrossComm,   
+		 SUM(MemberWinLost) MemberWinLost,  
+		 SUM(PlayerComm) PlayerComm,  
+		 SUM(MemberTotal) MemberTotal,  
+		 SUM(AgWinLost) AgWinLost,  
+		 SUM(AgComm) AgComm,  
+		 SUM(AgTotal) AgTotal,  
+		 SUM(MAgWinLost) MAgWinLost,  
+		 SUM(MAgComm) MAgComm ,  
+		 SUM(MAgTotal) MAgTotal,  
+		 SUM(SAgWinLost) SAgWinLost,   
+		 SUM(SAgComm) SAgComm ,   
+		 SUM(SAgTotal) SAgTotal,   
+		 SUM(Company) Company,  
+		 SUM(BetCount) BetCount
    FROM #ComWinLossDetails w  
 		INNER JOIN CTE_Filter f ON f.CustID = w.CustID
-   GROUP BY w.CustID, f.SubGroup, f.UserName
-   ORDER BY COALESCE(f.SubGroup,'zzzz'), f.UserName
+   GROUP BY w.CustID, f.SubGroup, f.username
+   ORDER BY COALESCE(f.SubGroup,'zzzz'), f.username
 	
 	SELECT	NULL AS CustId,
 			'Total' AS UserName,
@@ -541,6 +543,7 @@ BEGIN
 	DROP TABLE #tmpSuperList
 	DROP TABLE #GrossComm	
 	DROP TABLE #ComWinLossDetailsSubGroupList   
+	DROP TABLE #tmpSubGroup   
 
 END
 GO
