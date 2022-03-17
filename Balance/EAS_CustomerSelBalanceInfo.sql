@@ -13,13 +13,14 @@ AS
 		- 20191227@Johnson: get last transdate [redmine:#125894]
 		- 20200602@Percy: Separate PendingTransfer3rd to Cash and Balance [RedmineID: #135200]
 		- 20210505@Sol: NAP - Alpha - Allow more time for transfer - [Redmine: #149927]
+		- 20211122@Danny: Split transfer tickets out of bettrans [Redmine: #164196]
 */
 
 BEGIN
 	SET NOCOUNT ON
 
 	DECLARE @RoleId TINYINT, @CurrencyId INT, @Currency NVARCHAR(50), @Credit MONEY, @UsedCredit MONEY
-			,@transdate DATETIME, @transid BIGINT
+			,@transdate DATETIME, @transid BIGINT, @transferid BIGINT
 			
 	SELECT  @RoleId = roleid, @CurrencyId = currency FROM dbo.custInfo WITH (NOLOCK) WHERE custid = @CustId
 
@@ -67,10 +68,19 @@ BEGIN
 		--last txn 
 		SELECT @transid = MAX(transid) FROM bettrans WITH (NOLOCK) 
 		WHERE srecommend = @custid
-			AND bettype NOT IN (20000,19999)
 		OPTION(OPTIMIZE FOR	UNKNOWN)
+
+		SELECT @transferid = MAX(transid) FROM dbo.transfer WITH (NOLOCK) 
+		WHERE srecommend = @custid
+			AND bettype NOT IN (20000,19999)
 		
-		SELECT @transdate = transdate FROM bettrans WITH (NOLOCK) WHERE transid = @transid
+		SELECT @transdate = MAX(transdate)
+		FROM
+		(
+			SELECT transdate FROM bettrans WITH (NOLOCK) WHERE transid = @transid
+			UNION ALL
+			SELECT transdate FROM dbo.transfer WITH (NOLOCK) WHERE transid = @transferid
+		) x
 		
 		-- Credit
 		SELECT @UsedCredit = SUM(ISNULL(credit, 0)) FROM DBCUST.CustDB.dbo.custInfo WITH (NOLOCK) WHERE srecommend = @CustId AND roleId = 3
@@ -82,12 +92,20 @@ BEGIN
 			SUM(winlost), SUM(actual_stake), SUM(swinlost), SUM(mwinlost), SUM(awinlost), SUM(scomm), SUM(acomm), SUM(ABS(actual_stake) * spositiontaking)
 		FROM dbo.bettrans WITH (NOLOCK)
 		WHERE srecommend = @CustId
-			AND 1 = CASE 
-						WHEN bettype = 19999 and winlostdate > @moveBetsDay THEN 0 --> get data from ticket detail
-						WHEN bettype < 19999 and winlostdate <= @moveBetsDay THEN 0 --> get data from sum record
-					ELSE 1 END
-		GROUP BY
-			winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 4 ELSE 0 END
+			AND bettype < 19999
+			AND  winlostdate > @moveBetsDay
+		GROUP BY winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 4 ELSE 0 END
+
+		-- transfer
+		INSERT INTO #BalanceInfo (winlostdate, bettype, statusId, roleId, winlost, actual_stake, swinlost, mwinlost, awinlost, scomm, acomm, actual_stakePT)
+		SELECT 
+			winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 4 ELSE 0 END,
+			SUM(winlost), SUM(actual_stake), SUM(swinlost), SUM(mwinlost), SUM(awinlost), SUM(scomm), SUM(acomm), SUM(ABS(actual_stake) * ISNULL(ti.spositiontaking,0))
+		FROM dbo.transfer t WITH(NOLOCK)
+		LEFT JOIN dbo.transferInfo ti WITH(NOLOCK) ON t.TransId = ti.TransId
+		WHERE srecommend = @CustId
+		AND ((bettype = 19999 AND winlostdate <= @moveBetsDay) OR (bettype > 19999))
+		GROUP BY winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 4 ELSE 0 END
 
 		DELETE b
 		FROM #BalanceInfo b
@@ -153,10 +171,19 @@ BEGIN
 		--last txn 
 		SELECT @transid = MAX(transid) FROM bettrans WITH (NOLOCK) 
 		WHERE mrecommend = @custid
-			AND bettype NOT IN (20000,19999)
 		OPTION(OPTIMIZE FOR	UNKNOWN)
+
+		SELECT @transferid = MAX(transid) FROM dbo.Transfer WITH (NOLOCK) 
+		WHERE mrecommend = @custid
+			AND bettype NOT IN (20000,19999)
 		
-		SELECT @transdate = transdate FROM bettrans WITH (NOLOCK) WHERE transid = @transid
+		SELECT @transdate = MAX(transdate)
+		FROM 
+		(
+			SELECT transdate FROM bettrans WITH (NOLOCK) WHERE transid = @transid
+			UNION ALL
+			SELECT transdate FROM dbo.Transfer WITH (NOLOCK) WHERE transid = @transferid
+		) x
 		
 		-- Credit
 		SELECT @UsedCredit = SUM(ISNULL(credit, 0)) FROM DBCUST.CustDB.dbo.custInfo WITH (NOLOCK) WHERE mrecommend = @CustId AND roleId = 2
@@ -168,12 +195,21 @@ BEGIN
 			SUM(winlost), SUM(actual_stake), SUM(mwinlost), SUM(awinlost), SUM(acomm), SUM(comm), SUM(ABS(actual_stake) * mpositiontaking)
 		FROM dbo.bettrans WITH (NOLOCK)
 		WHERE mrecommend = @CustId
-			AND 1 = CASE 
-						WHEN bettype = 19999 and winlostdate > @moveBetsDay THEN 0 --> get data from ticket detail
-						WHEN bettype < 19999 and winlostdate <= @moveBetsDay THEN 0 --> get data from sum record
-					ELSE 1 END
+			AND bettype < 19999
+			AND winlostdate > @moveBetsDay
 		GROUP BY
 			winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 3 ELSE 0 END
+
+		-- transfer
+		INSERT INTO #BalanceInfo (winlostdate, bettype, statusId, roleId, winlost, actual_stake, mwinlost, awinlost, acomm, comm, actual_stakePT)
+		SELECT 
+			winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 3 ELSE 0 END,
+			SUM(winlost), SUM(actual_stake), SUM(mwinlost), SUM(awinlost), SUM(acomm), SUM(comm), SUM(ABS(actual_stake) * ISNULL(mpositiontaking,0))
+		FROM dbo.transfer t WITH (NOLOCK)
+		LEFT JOIN dbo.transferInfo ti WITH(NOLOCK) ON t.TransId = ti.TransId
+		WHERE mrecommend = @CustId
+			AND ((bettype = 19999 AND winlostdate <= @moveBetsDay) OR (bettype > 19999))	
+		GROUP BY winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 3 ELSE 0 END
 
 		DELETE b
 		FROM #BalanceInfo b
@@ -239,10 +275,19 @@ BEGIN
 		--last txn 
 		SELECT @transid = MAX(transid) FROM bettrans WITH (NOLOCK) 
 		WHERE recommend = @custid
-			AND bettype NOT IN (20000,19999)
 		OPTION(OPTIMIZE FOR	UNKNOWN)
+
+		SELECT @transferid = MAX(transid) FROM dbo.Transfer WITH (NOLOCK) 
+		WHERE recommend = @custid AND bettype NOT IN (20000,19999)
+
 		
-		SELECT @transdate = transdate FROM bettrans WITH (NOLOCK) WHERE transid = @transid
+		SELECT @transdate = MAX(transdate)
+		FROM
+		(
+			SELECT transdate FROM bettrans WITH (NOLOCK) WHERE transid = @transid
+			UNION ALL
+			SELECT transdate FROM  dbo.Transfer WITH (NOLOCK)  WHERE transid = @transferid
+		) x
 		
 		-- Credit
 		SELECT @UsedCredit = SUM(ISNULL(credit, 0)) FROM DBCUST.CustDB.dbo.custInfo WITH (NOLOCK) WHERE recommend = @CustId AND roleId = 1
@@ -254,12 +299,20 @@ BEGIN
 			SUM(winlost), SUM(actual_stake), SUM(awinlost), SUM(comm), SUM(playercomm), SUM(ABS(actual_stake) * apositiontaking)
 		FROM dbo.bettrans WITH (NOLOCK)
 		WHERE recommend = @CustId
-			AND 1 = CASE 
-						WHEN bettype = 19999 and winlostdate > @moveBetsDay THEN 0 --> get data from ticket detail
-						WHEN bettype < 19999 and winlostdate <= @moveBetsDay THEN 0 --> get data from sum record
-					ELSE 1 END
-		GROUP BY
-			winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 2 ELSE 0 END
+			AND bettype < 19999
+			AND winlostdate > @moveBetsDay
+		GROUP BY winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 2 ELSE 0 END
+
+		-- Transfer
+		INSERT INTO #BalanceInfo (winlostdate, bettype, statusId, roleId, winlost, actual_stake, awinlost, comm, playercomm, actual_stakePT)
+		SELECT 
+			winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 2 ELSE 0 END,
+			SUM(winlost), SUM(actual_stake), SUM(awinlost), SUM(comm), SUM(playercomm), SUM(ABS(actual_stake) * ISNULL(apositiontaking,0))
+		FROM dbo.Transfer t WITH (NOLOCK)
+		LEFT JOIN dbo.transferInfo ti WITH(NOLOCK) ON t.TransId = ti.TransId
+		WHERE recommend = @CustId
+			AND ((bettype = 19999 AND winlostdate <= @moveBetsDay) OR (bettype > 19999))
+		GROUP BY winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 2 ELSE 0 END
 
 		DELETE b
 		FROM #BalanceInfo b
@@ -323,7 +376,13 @@ BEGIN
 	ELSE IF @RoleId = 1
 	BEGIN
 		--last txn 		
-		SELECT @transdate = MAX(transdate) FROM bettrans WITH (NOLOCK) WHERE custid = @custid
+		SELECT @transdate = MAX(transdate) 
+		FROM
+		(
+			SELECT MAX(transdate) AS transdate   FROM bettrans WITH (NOLOCK) WHERE custid = @custid
+			UNION ALL
+			SELECT MAX(transdate) AS transdate   FROM dbo.Transfer WITH (NOLOCK) WHERE custid = @custid
+		) x
 		
 		-- Credit
 		SELECT @UsedCredit = ISNULL(@Credit, 0)
@@ -335,13 +394,20 @@ BEGIN
 			SUM(winlost), SUM(actual_stake), SUM(playercomm)
 		FROM dbo.bettrans WITH (NOLOCK)
 		WHERE custid = @CustId AND statusID NOT IN (0,1)
+			AND bettype < 19999
+			AND winlostdate > @moveBetsDay
+		GROUP BY winlostdate, bettype, statusID
+
+		-- transfer
+		INSERT INTO #BalanceInfo (winlostdate, bettype, statusId, winlost, actual_stake, playercomm)
+		SELECT 
+			winlostdate, bettype, statusID,
+			SUM(winlost), SUM(actual_stake), SUM(playercomm)
+		FROM dbo.transfer WITH (NOLOCK)
+		WHERE custid = @CustId AND statusID NOT IN (0,1)
 			AND bettype NOT IN (21008, 21009) -- BBIN Transfer
-			AND 1 = CASE 
-						WHEN bettype = 19999 and winlostdate > @moveBetsDay THEN 0 --> get data from ticket detail
-						WHEN bettype < 19999 and winlostdate <= @moveBetsDay THEN 0 --> get data from sum record
-					ELSE 1 END
-		GROUP BY
-			winlostdate, bettype, statusID
+			AND ((bettype = 19999 AND winlostdate <= @moveBetsDay) OR (bettype > 19999))
+		GROUP BY winlostdate, bettype, statusID
 
 		DELETE b
 		FROM #BalanceInfo b
