@@ -1,4 +1,4 @@
-Report\Winloss Detail\dbo.EAS_Rpt_WinLossDetail_Ag.sql
-Report\Winloss Detail\dbo.EAS_Rpt_WinLossDetail_MAg.sql
-Report\Winloss Detail\dbo.EAS_Rpt_WinLossDetail_SAg.sql
-Report\Winloss Detail By PT\EAS_Rpt_WinLossDetail_byPT.sql
+Report\Winloss Daily\dbo.EAS_Rpt_WinLossDaily_Ag.sql
+Report\Winloss Daily\dbo.EAS_Rpt_WinLossDaily_Com.sql
+Report\Winloss Daily\dbo.EAS_Rpt_WinLossDaily_MAg.sql
+Report\Winloss Daily\dbo.EAS_Rpt_WinLossDaily_SAg.sql
