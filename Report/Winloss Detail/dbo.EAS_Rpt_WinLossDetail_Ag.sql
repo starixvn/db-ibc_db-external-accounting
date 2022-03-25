@@ -508,7 +508,7 @@ BEGIN
 					isnull(sum(awinlost), 0) + isnull(sum(comm-playercomm), 0), --AgTotal
 					-isnull(sum(winlost+awinlost+comm), 0) --Company
 				FROM
-					bodb02.dbo.sum_winloss b WITH (NOLOCK) INNER JOIN @TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype AND b.leagueGroupID = t.LeagueGroupID AND b.ticketType = t.TicketType
+					bodb02.dbo.sum_winloss b WITH (NOLOCK) INNER JOIN @TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype AND ISNULL(b.leagueGroupID,0) = t.LeagueGroupID AND ISNULL(b.ticketType,0) = t.TicketType
 				WHERE
 					winlostdate between @FDate and @TDate			
 					AND recommend=@CustID
@@ -562,7 +562,7 @@ BEGIN
 				isnull(sum(awinlost), 0) + isnull(sum(comm-playercomm), 0), --AgTotal
 				-isnull(sum(winlost+awinlost+comm), 0) --Company
 			FROM
-				bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK) INNER JOIN @TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype AND b.leagueGroupID = t.LeagueGroupID AND b.ticketType = t.TicketType
+				bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK) INNER JOIN @TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype AND ISNULL(b.leagueGroupID,0) = t.LeagueGroupID AND ISNULL(b.ticketType,0) = t.TicketType
 			WHERE
 				winlostdate between @FDate and @TDate	
 				and recommend=@custid

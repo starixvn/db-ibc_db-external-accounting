@@ -442,7 +442,7 @@ BEGIN
 				-(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost), 0)), --Company
 				-(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost), 0) + ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0)) --Company after extra pt					
 			FROM
-				bodb02.dbo.sum_winloss b WITH (NOLOCK) INNER JOIN #TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype AND b.leagueGroupID = t.LeagueGroupID AND b.ticketType = t.TicketType
+				bodb02.dbo.sum_winloss b WITH (NOLOCK) INNER JOIN #TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype AND ISNULL(b.leagueGroupID,0) = t.LeagueGroupID AND ISNULL(b.ticketType,0) = t.TicketType
 			WHERE
 				winlostdate between @FDate and @TDate			
 				and SRecommend IN (SELECT custID FROM #tmpSuperList)
@@ -507,8 +507,8 @@ BEGIN
 					AND b.roleid = 4
 					AND b.sporttype = w.sporttype 
 					AND b.bettype = w.bettype
-					AND b.leagueGroupID = w.LeagueGroupID
-					AND b.ticketType = w.TicketType
+					AND ISNULL(b.leagueGroupID,0) = w.LeagueGroupID
+					AND ISNULL(b.ticketType,0) = w.TicketType
 			GROUP BY b.CustID
 
 	END	

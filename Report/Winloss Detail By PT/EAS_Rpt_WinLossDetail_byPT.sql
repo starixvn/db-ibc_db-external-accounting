@@ -364,7 +364,7 @@ SET NOCOUNT ON
 			 SUM(betcount)
 
 		FROM dbo.SUM_winloss b WITH(NOLOCK)
-			INNER JOIN #TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype AND b.leagueGroupID = t.LeagueGroupID AND b.ticketType = t.TicketType
+			INNER JOIN #TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype AND ISNULL(b.leagueGroupID,0) = t.LeagueGroupID AND ISNULL(b.ticketType,0) = t.TicketType
 		WHERE b.winlostdate BETWEEN @FDate AND @TDate
 			AND b.custid  IN (SELECT tmp.custID FROM #tmpSuperList tmp) 
 			AND RoleID = 4
@@ -430,8 +430,8 @@ SET NOCOUNT ON
 			AND b.RoleID = 4
 			AND b.sporttype = w.sporttype
 			AND b.bettype = w.bettype
-			AND b.leagueGroupID = w.LeagueGroupID
-			AND b.ticketType = w.TicketType
+			AND ISNULL(b.leagueGroupID,0) = w.LeagueGroupID
+			AND ISNULL(b.ticketType,0) = w.TicketType
 		GROUP BY b.CustID,  w.ProductID;
 	END
 
