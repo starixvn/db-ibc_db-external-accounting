@@ -84,7 +84,7 @@ SET NOCOUNT ON
 	(
 		SELECT f.SportType, f.BetType, x.LeagueGroupID, f.TicketType, f.ProductID
 		FROM dbo.f_SumWinloss_ConditionSel(@ProductIds) f
-		CROSS APPLY (SELECT CAST (val AS INT) LeagueGroupID FROM  strSplit(f.LeagueGroupID, ',') x) x
+		CROSS APPLY (SELECT CAST (value AS INT) LeagueGroupID FROM  STRING_SPLIT(f.LeagueGroupID, ',') x) x
 	)
 	INSERT INTO #TmpCondSumWL(SportType, BetType, LeagueGroupID, TicketType, ProductID) 
 	SELECT f.SportType, f.BetType, f.LeagueGroupID, f.TicketType, f.ProductID
