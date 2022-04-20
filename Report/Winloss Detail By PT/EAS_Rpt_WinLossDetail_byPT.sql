@@ -28,15 +28,27 @@ AS
 		- 20220208@Danny: Separate Saba Sport Performance [Redmine: #167177]
 
 	 @ProductDetails:		
-		<ROOT>
-				<ProductDetail ProductId = "32" Sporttype = "248" Bettype = "0" LeagueGroupID = "0" TicketType = "0"/>
-				<ProductDetail ProductId = "32" Sporttype = "248" Bettype = "4298" LeagueGroupID = "0" TicketType = "0"/>
-				<ProductDetail ProductId = "1" Sporttype = "0" Bettype = "0" LeagueGroupID = "0" TicketType = "0"/>
-				<ProductDetail ProductId = "1" Sporttype = "1" Bettype = "0" LeagueGroupID = "42,74" TicketType = "0"/>
-				<ProductDetail ProductId = "1" Sporttype = "1" Bettype = "0" LeagueGroupID = "113" TicketType = "0"/>
-				<ProductDetail ProductId = "1" Sporttype = "2" Bettype = "0" LeagueGroupID = "42,74" TicketType = "0"/>
-				<ProductDetail ProductId = "1" Sporttype = "2" Bettype = "0" LeagueGroupID = "113" TicketType = "0"/>
-		</ROOT>	
+		N'<ROOT>
+                <ProductDetail ProductId="32" Sporttype="248" Bettype="0" LeagueGroupId="0" TicketType="0"/>
+                <ProductDetail ProductId="32" Sporttype="248" Bettype="4297" LeagueGroupId="0" TicketType="0"/>
+                <ProductDetail ProductId="32" Sporttype="248" Bettype="4298" LeagueGroupId="0" TicketType="0"/>
+                <ProductDetail ProductId="45" Sporttype="243" Bettype="0" LeagueGroupId="0" TicketType="0"/>
+                <ProductDetail ProductId="45" Sporttype="243" Bettype="3150" LeagueGroupId="0" TicketType="0"/>
+                <ProductDetail ProductId="36" Sporttype="247" Bettype="0" LeagueGroupId="0" TicketType="0"/>
+                <ProductDetail ProductId="36" Sporttype="247" Bettype="4599" LeagueGroupId="0" TicketType="0"/>
+                <ProductDetail ProductId="36" Sporttype="247" Bettype="4600" LeagueGroupId="0" TicketType="0"/>
+                <ProductDetail ProductId="21" Sporttype="211" Bettype="0" LeagueGroupId="0" TicketType="0"/>
+                <ProductDetail ProductId="21" Sporttype="211" Bettype="2499" LeagueGroupId="0" TicketType="0"/>
+                <ProductDetail ProductId="1" Sporttype="0" Bettype="0" LeagueGroupId="0" TicketType="0"/>
+                <ProductDetail ProductId="1" Sporttype="0" Bettype="0" LeagueGroupId="0" TicketType="1"/>
+                <ProductDetail ProductId="1" Sporttype="1" Bettype="0" LeagueGroupId="42" TicketType="0"/>
+                <ProductDetail ProductId="1" Sporttype="1" Bettype="0" LeagueGroupId="74" TicketType="0"/>
+                <ProductDetail ProductId="1" Sporttype="1" Bettype="0" LeagueGroupId="108" TicketType="0"/>
+                <ProductDetail ProductId="1" Sporttype="2" Bettype="0" LeagueGroupId="42" TicketType="0"/>
+                <ProductDetail ProductId="1" Sporttype="50" Bettype="0" LeagueGroupId="42" TicketType="0"/>
+                <ProductDetail ProductId="1" Sporttype="1" Bettype="0" LeagueGroupId="113" TicketType="0"/>
+                <ProductDetail ProductId="1" Sporttype="2" Bettype="0" LeagueGroupId="122" TicketType="0"/>
+            </ROOT>'
 */
 
 SET NOCOUNT ON
@@ -80,17 +92,14 @@ SET NOCOUNT ON
 		TicketType		TINYINT
 	);
 
-	;WITH cte AS 
-	(
-		SELECT f.SportType, f.BetType, x.LeagueGroupID, f.TicketType, f.ProductID
+	IF @FromDate <= @MoveBetsDay
+	BEGIN
+		INSERT INTO #TmpCondSumWL(SportType, BetType, LeagueGroupID, TicketType, ProductID) 
+		SELECT f.SportType, f.BetType, f.LeagueGroupID, f.TicketType, f.ProductID
 		FROM dbo.f_SumWinloss_ConditionSel(@ProductIds) f
-		CROSS APPLY (SELECT CAST (value AS INT) LeagueGroupID FROM  STRING_SPLIT(f.LeagueGroupID, ',') x) x
-	)
-	INSERT INTO #TmpCondSumWL(SportType, BetType, LeagueGroupID, TicketType, ProductID) 
-	SELECT f.SportType, f.BetType, f.LeagueGroupID, f.TicketType, f.ProductID
-	FROM cte f
-		LEFT JOIN @ExistingProductDetails e ON f.ProductID = e.ProductId 
-	WHERE e.ProductId IS NULL OR (e.Bettype = f.BetType AND e.Sporttype = f.SportType AND e.TicketType = f.TicketType AND e.LeagueGroupID = f.LeagueGroupID AND e.ProductID = f.ProductId)
+			LEFT JOIN @ExistingProductDetails e ON f.ProductID = e.ProductId 
+		WHERE e.ProductId IS NULL OR (e.Bettype = f.BetType AND e.Sporttype = f.SportType AND e.TicketType = f.TicketType AND e.LeagueGroupID = f.LeagueGroupID AND e.ProductID = f.ProductId)
+	END
 
 	CREATE TABLE #ComWinLossDetails 
 	(	
@@ -172,7 +181,10 @@ SET NOCOUNT ON
 					SUM(b.oddsspread) oddsspread
 			FROM	bodb02.dbo.bettrans b WITH (NOLOCK)
 			LEFT JOIN dbo.match m WITH(NOLOCK) ON b.matchid = m.matchid AND m.eventdate = b.winlostdate AND m.sporttype IN (1,2,50)
-			LEFT JOIN dbo.League l WITH(NOLOCK) ON m.leagueid = l.leagueid
+			LEFT JOIN (
+						SELECT LeagueGroupID, leagueid
+						FROM dbo.League l WITH(NOLOCK) WHERE l.LeagueGroupID IN (42,74,108,113,122)
+					  )l  ON m.leagueid = l.leagueid
 			WHERE	b.winlostdate BETWEEN @FDate AND @Tdate
 					AND b.srecommend IN (SELECT custID FROM #tmpSuperList) 
 					AND b.statusID IN (111, 112, 113) 
