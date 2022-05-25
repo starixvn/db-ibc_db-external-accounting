@@ -26,6 +26,7 @@ AS
 		- 20210617@Sol: changed how to calc net turn over - [RedmineId : #156653]
 		- 20211122@Percy: Enhance gross comm formula [RedmineID: #164479]
 		- 20220208@Danny: Separate Saba Sport Performance [Redmine: #167177]
+		- 20220525@Danny: Separate Saba Sport Performance [Redmine: #173196]
 
 	 @ProductDetails:		
 		N'<ROOT>
@@ -95,10 +96,11 @@ SET NOCOUNT ON
 	IF @FromDate <= @MoveBetsDay
 	BEGIN
 		INSERT INTO #TmpCondSumWL(SportType, BetType, LeagueGroupID, TicketType, ProductID) 
-		SELECT f.SportType, f.BetType, f.LeagueGroupID, f.TicketType, f.ProductID
+		SELECT f.SportType, f.BetType, f.LeagueGroupID, f.TicketType, ISNULL(p.GroupProductId, f.ProductID)
 		FROM dbo.f_SumWinloss_ConditionSel(@ProductIds) f
 			LEFT JOIN @ExistingProductDetails e ON f.ProductID = e.ProductId 
-		WHERE e.ProductId IS NULL OR (e.Bettype = f.BetType AND e.Sporttype = f.SportType AND e.TicketType = f.TicketType AND e.LeagueGroupID = f.LeagueGroupID AND e.ProductID = f.ProductId)
+			LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId    
+		WHERE e.ProductId IS NULL OR (e.Bettype = f.BetType AND e.Sporttype = f.SportType AND e.TicketType = f.TicketType AND e.LeagueGroupID = f.LeagueGroupID AND e.ProductID =  ISNULL(p.GroupProductId, f.ProductID))
 	END
 
 	CREATE TABLE #ComWinLossDetails 
