@@ -1,5 +1,5 @@
 /*<info serverAlias="DBCUST-CUSTDB" executers="bodbExtAccNet" isFunction="0" isNested="0"></info>*/
-CREATE PROCEDURE EAS_Rpt_ViewExtraPT2
+ALTER PROCEDURE EAS_Rpt_ViewExtraPT2
 (
 	@GroupName VARCHAR(50) = ''
 )
@@ -12,6 +12,7 @@ AS
 	Revisions:
 		- 20200721@Sol: View Extra PT - Redmine: [#136320]
 		- 20200928@Danny: Merge Virtual Sport and Virtual Sport 2 - Redmine: [#141832]
+		- 20220615@Danny: Use explicit temporary table  [RemineID: #174035]
 */
 BEGIN
 	
@@ -19,9 +20,9 @@ BEGIN
 
 	DECLARE @currDate DATETIME = CAST(GETDATE() AS DATE) 
 
-		
+	CREATE TABLE #f_GroupProduct(ProductId TINYINT, GroupProductId TINYINT)
+	INSERT INTO #f_GroupProduct(ProductId, GroupProductId)
 	SELECT ProductId,GroupProductId 
-	INTO #f_GroupProduct
 	FROM OPENQUERY (DBAGE,'select ProductId, GroupProductId from bodb02.dbo.f_GroupProduct()')
 
 	;WITH rs AS 
