@@ -14,6 +14,8 @@ AS
 		- 20200602@Percy: Separate PendingTransfer3rd to Cash and Balance [RedmineID: #135200]
 		- 20210505@Sol: NAP - Alpha - Allow more time for transfer - [Redmine: #149927]
 		- 20211122@Danny: Split transfer tickets out of bettrans [Redmine: #164196]
+		- 20221128@Evan: Enhance performance get max transid [RedmineID: #180141]
+
 */
 
 BEGIN
@@ -68,12 +70,13 @@ BEGIN
 		--last txn 
 		SELECT @transid = MAX(transid) FROM bettrans WITH (NOLOCK) 
 		WHERE srecommend = @custid
-		OPTION(OPTIMIZE FOR	UNKNOWN)
+		OPTION (OPTIMIZE FOR(@custid = -1))
 
 		SELECT @transferid = MAX(transid) FROM dbo.transfer WITH (NOLOCK) 
 		WHERE srecommend = @custid
 			AND bettype NOT IN (20000,19999)
-		
+		OPTION (OPTIMIZE FOR(@custid = -1))
+
 		SELECT @transdate = MAX(transdate)
 		FROM
 		(
@@ -171,12 +174,13 @@ BEGIN
 		--last txn 
 		SELECT @transid = MAX(transid) FROM bettrans WITH (NOLOCK) 
 		WHERE mrecommend = @custid
-		OPTION(OPTIMIZE FOR	UNKNOWN)
+		OPTION (OPTIMIZE FOR(@custid = -1))
 
-		SELECT @transferid = MAX(transid) FROM dbo.Transfer WITH (NOLOCK) 
-		WHERE mrecommend = @custid
-			AND bettype NOT IN (20000,19999)
-		
+		SELECT 	@transferid = MAX(transid) FROM dbo.Transfer WITH (NOLOCK) 
+		WHERE 	mrecommend = @custid
+				AND bettype NOT IN (20000,19999)
+		OPTION (OPTIMIZE FOR(@custid = -1))
+
 		SELECT @transdate = MAX(transdate)
 		FROM 
 		(
@@ -275,11 +279,11 @@ BEGIN
 		--last txn 
 		SELECT @transid = MAX(transid) FROM bettrans WITH (NOLOCK) 
 		WHERE recommend = @custid
-		OPTION(OPTIMIZE FOR	UNKNOWN)
+		OPTION (OPTIMIZE FOR(@custid = -1))
 
 		SELECT @transferid = MAX(transid) FROM dbo.Transfer WITH (NOLOCK) 
 		WHERE recommend = @custid AND bettype NOT IN (20000,19999)
-
+		OPTION (OPTIMIZE FOR(@custid = -1))
 		
 		SELECT @transdate = MAX(transdate)
 		FROM
@@ -376,14 +380,23 @@ BEGIN
 	ELSE IF @RoleId = 1
 	BEGIN
 		--last txn 		
-		SELECT @transdate = MAX(transdate) 
-		FROM
+		SELECT @transid = MAX(transid) FROM bettrans WITH (NOLOCK) 
+		WHERE custid = @custid
+		OPTION(OPTIMIZE FOR	(@custid = -1))
+
+		SELECT @transferid = MAX(transid) FROM dbo.Transfer WITH (NOLOCK) 
+		WHERE custid = @custid
+		AND bettype NOT IN (20000,19999)
+		OPTION (OPTIMIZE FOR(@custid = -1))
+
+		SELECT @transdate = MAX(transdate)
+		FROM 
 		(
-			SELECT MAX(transdate) AS transdate   FROM bettrans WITH (NOLOCK) WHERE custid = @custid
+			SELECT transdate FROM bettrans WITH (NOLOCK) WHERE transid = @transid
 			UNION ALL
-			SELECT MAX(transdate) AS transdate   FROM dbo.Transfer WITH (NOLOCK) WHERE custid = @custid
+			SELECT transdate FROM dbo.Transfer WITH (NOLOCK) WHERE transid = @transferid
 		) x
-		
+
 		-- Credit
 		SELECT @UsedCredit = ISNULL(@Credit, 0)
 		
