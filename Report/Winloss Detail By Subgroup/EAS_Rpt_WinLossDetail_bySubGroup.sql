@@ -20,6 +20,7 @@ AS
 	Revisions:
 		- 20220107@Evan: Initialize SPs [RedmineID : #166058]
 		- 20220317@Danny: Separate Saba Sport Performance [Redmine: #167177]
+		- 20221208@Eddie: Add New SABA ESports PinGoal [RedmineID: #181383]
 
 	Param's Explanation:  
 		@FromDate, @ToDate: date range  
@@ -172,12 +173,14 @@ BEGIN
 							(l.LeagueGroupID IN (42,74,108,113) AND m.sporttype = 1 ) 
 								OR (l.LeagueGroupID IN (122, 42) AND m.sporttype = 2 )
 								OR (l.LeagueGroupID = 42 AND m.sporttype = 50)
+								OR (l.LeagueGroupID = 151 AND m.sporttype = 43)
 							) AND b.betdaqid <> -2 AND b.winlostdate >= @SeparateSabaSport_Cutoff THEN m.sporttype
 					ELSE 0 END  sporttype, 
 					CASE WHEN ( 
 								(l.LeagueGroupID IN (42,74,108,113) AND m.sporttype = 1 ) 
 									OR (l.LeagueGroupID IN (122, 42) AND m.sporttype = 2 )
 									OR (l.LeagueGroupID = 42 AND m.sporttype = 50)
+									OR (l.LeagueGroupID = 151 AND m.sporttype = 43)
 								) AND b.betdaqid <> -2 AND b.winlostdate >= @SeparateSabaSport_Cutoff THEN l.LeagueGroupID
 					ELSE 0 END LeagueGroupID,
 					CASE WHEN b.betdaqid = -2 THEN 1 ELSE 0 END TicketType,
@@ -197,10 +200,10 @@ BEGIN
 					SUM(awinlost) awinlost,
 					SUM(b.oddsspread) oddsspread
 			FROM	bodb02.dbo.bettrans b WITH (NOLOCK)
-			LEFT JOIN dbo.match m WITH(NOLOCK) ON b.matchid = m.matchid AND m.eventdate = b.winlostdate AND m.sporttype IN (1,2,50)
+			LEFT JOIN dbo.match m WITH(NOLOCK) ON b.matchid = m.matchid AND m.eventdate = b.winlostdate AND m.sporttype IN (1,2,50,43)
 			LEFT JOIN (
 						SELECT LeagueGroupID, leagueid
-						FROM dbo.League l WITH(NOLOCK) WHERE l.LeagueGroupID IN (42,74,108,113,122)
+						FROM dbo.League l WITH(NOLOCK) WHERE l.LeagueGroupID IN (42,74,108,113,122,151)
 					  )l  ON m.leagueid = l.leagueid
 			WHERE b.winlostdate BETWEEN @FDate AND @Tdate
 				AND b.srecommend IN (SELECT custID FROM #tmpSuperList) 
@@ -210,12 +213,14 @@ BEGIN
 							(l.LeagueGroupID IN (42,74,108,113) AND m.sporttype = 1 ) 
 								OR (l.LeagueGroupID IN (122, 42) AND m.sporttype = 2 )
 								OR (l.LeagueGroupID = 42 AND m.sporttype = 50)
+								OR (l.LeagueGroupID = 151 AND m.sporttype = 43)
 							) AND b.betdaqid <> -2 AND b.winlostdate >= @SeparateSabaSport_Cutoff THEN m.sporttype
 					ELSE 0 END , 
 					CASE WHEN ( 
 								(l.LeagueGroupID IN (42,74,108,113) AND m.sporttype = 1 ) 
 									OR (l.LeagueGroupID IN (122, 42) AND m.sporttype = 2 )
 									OR (l.LeagueGroupID = 42 AND m.sporttype = 50)
+									OR (l.LeagueGroupID = 151 AND m.sporttype = 43)
 								) AND b.betdaqid <> -2 AND b.winlostdate >= @SeparateSabaSport_Cutoff THEN l.LeagueGroupID
 					ELSE 0 END,
 					CASE WHEN b.betdaqid = -2 THEN 1 ELSE 0 END,
