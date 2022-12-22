@@ -63,6 +63,7 @@ AS
 		- 20220106@Evan: Add SG Jackpot - [Redmine: #166685]	
 		- 20220208@Danny: Separate Saba Sport Performance [Redmine: #167177]
 		- 20221208@Eddie: Add New SABA ESports PinGoal [RedmineID: #181383]
+		- 20221222@Bobby: Fix GrossComm on WinLossDetail_Com report [RedmineID: #181912]
 	
 	Param's Explanation:
 	 @ProductDetails:		
@@ -204,7 +205,7 @@ BEGIN
 				SRecommend,
 				bettype,
 				StatusID,
-				MOdds,
+				CASE WHEN  b.modds IN (-0.25, 0.25) THEN b.modds ELSE 0 END AS MOdds,
 				tpositiontaking,
 				SUM(ABS(b.stake)),	
 				SUM(b.oddsspread),
@@ -220,7 +221,8 @@ BEGIN
 				SUM(ISNULL(b.betid/CONVERT(DECIMAL(19,8), 100000000), 0)),    
 				epositiontaking,
 				Winlostdate,
-				SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END),
+				--SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END),
+				0 AS GrossComm,
 				CASE WHEN ( 
 							(l.LeagueGroupID IN (42,74,108,113) AND m.sporttype = 1 ) 
 								OR (l.LeagueGroupID IN (122, 42) AND m.sporttype = 2 )
@@ -247,7 +249,9 @@ BEGIN
 				b.winlostdate between @FDate and @TDate 
 				and b.srecommend in (SELECT custID FROM #tmpSuperList) 
 				and b.statusID IN (111,112,113)
-			GROUP BY SRecommend, bettype, StatusID, MOdds, tpositiontaking,Winlostdate, epositiontaking,
+			GROUP BY SRecommend, bettype, StatusID
+				, CASE WHEN  b.modds IN (-0.25, 0.25) THEN b.modds ELSE 0 END
+				, tpositiontaking,Winlostdate, epositiontaking,
 					CASE WHEN ( 
 							(l.LeagueGroupID IN (42,74,108,113) AND m.sporttype = 1 ) 
 								OR (l.LeagueGroupID IN (122, 42) AND m.sporttype = 2 )
@@ -279,11 +283,7 @@ BEGIN
 						WHEN s.ProductId = 1 AND b.StatusId IN (112, 113) AND b.modds IN (-0.25, 0.25) THEN ABS(b.stake)/2 -- SB half won/lose
 						ELSE ABS(b.stake)
 					END) AS TurnoverNoDraw,
-				SUM(CASE
-						WHEN s.RefTable IN (1, 2) THEN 0
-						WHEN tpositiontaking = 1 THEN 0
-						ELSE GrossComm
-					END) AS GrossComm,
+				SUM(gc.GrossComm) AS GrossComm,
 				sum(MemberWinlost), --MemberWinlost
 				sum(playercomm), -- PlayerComm
 				SUM(isnull(MemberWinlost, 0)) + SUM(isnull(playercomm, 0)), --MemberTotal
@@ -311,7 +311,7 @@ BEGIN
 								/*IBCBet Live Casino*/
 								WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
 							WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298, 4599, 4600) THEN 0
-								ELSE  b.GrossComm * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+								ELSE  gc.GrossComm * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 								END
 								), 0) AS ExtraComm,
 				-1 * (
@@ -331,7 +331,7 @@ BEGIN
 								/*IBCBet Live Casino*/
 								WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
 							WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298, 4599, 4600) THEN 0
-								ELSE b.GrossComm * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+								ELSE gc.GrossComm * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 								END
 								), 0)
 					) AS ExtraTotal,
@@ -356,7 +356,7 @@ BEGIN
 										/*IBCBet Live Casino*/
 										WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
 									WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298, 4599, 4600) THEN 0
-										ELSE b.GrossComm* CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+										ELSE gc.GrossComm* CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 										END
 									), 0)
 						)
@@ -364,6 +364,13 @@ BEGIN
 			FROM
 				#ComWinLossDetails_bettrans b WITH (NOLOCK)
 				INNER JOIN #SportBettype s ON b.bettype = s.bettype AND (s.ProductID <> 1 OR (s.ProductID = 1 AND b.sporttype = s.SportType AND b.LeagueGroupID = s.LeagueGroupID AND b.TicketType = s.TicketType))
+				CROSS APPLY (
+					SELECT CASE
+						WHEN s.RefTable IN (1, 2) THEN 0
+						WHEN b.tpositiontaking = 1 THEN 0
+						ELSE (b.scomm/(1 - b.tpositiontaking))
+					END AS GrossComm
+				) AS gc
 				OUTER APPLY 
 				(
 					SELECT expt2.SuperId, expt2.ExtraPT
