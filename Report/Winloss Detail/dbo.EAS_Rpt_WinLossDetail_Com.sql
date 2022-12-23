@@ -379,7 +379,7 @@ BEGIN
 								/*IBCBet Live Casino*/
 								WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
 							WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298, 4599, 4600) THEN 0
-								ELSE  gc.GrossComm * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+								ELSE  ec.GrossCommExpt2 * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 								END
 								), 0) AS ExtraComm,
 				-1 * (
@@ -399,7 +399,7 @@ BEGIN
 								/*IBCBet Live Casino*/
 								WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
 							WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298, 4599, 4600) THEN 0
-								ELSE gc.GrossComm * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+								ELSE ec.GrossCommExpt2 * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 								END
 								), 0)
 					) AS ExtraTotal,
@@ -424,7 +424,7 @@ BEGIN
 										/*IBCBet Live Casino*/
 										WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
 									WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298, 4599, 4600) THEN 0
-										ELSE gc.GrossComm* CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+										ELSE ec.GrossCommExpt2* CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
 										END
 									), 0)
 						)
@@ -433,6 +433,13 @@ BEGIN
 				#ComWinLossDetails_bettrans b WITH (NOLOCK)
 				INNER JOIN #SportBettype s ON b.bettype = s.bettype AND (s.ProductID <> 1 OR (s.ProductID = 1 AND b.sporttype = s.SportType AND b.LeagueGroupID = s.LeagueGroupID AND b.TicketType = s.TicketType))
 				INNER JOIN #superGrossComm AS gc ON gc.SRecommend = b.SRecommend
+				OUTER APPLY (
+					SELECT CASE
+						WHEN s.RefTable IN (1, 2) THEN 0
+						WHEN b.tpositiontaking = 1 THEN 0
+						ELSE (b.scomm/(1 - b.tpositiontaking))
+					END AS GrossCommExpt2
+				) AS ec
 				OUTER APPLY 
 				(
 					SELECT expt2.SuperId, expt2.ExtraPT
