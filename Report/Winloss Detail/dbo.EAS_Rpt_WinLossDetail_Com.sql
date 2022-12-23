@@ -434,11 +434,7 @@ BEGIN
 				INNER JOIN #SportBettype s ON b.bettype = s.bettype AND (s.ProductID <> 1 OR (s.ProductID = 1 AND b.sporttype = s.SportType AND b.LeagueGroupID = s.LeagueGroupID AND b.TicketType = s.TicketType))
 				INNER JOIN #superGrossComm AS gc ON gc.SRecommend = b.SRecommend
 				OUTER APPLY (
-					SELECT CASE
-						WHEN s.RefTable IN (1, 2) THEN 0
-						WHEN b.tpositiontaking = 1 THEN 0
-						ELSE (b.scomm/(1 - b.tpositiontaking))
-					END AS GrossCommExpt2
+					SELECT (b.scomm/(1 - b.tpositiontaking)) AS GrossCommExpt2
 				) AS ec
 				OUTER APPLY 
 				(
