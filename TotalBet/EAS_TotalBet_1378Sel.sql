@@ -14,16 +14,19 @@ AS
 
 	Explanation:
 		- @ViewMode: TINYINT
-			+ 1 -> View by headline [actual_stake * epositiontaking]
+			+ 1 -> View by headline [actual_stake * epositiontaking|ExtraPT2]
 			+ 2 -> View by super [actual_stake * spositiontaking]
 */
 BEGIN
 	SET NOCOUNT ON;
 
+	DECLARE @winlostdate SMALLDATETIME;
+
 	-- INPUT validation
 	SELECT @ViewMode	= IIF(@ViewMode NOT IN (1,2), 1, @ViewMode)
 		, @LeagueIds	= IIF(@LeagueIds = 'ALL', NULL, @LeagueIds)
 		, @MatchIds		= IIF(@MatchIds = 'ALL', NULL, @MatchIds)
+		, @winlostdate	= CAST(GETDATE() AS DATE)
 
 	-- filter league								
 	DECLARE @leagueList TABLE  (leagueid INT);								
@@ -37,12 +40,21 @@ BEGIN
 								
 	-- filter headline/super								
 	DROP TABLE IF EXISTS #super;								
-	CREATE TABLE #super (custid INT PRIMARY KEY);
+	CREATE TABLE #super (custid INT PRIMARY KEY, ExtraPT2 DECIMAL(9,8));
 	
-	INSERT INTO #super (custid)								
-	SELECT DISTINCT cg.custid						
+	INSERT INTO #super (custid,ExtraPT2)								
+	SELECT DISTINCT cg.custid, ept.ExtraPT	
 	FROM dbo.Acc_CustGroup cg WITH(NOLOCK)								
-	INNER JOIN  dbo.custinfo ci WITH(NOLOCK) ON ci.custid = cg.CustID								
+	INNER JOIN  dbo.custinfo ci WITH(NOLOCK) ON ci.custid = cg.CustID
+	OUTER APPLY 
+	(
+		SELECT TOP 1 expt2.ExtraPT
+		FROM dbo.Acc_GroupExtraPT2Setting expt2 WITH (NOLOCK)
+		WHERE @winlostdate BETWEEN expt2.FromDate AND  expt2.ToDate
+			AND cg.custid = expt2.SuperId 
+			AND expt2.ProductID = 1
+			AND expt2.Sporttype = 0
+	) AS ept
 	WHERE cg.GroupName = @GroupName								
 		AND ci.[Enabled] = 1		
 		AND cg.RoleID = 4							
@@ -51,25 +63,37 @@ BEGIN
 	-- filter running events
 	DROP TABLE IF EXISTS #cteEvent;								
 	CREATE TABLE #cteEvent(matchid INT PRIMARY KEY);								
-								
-	INSERT INTO #cteEvent (matchid)								
-	SELECT m.matchid								
-	FROM dbo.match m WITH(NOLOCK)								
-	OUTER APPLY (SELECT TOP 1 1 AS IsExist FROM @leagueList t WHERE t.leagueid = m.leagueid) AS lc								
-	WHERE m.sporttype =  1								
-		AND (@LeagueIds IS NULL OR lc.IsExist = 1)							
-		AND @MatchIds IS NULL							
-		AND m.eventstatus = 'running'							
-	UNION								
-	SELECT m.matchid								
-	FROM dbo.match m WITH(NOLOCK)								
-	INNER JOIN @matchList t on t.matchid = m.matchid								
-	OUTER APPLY (SELECT TOP 1 1 AS IsExist FROM @leagueList t WHERE t.leagueid = m.leagueid) AS lc								
-	WHERE m.sporttype =  1								
-		AND (@LeagueIds IS NULL OR lc.IsExist = 1)							
-		AND @MatchIds IS NOT NULL							
-		AND m.eventstatus = 'running'			
 	
+	WITH cte_match AS (
+		SELECT m.matchid								
+		FROM dbo.match m WITH(NOLOCK)	
+		OUTER APPLY (SELECT TOP 1 1 AS IsExist FROM @leagueList t WHERE t.leagueid = m.leagueid) AS lc
+		WHERE m.sporttype =  1								
+			AND (@LeagueIds IS NULL OR lc.IsExist = 1)							
+			AND @MatchIds IS NULL							
+			AND m.eventstatus = 'running'	
+		UNION								
+		SELECT m.matchid								
+		FROM dbo.match m WITH(NOLOCK)								
+		INNER JOIN @matchList t on t.matchid = m.matchid	
+		OUTER APPLY (SELECT TOP 1 1 AS IsExist FROM @leagueList t WHERE t.leagueid = m.leagueid) AS lc								
+		WHERE m.sporttype =  1								
+			AND (@LeagueIds IS NULL OR lc.IsExist = 1)							
+			AND @MatchIds IS NOT NULL							
+			AND m.eventstatus = 'running'	
+	)
+	INSERT INTO #cteEvent (matchid)	
+	SELECT m.matchid
+	FROM cte_match m
+	CROSS APPLY ( 
+		SELECT TOP 1 1 AS IsRunning 
+		FROM dbo.odds o WITH(NOLOCK) 
+		WHERE o.matchid	= m.matchid 
+			AND o.bettype IN (1,7,3,8)
+			AND o.oddsstatus <> 'closed'
+			AND o.IsDeleted <> 1
+	) AS ck
+
 	--- TODO: totalbet
 	;WITH totalbet AS (								
 		SELECT							
@@ -89,7 +113,7 @@ BEGIN
 		INNER JOIN #super super ON super.CustID = b.srecommend							
 		INNER JOIN #cteEvent e ON e.matchid = b.matchid							
 		CROSS APPLY (							
-			SELECT b.actual_stake * IIF(@ViewMode = 1, b.epositiontaking, b.spositiontaking) AS stakePT					
+			SELECT b.actual_stake * IIF(@ViewMode = 1, ISNULL(super.ExtraPT2, b.epositiontaking), b.spositiontaking) AS stakePT					
 		) AS cal							
 		WHERE b.statusID IN (0,1)							
 			AND b.bettype IN (1,3,7,8)				
@@ -101,14 +125,10 @@ BEGIN
 			b.liveawayscore						
 	)								
 	SELECT e.leagueid, e.matchid, e.homeid,	e.awayid, e.showtime, e.matchcode, tb.liveindicator, tb.livehomescore, tb.liveawayscore
-		, tb.home_odds_HDP
-		, tb.away_odds_HDP
-		, tb.home_odds_OU
-		, tb.away_odds_OU
-		, tb.home_odds_HTHDP
-		, tb.away_odds_HTHDP
-		, tb.home_odds_HTOU
-		, tb.away_odds_HTOU				
+		, CAST(IIF(tb.home_odds_HDP <> 0 AND tb.away_odds_HDP <> 0 ,tb.home_odds_HDP - tb.away_odds_HDP, NULL) AS MONEY) AS HDPFT
+		, CAST(IIF(tb.home_odds_OU <> 0 AND tb.away_odds_OU <> 0, tb.home_odds_OU - tb.away_odds_OU, NULL) AS MONEY) AS OUFT
+		, CAST(IIF(tb.home_odds_HTHDP <> 0 AND tb.away_odds_HTHDP <> 0, tb.home_odds_HTHDP - tb.away_odds_HTHDP, NULL) AS MONEY) AS HDPHT
+		, CAST(IIF(tb.home_odds_HTOU <> 0 AND tb.away_odds_HTOU <> 0, tb.home_odds_HTOU - tb.away_odds_HTOU, NULL) AS MONEY) AS OUHT				
 	FROM totalbet tb								
 	INNER JOIN dbo.match e WITH(NOLOCK) ON e.matchid = tb.matchid								
 	ORDER BY tb.liveindicator DESC, e.matchcode								
