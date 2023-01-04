@@ -228,7 +228,7 @@ BEGIN
 		GROUP BY	b.SRecommend,
 					s.ProductID
 		)
-		INSERT INTO #ComWinLossDetails(CustID, ProductID,Turnover,TurnoverNoDraw,GrossComm, MemberWinLost,PlayerComm,MemberTotal,AgWinLost,AgComm,AgTotal,MAgWinLost,MAgComm,MAgTotal,SAgWinLost, SAgComm, SAgTotal, Company,BetCount)
+		INSERT INTO #ComWinLossDetails(CustID, ProductID,Turnover,TurnoverNoDraw,GrossComm, MemberWinLost,PlayerComm,MemberTotal,AgWinLost,AgComm,AgTotal,MAgWinLost,MAgComm,MAgTotal,SAgWinLost, SAgComm, SAgTotal, Company)
 		SELECT
 			SRecommend,																																																	
 			b.ProductID,																									
@@ -364,8 +364,7 @@ BEGIN
 			   SUM(swinlost),
 			   ISNULL(SUM(scomm),0) - ISNULL(SUM(acomm),0),
 			   SUM(swinlost) +  ISNULL(SUM(scomm),0) -  ISNULL(SUM(acomm),0),
-			   	-(SUM(swinlost)+ SUM(mwinlost) +SUM(awinlost) + SUM(winlost)  + SUM(scomm)),
-			 SUM(betcount)
+			   	-(SUM(swinlost)+ SUM(mwinlost) +SUM(awinlost) + SUM(winlost)  + SUM(scomm))
 
 		FROM dbo.SUM_winloss b WITH(NOLOCK)
 			INNER JOIN #TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype AND ISNULL(b.leagueGroupID,0) = t.LeagueGroupID AND ISNULL(b.ticketType,0) = t.TicketType
@@ -400,7 +399,7 @@ BEGIN
 		OPTION (MAXRECURSION 0)
 
 		-- using cte to remove predicate when seek on sum_winloss_old
-		INSERT INTO #ComWinLossDetails(CustID, ProductID,Turnover,TurnoverNoDraw,GrossComm, MemberWinLost,PlayerComm,MemberTotal,AgWinLost,AgComm,AgTotal,MAgWinLost,MAgComm,MAgTotal,SAgWinLost, SAgComm, SAgTotal, Company,BetCount)
+		INSERT INTO #ComWinLossDetails(CustID, ProductID,Turnover,TurnoverNoDraw,GrossComm, MemberWinLost,PlayerComm,MemberTotal,AgWinLost,AgComm,AgTotal,MAgWinLost,MAgComm,MAgTotal,SAgWinLost, SAgComm, SAgTotal, Company)
 		SELECT b.CustID,
 			   w.ProductID,
 			   SUM(Turnover),
@@ -418,8 +417,7 @@ BEGIN
 			   SUM(swinlost),
 			   ISNULL(SUM(scomm),0) - ISNULL(SUM(acomm),0),
 			   SUM(swinlost) +  ISNULL(SUM(scomm),0) -  ISNULL(SUM(acomm),0),
-			   	-(SUM(swinlost)+ SUM(mwinlost) +SUM(awinlost) + SUM(winlost)  + SUM(scomm)),
-				SUM(betcount)
+			   	-(SUM(swinlost)+ SUM(mwinlost) +SUM(awinlost) + SUM(winlost)  + SUM(scomm))
 
 		FROM bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK)
 		CROSS APPLY (
@@ -476,8 +474,7 @@ BEGIN
 				SUM(SAgWinLost) SAgWinLost, 
 				SUM(SAgComm) SAgComm	, 
 				SUM(SAgTotal) SAgTotal, 
-				SUM(Company) Company,
-				SUM(BetCount) BetCount
+				SUM(Company) Company
 		FROM #ComWinLossDetails w
 		INNER JOIN dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID
 		INNER JOIN dbo.Products p WITH(NOLOCK) ON w.ProductId = p.ProductID
@@ -503,8 +500,7 @@ BEGIN
 				SUM(SAgWinLost) SAgWinLost, 
 				SUM(SAgComm) SAgComm	, 
 				SUM(SAgTotal) SAgTotal, 
-				SUM(Company) Company,
-				SUM(BetCount) BetCount
+				SUM(Company) Company
 		FROM	#ComWinLossDetails;
 
 		RETURN
@@ -537,8 +533,7 @@ BEGIN
 			SUM(SAgWinLost) SAgWinLost, 
 			SUM(SAgComm) SAgComm	, 
 			SUM(SAgTotal) SAgTotal, 
-			SUM(Company) Company,
-			SUM(BetCount) BetCount
+			SUM(Company) Company
 	FROM #ComWinLossDetails w
 	INNER JOIN CTE_filter f ON f.CustID = w.CustID
 	INNER JOIN dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID
@@ -565,8 +560,7 @@ BEGIN
 			SUM(SAgWinLost) SAgWinLost, 
 			SUM(SAgComm) SAgComm	, 
 			SUM(SAgTotal) SAgTotal, 
-			SUM(Company) Company,
-			SUM(BetCount) BetCount
+			SUM(Company) Company
 	FROM	#ComWinLossDetails;
 END
 GO
