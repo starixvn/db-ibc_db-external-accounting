@@ -206,11 +206,9 @@ BEGIN
 			CROSS APPLY 
 			(
 				SELECT DISTINCT
-					tbl.ProductID,  tbl.RefTable
-					, ISNULL(e.Sporttype, 0) AS Sporttype, ISNULL(e.LeagueGroupID,0) AS LeagueGroupID, ISNULL(e.TicketType,0) AS TicketType
-				FROM f_SportBettypeMatrix_Sel(@ProductIds, @isTest, b.bettype, 2, '', '', 0) AS tbl
-				LEFT JOIN @ExistingProductDetails e ON e.ProductId = tbl.ProductID
-				WHERE b.bettype = tbl.bettype
+					s.ProductID, s.RefTable, s.Sporttype, s.LeagueGroupID, s.TicketType
+				FROM #SportBettype s
+				WHERE s.bettype = b.bettype
 			) AS tbl
 			OUTER APPLY 
 			(
