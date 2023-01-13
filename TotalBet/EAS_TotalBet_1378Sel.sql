@@ -102,13 +102,20 @@ BEGIN
 			b.livehomescore,						
 			b.liveawayscore,						
 			SUM(IIF(b.bettype = 1 AND b.betteam = 'h', cal.stakePT, 0)) AS home_odds_HDP,						
-			SUM(IIF(b.bettype = 1 AND b.betteam = 'a', cal.stakePT, 0)) AS away_odds_HDP,						
+			SUM(IIF(b.bettype = 1 AND b.betteam = 'a', cal.stakePT, 0)) AS away_odds_HDP,	
+			SUM(IIF(b.bettype = 1 AND b.betteam IN ('h','a'), 1, 0))	AS count_odds_HDP,
+			---------
 			SUM(IIF(b.bettype = 3 AND b.betteam = 'h', cal.stakePT, 0)) AS home_odds_OU,						
-			SUM(IIF(b.bettype = 3 AND b.betteam = 'a', cal.stakePT, 0)) AS away_odds_OU,						
+			SUM(IIF(b.bettype = 3 AND b.betteam = 'a', cal.stakePT, 0)) AS away_odds_OU,
+			SUM(IIF(b.bettype = 3 AND b.betteam IN ('h','a'), 1, 0))	AS count_odds_OU,
+			----------
 			SUM(IIF(b.bettype = 7 AND b.betteam = 'h', cal.stakePT, 0)) AS home_odds_HTHDP,						
-			SUM(IIF(b.bettype = 7 AND b.betteam = 'a', cal.stakePT, 0)) AS away_odds_HTHDP,						
+			SUM(IIF(b.bettype = 7 AND b.betteam = 'a', cal.stakePT, 0)) AS away_odds_HTHDP,	
+			SUM(IIF(b.bettype = 7 AND b.betteam IN ('h','a'), 1, 0))	AS count_odds_HTHDP,	
+			----------
 			SUM(IIF(b.bettype = 8 AND b.betteam = 'h', cal.stakePT, 0)) AS home_odds_HTOU,						
-			SUM(IIF(b.bettype = 8 AND b.betteam = 'a', cal.stakePT, 0)) AS away_odds_HTOU						
+			SUM(IIF(b.bettype = 8 AND b.betteam = 'a', cal.stakePT, 0)) AS away_odds_HTOU,
+			SUM(IIF(b.bettype = 8 AND b.betteam IN ('h','a'), 1, 0))	AS count_odds_HTOU
 		FROM dbo.bettrans b WITH(NOLOCK, INDEX = IX_betrunning_srecommend)							
 		INNER JOIN #super super ON super.CustID = b.srecommend							
 		INNER JOIN #cteEvent e ON e.matchid = b.matchid							
@@ -125,10 +132,10 @@ BEGIN
 			b.liveawayscore						
 	)
 	SELECT e.leagueid, e.matchid, e.homeid,	e.awayid, e.showtime, e.matchcode, tb.liveindicator, tb.livehomescore, tb.liveawayscore
-		, CAST(IIF(tb.home_odds_HDP <> 0 OR tb.away_odds_HDP <> 0 ,tb.home_odds_HDP - tb.away_odds_HDP, NULL) AS MONEY) AS HDPFT
-		, CAST(IIF(tb.home_odds_OU <> 0 OR tb.away_odds_OU <> 0, tb.home_odds_OU - tb.away_odds_OU, NULL) AS MONEY) AS OUFT
-		, CAST(IIF(tb.home_odds_HTHDP <> 0 OR tb.away_odds_HTHDP <> 0, tb.home_odds_HTHDP - tb.away_odds_HTHDP, NULL) AS MONEY) AS HDPHT
-		, CAST(IIF(tb.home_odds_HTOU <> 0 OR tb.away_odds_HTOU <> 0, tb.home_odds_HTOU - tb.away_odds_HTOU, NULL) AS MONEY) AS OUHT	
+		, CAST(IIF(tb.home_odds_HDP <> 0 OR tb.away_odds_HDP <> 0 ,tb.home_odds_HDP - tb.away_odds_HDP, IIF(tb.count_odds_HDP > 0, 0, NULL)) AS MONEY) AS HDPFT
+		, CAST(IIF(tb.home_odds_OU <> 0 OR tb.away_odds_OU <> 0, tb.home_odds_OU - tb.away_odds_OU, IIF(tb.count_odds_OU > 0, 0, NULL)) AS MONEY) AS OUFT
+		, CAST(IIF(tb.home_odds_HTHDP <> 0 OR tb.away_odds_HTHDP <> 0, tb.home_odds_HTHDP - tb.away_odds_HTHDP, IIF(tb.count_odds_HTHDP > 0, 0, NULL)) AS MONEY) AS HDPHT
+		, CAST(IIF(tb.home_odds_HTOU <> 0 OR tb.away_odds_HTOU <> 0, tb.home_odds_HTOU - tb.away_odds_HTOU, IIF(tb.count_odds_HTOU > 0, 0, NULL)) AS MONEY) AS OUHT	
 		, ROW_NUMBER() OVER (PARTITION BY tb.liveindicator, e.matchcode ORDER BY tb.liveindicator DESC, e.matchcode ASC, (tb.liveawayscore + tb.livehomescore) DESC) AS RIdx
 	FROM totalbet tb								
 	INNER JOIN dbo.match e WITH(NOLOCK) ON e.matchid = tb.matchid
