@@ -1,5 +1,6 @@
 /*<info serverAlias="DBBOF-bodb02" executers="bodbExtAccNet" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[EAS_TotalBet_LeagueSel] 	
+	@IsTest BIT = NULL
 AS
 /*
 	Created by: Bobby@20221215
@@ -12,7 +13,10 @@ BEGIN
 	SET NOCOUNT ON;
 
 	--- SB only
-	DECLARE @sporttype TINYINT = 1;
+	DECLARE @sporttype	TINYINT = 1,
+		@ckIsTest		BIT;
+
+	SELECT @ckIsTest = ISNULL(@IsTest, 0);
 
 	SELECT l.leagueid
 		, l.leaguename
@@ -30,5 +34,6 @@ BEGIN
 	WHERE l.sporttype		= @sporttype
 		AND l.IsActive		= 1
 		AND ck.IsRunning	= 1
+		AND l.IsTest		= IIF(@ckIsTest = 1, l.IsTest, @ckIsTest)
 END
 GO
