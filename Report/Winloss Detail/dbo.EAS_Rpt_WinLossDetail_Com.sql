@@ -64,6 +64,7 @@ AS
 		- 20220208@Danny: Separate Saba Sport Performance [Redmine: #167177]
 		- 20221208@Eddie: Add New SABA ESports PinGoal [RedmineID: #181383]
 		- 20221222@Bobby: Fix GrossComm on WinLossDetail_Com report [RedmineID: #181912]
+		- 20221229@Bobby: Enhance GrossComm figure [RedmineID: #182155]
 	
 	Param's Explanation:
 	 @ProductDetails:		
@@ -91,8 +92,9 @@ AS
 
 */
 BEGIN
-	SET NOCOUNT ON
+	SET NOCOUNT ON;
 
+	DROP TABLE IF EXISTS #tmpSuperList;
 	CREATE TABLE #tmpSuperList (custID INT PRIMARY KEY)
 
 	DECLARE @ExistingProductDetails TABLE (ProductId INT,Sporttype INT,Bettype INT, LeagueGroupID SMALLINT, TicketType TINYINT)
@@ -101,11 +103,12 @@ BEGIN
 	SELECT @FDate = @FromDate, @TDate = @ToDate
 
 	INSERT INTO #tmpSuperList(CustID)
-	SELECT custID 
-	FROM bodb02.dbo.Acc_CustGroup WITH(NOLOCK)
+	SELECT cg.custID
+	FROM bodb02.dbo.Acc_CustGroup cg WITH(NOLOCK)
 	WHERE (@custid IS NULL OR custid = @custid)
 		AND GroupName = @GroupName
 
+	DROP TABLE IF EXISTS #ComWinLossDetails;
 	CREATE TABLE #ComWinLossDetails 
 	(
 		CustID int, Turnover money, TurnoverNoDraw MONEY, GrossComm money, MemberWinLost money, 
@@ -114,6 +117,7 @@ BEGIN
 		ExtraWinloss MONEY, ExtraComm MONEY, ExtraTotal MONEY, Company MONEY, CompanyAfterExtraPT MONEY
 	)
 
+	DROP TABLE IF EXISTS #TmpCondSumWL;
 	CREATE TABLE #TmpCondSumWL (sporttype INT, bettype INT, LeagueGroupID SMALLINT, TicketType TINYINT)--, PRIMARY KEY NONCLUSTERED (Bettype ASC, sporttype ASC))
 
 	SELECT @ProductIds = bodb02.dbo.f_AddRelatedProducts(@ProductIds)
@@ -133,6 +137,7 @@ BEGIN
 	DECLARE @isTest BIT = 0
 	SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
 
+	DROP TABLE IF EXISTS #SportBettype;
 	CREATE TABLE #SportBettype (ProductID INT, Bettype INT, RefTable TINYINT, sporttype SMALLINT, LeagueGroupID SMALLINT, TicketType TINYINT ,PRIMARY KEY NONCLUSTERED (Bettype ASC, ProductID ASC, sporttype ASC, LeagueGroupID ASC, TicketType ASC))
 
 	IF @FromDate <= @MoveBetsDay
@@ -168,7 +173,55 @@ BEGIN
 		IF @ToDate > @MoveBetsDay
 		BEGIN
 			IF @MoveBetsDay > @FromDate
-			SELECT @FDate = DATEADD(DD, 1, @MoveBetsDay) --DATEADD(dd, -1, @BalanceUpDay)
+				SELECT @FDate = DATEADD(DD, 1, @MoveBetsDay) --DATEADD(dd, -1, @BalanceUpDay)
+
+			---- get extra PT from table setting
+			DROP TABLE IF EXISTS #tmpSuperExtraPT;
+			CREATE TABLE #tmpSuperExtraPT(SuperId INT, winlostdate SMALLDATETIME, productId INT, sporttype int, bettypePT INT,  ExtraPT MONEY, RefTable TINYINT, LeagueGroupID SMALLINT, TicketType TINYINT)
+			CREATE CLUSTERED INDEX CIX_tmpSuperExtraPT ON #tmpSuperExtraPT(SuperId, winlostdate, bettypePT)
+
+			;
+			WITH wld AS (
+				SELECT @FDate AS winlostdate
+				UNION ALL
+				SELECT DATEADD(DD, 1, winlostdate) 
+				FROM wld
+				WHERE winlostdate < @TDate
+			), superWLD AS (
+				SELECT cg.custID AS SuperID, wld.winlostdate
+				FROM #tmpSuperList cg
+				CROSS APPLY wld
+			),
+			superBet AS (
+				SELECT sw.SuperID, sw.winlostdate, b.bettype
+				FROM dbo.bettrans b WITH(NOLOCK)
+				INNER JOIN superWLD sw ON sw.SuperID = b.srecommend AND sw.winlostdate = b.winlostdate
+				WHERE b.statusID IN (111,112,113)
+				GROUP BY sw.SuperID, sw.winlostdate, b.bettype
+			)
+			INSERT INTO #tmpSuperExtraPT(SuperId, winlostdate, productId, Sporttype, bettypePT, ExtraPT, RefTable, LeagueGroupID, TicketType)
+			SELECT b.SuperID, b.winlostdate, tbl.ProductID, tbl.Sporttype, b.bettype, ept.ExtraPT, tbl.RefTable
+				, tbl.LeagueGroupID, tbl.TicketType
+			FROM superBet b 
+			CROSS APPLY 
+			(
+				SELECT DISTINCT
+					s.ProductID, s.RefTable, s.Sporttype, s.LeagueGroupID, s.TicketType
+				FROM #SportBettype s
+				WHERE s.bettype = b.bettype
+			) AS tbl
+			OUTER APPLY 
+			(
+				SELECT DISTINCT expt2.SuperId, expt2.ExtraPT
+				FROM dbo.Acc_GroupExtraPT2Setting expt2 WITH (NOLOCK)
+				WHERE b.winlostdate BETWEEN expt2.FromDate AND expt2.ToDate
+						AND tbl.ProductID = expt2.ProductID
+						AND b.SuperID = expt2.SuperId 
+						AND ISNULL(expt2.SubProduct,'') = ''
+						AND expt2.Sporttype = 0
+			) AS ept
+			OPTION (MAXRECURSION 0);
+			
 
 			DROP TABLE IF EXISTS #ComWinLossDetails_bettrans;
 			CREATE TABLE #ComWinLossDetails_bettrans 
@@ -176,10 +229,12 @@ BEGIN
 				SRecommend		INT, 
 				bettype			MONEY, 
 				StatusID		TINYINT, 
-				MOdds			SMALLMONEY, 
-				tpositiontaking SMALLMONEY, 
+				tpositiontaking SMALLMONEY,
+				epositiontaking SMALLMONEY,
+				RefTable		TINYINT,
+				ExtraPT2		DECIMAL(9,8),
+				TurnoverNoDraw	MONEY,
 				stake			MONEY, 
-				oddsspread		MONEY, 
 				scomm			MONEY, 
 				MemberWinlost	MONEY, 
 				playercomm		MONEY, 
@@ -190,26 +245,28 @@ BEGIN
 				SAgWinlost		MONEY, 
 				SAgComm			MONEY,
 				betid			MONEY, 
-				epositiontaking SMALLMONEY,
-				Winlostdate		SMALLDATETIME,
-				GrossComm		MONEY,
-				LeagueGroupID	SMALLINT,
-				SportType		SMALLINT,
-				TicketType		TINYINT
+				GrossComm		MONEY
 			)
 
 			INSERT #ComWinLossDetails_bettrans(
-				SRecommend, bettype, StatusID, MOdds, tpositiontaking, stake, oddsspread, scomm, MemberWinlost, playercomm,
-				AgWinlost, AgComm, MAgWinlost, MAgComm, SAgWinlost, SAgComm, betid, epositiontaking, Winlostdate, GrossComm, LeagueGroupID, SportType, TicketType
+				SRecommend, bettype, tpositiontaking, epositiontaking, RefTable, ExtraPT2
+				,TurnoverNoDraw,stake, scomm, MemberWinlost, playercomm, AgWinlost, AgComm, MAgWinlost, MAgComm, SAgWinlost, SAgComm, betid, GrossComm
 			)
 			 SELECT
 				SRecommend,
 				bettype,
-				StatusID,
-				CASE WHEN  b.modds IN (-0.25, 0.25) THEN b.modds ELSE 0 END AS MOdds,
 				tpositiontaking,
+				epositiontaking,
+				sl.RefTable,
+				sl.ExtraPT,
+				SUM(CASE
+					WHEN sl.RefTable IN (1, 2) THEN 0 -- bettransRnG/bettransLC
+					WHEN sl.ProductId = 47 THEN b.oddsspread -- BBIN
+					WHEN sl.ProductId = 1 AND b.statusId = 111 THEN 0 -- SB draw
+					WHEN sl.ProductId = 1 AND b.StatusId IN (112, 113) AND b.modds IN (-0.25, 0.25) THEN ABS(b.stake)/2 -- SB half won/lose
+					ELSE ABS(b.stake)
+				END) AS TurnoverNoDraw,
 				SUM(ABS(b.stake)),	
-				SUM(b.oddsspread),
 				SUM(scomm),
 				sum(winlost-actual_stake), --MemberWinlost
 				sum(playercomm), -- PlayerComm
@@ -220,122 +277,42 @@ BEGIN
 				sum(swinlost), -- SAgWinlost
 				isnull(sum(scomm),0) -isnull(sum(acomm),0), --SAgComm
 				SUM(ISNULL(b.betid/CONVERT(DECIMAL(19,8), 100000000), 0)),    
-				epositiontaking,
-				Winlostdate,
-				--SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END),
-				0 AS GrossComm,
-				CASE WHEN ( 
-							(l.LeagueGroupID IN (42,74,108,113) AND m.sporttype = 1 ) 
-								OR (l.LeagueGroupID IN (122, 42) AND m.sporttype = 2 )
-								OR (l.LeagueGroupID = 42 AND m.sporttype = 50)
-								OR (l.LeagueGroupID = 151 AND m.sporttype = 43)
-							) AND b.betdaqid <> -2 AND b.winlostdate >= @SeparateSabaSport_Cutoff THEN l.LeagueGroupID
-				ELSE 0 END LeagueGroupID,
-				CASE WHEN ( 
-							(l.LeagueGroupID IN (42,74,108,113) AND m.sporttype = 1 ) 
-								OR (l.LeagueGroupID IN (122, 42) AND m.sporttype = 2 )
-								OR (l.LeagueGroupID = 42 AND m.sporttype = 50)
-								OR (l.LeagueGroupID = 151 AND m.sporttype = 43)
-							) AND b.betdaqid <> -2 AND b.winlostdate >= @SeparateSabaSport_Cutoff THEN m.sporttype
-				ELSE 0 END  sporttype, 
-				CASE WHEN b.betdaqid = -2 THEN 1 ELSE 0 END TicketType
-
+				SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END) AS GrossComm
 			FROM bodb02.dbo.bettrans b WITH (NOLOCK)
-			LEFT JOIN dbo.match m WITH(NOLOCK) ON b.matchid = m.matchid AND m.eventdate = b.winlostdate AND m.sporttype IN (1,2,50,43)
-			LEFT JOIN (
-						SELECT LeagueGroupID, leagueid
-						FROM dbo.League l WITH(NOLOCK) WHERE l.LeagueGroupID IN (42,74,108,113,122,151)
-					  )l  ON m.leagueid = l.leagueid
-			WHERE
-				b.winlostdate between @FDate and @TDate 
-				and b.srecommend in (SELECT custID FROM #tmpSuperList) 
-				and b.statusID IN (111,112,113)
-			GROUP BY SRecommend, bettype, StatusID
-				, CASE WHEN  b.modds IN (-0.25, 0.25) THEN b.modds ELSE 0 END
-				, tpositiontaking,Winlostdate, epositiontaking,
-					CASE WHEN ( 
-							(l.LeagueGroupID IN (42,74,108,113) AND m.sporttype = 1 ) 
-								OR (l.LeagueGroupID IN (122, 42) AND m.sporttype = 2 )
-								OR (l.LeagueGroupID = 42 AND m.sporttype = 50)
-								OR (l.LeagueGroupID = 151 AND m.sporttype = 43)
-							) AND b.betdaqid <> -2 AND b.winlostdate >= @SeparateSabaSport_Cutoff THEN l.LeagueGroupID
-					ELSE 0 END ,
+				LEFT JOIN dbo.match m WITH(NOLOCK) ON b.matchid = m.matchid AND m.eventdate = b.winlostdate AND m.sporttype IN (1,2,50,43)
+				LEFT JOIN (
+					SELECT LeagueGroupID, leagueid
+					FROM dbo.League l WITH(NOLOCK) WHERE l.LeagueGroupID IN (42,74,108,113,122,151)
+				) AS l  ON m.leagueid = l.leagueid
+				OUTER APPLY (
+					SELECT CASE WHEN ( 
+								(l.LeagueGroupID IN (42,74,108,113) AND m.sporttype = 1 ) 
+									OR (l.LeagueGroupID IN (122, 42) AND m.sporttype = 2 )
+									OR (l.LeagueGroupID = 42 AND m.sporttype = 50)
+									OR (l.LeagueGroupID = 151 AND m.sporttype = 43)
+								) AND b.betdaqid <> -2 AND b.winlostdate >= @SeparateSabaSport_Cutoff THEN l.LeagueGroupID
+					ELSE 0 END AS LeagueGroupID,
 					CASE WHEN ( 
 								(l.LeagueGroupID IN (42,74,108,113) AND m.sporttype = 1 ) 
 									OR (l.LeagueGroupID IN (122, 42) AND m.sporttype = 2 )
 									OR (l.LeagueGroupID = 42 AND m.sporttype = 50)
 									OR (l.LeagueGroupID = 151 AND m.sporttype = 43)
 								) AND b.betdaqid <> -2 AND b.winlostdate >= @SeparateSabaSport_Cutoff THEN m.sporttype
-					ELSE 0 END, 
-					CASE WHEN b.betdaqid = -2 THEN 1 ELSE 0 END 
+					ELSE 0 END  AS sporttype, 
+					CASE WHEN b.betdaqid = -2 THEN 1 ELSE 0 END AS TicketType
+				) AS et
+				INNER JOIN #tmpSuperExtraPT sl ON sl.SuperId = b.srecommend 
+					AND sl.Winlostdate = b.winlostdate
+					AND sl.bettypePT = b.bettype
+					AND (sl.ProductID <> 1 OR (sl.ProductID = 1 AND et.sporttype = sl.SportType AND et.LeagueGroupID = sl.LeagueGroupID AND et.TicketType = sl.TicketType))
+			
+			WHERE b.statusID IN (111,112,113)
+			GROUP BY b.SRecommend, b.bettype
+				, b.tpositiontaking
+				, b.epositiontaking
+				, sl.RefTable
+				, sl.ExtraPT
 			OPTION (MAXDOP 8);
-
-			-- TODO: Super GrossComm
-			DROP TABLE IF EXISTS #superGrossComm;
-			CREATE TABLE #superGrossComm (SRecommend INT PRIMARY KEY, GrossComm MONEY);
-
-			WITH cte as (
-				SELECT
-				SRecommend,tpositiontaking,
-				b.bettype,
-				CASE WHEN ( 
-								(l.LeagueGroupID IN (42,74,108,113) AND m.sporttype = 1 ) 
-									OR (l.LeagueGroupID IN (122, 42) AND m.sporttype = 2 )
-									OR (l.LeagueGroupID = 42 AND m.sporttype = 50)
-									OR (l.LeagueGroupID = 151 AND m.sporttype = 43)
-								) AND b.betdaqid <> -2 AND b.winlostdate >= @SeparateSabaSport_Cutoff THEN l.LeagueGroupID
-					ELSE 0 END LeagueGroupID,
-				CASE WHEN ( 
-							(l.LeagueGroupID IN (42,74,108,113) AND m.sporttype = 1 ) 
-								OR (l.LeagueGroupID IN (122, 42) AND m.sporttype = 2 )
-								OR (l.LeagueGroupID = 42 AND m.sporttype = 50)
-								OR (l.LeagueGroupID = 151 AND m.sporttype = 43)
-							) AND b.betdaqid <> -2 AND b.winlostdate >= @SeparateSabaSport_Cutoff THEN m.sporttype
-					ELSE 0 END  sporttype, 
-				CASE WHEN b.betdaqid = -2 THEN 1 ELSE 0 END TicketType,
-				SUM(scomm) AS scomm
-
-			FROM bodb02.dbo.bettrans b WITH (NOLOCK)
-			LEFT JOIN dbo.match m WITH(NOLOCK) ON b.matchid = m.matchid AND m.eventdate = b.winlostdate AND m.sporttype IN (1,2,50,43)
-			LEFT JOIN (
-						SELECT LeagueGroupID, leagueid
-						FROM dbo.League l WITH(NOLOCK) WHERE l.LeagueGroupID IN (42,74,108,113,122,151)
-			) AS l  ON m.leagueid = l.leagueid
-			WHERE
-				b.winlostdate between @FDate and @TDate 
-				and b.srecommend in (SELECT custID FROM #tmpSuperList) 
-				and b.statusID IN (111,112,113)
-			GROUP BY SRecommend, b.bettype
-				, StatusID
-				, CASE WHEN  b.modds IN (-0.25, 0.25) THEN b.modds ELSE 0 END
-				, tpositiontaking
-				,CASE WHEN ( 
-							(l.LeagueGroupID IN (42,74,108,113) AND m.sporttype = 1 ) 
-								OR (l.LeagueGroupID IN (122, 42) AND m.sporttype = 2 )
-								OR (l.LeagueGroupID = 42 AND m.sporttype = 50)
-								OR (l.LeagueGroupID = 151 AND m.sporttype = 43)
-							) AND b.betdaqid <> -2 AND b.winlostdate >= @SeparateSabaSport_Cutoff THEN m.sporttype
-					ELSE 0 END , 
-					CASE WHEN ( 
-								(l.LeagueGroupID IN (42,74,108,113) AND m.sporttype = 1 ) 
-									OR (l.LeagueGroupID IN (122, 42) AND m.sporttype = 2 )
-									OR (l.LeagueGroupID = 42 AND m.sporttype = 50)
-									OR (l.LeagueGroupID = 151 AND m.sporttype = 43)
-								) AND b.betdaqid <> -2 AND b.winlostdate >= @SeparateSabaSport_Cutoff THEN l.LeagueGroupID
-					ELSE 0 END, 
-					CASE WHEN b.betdaqid = -2 THEN 1 ELSE 0 END
-			)
-			INSERT INTO #superGrossComm (srecommend, GrossComm)
-			SELECT srecommend,  SUM(CASE
-						WHEN s.RefTable IN (1, 2) THEN 0
-						WHEN b.tpositiontaking = 1 THEN 0
-						ELSE (b.scomm/(1 - b.tpositiontaking))
-					END) AS GrossComm
-			FROM cte AS b
-			INNER JOIN #SportBettype s ON b.bettype = s.bettype AND (s.ProductID <> 1 OR (s.ProductID = 1 AND b.sporttype = s.SportType AND b.LeagueGroupID = s.LeagueGroupID AND b.TicketType = s.TicketType))
-			GROUP BY srecommend
-			OPTION (MAXDOP 8);
-
 
 			INSERT INTO #ComWinLossDetails 	(
 					CustID, Turnover, TurnoverNoDraw, GrossComm, MemberWinLost, PlayerComm, MemberTotal, AgWinLost, AgComm, 
@@ -343,15 +320,12 @@ BEGIN
 				)
 			SELECT
 				b.SRecommend,
-				SUM(ABS(b.stake)),
-				SUM(CASE
-						WHEN s.RefTable IN (1, 2) THEN 0 -- bettransRnG/bettransLC
-						WHEN s.ProductId = 47 THEN b.oddsspread -- BBIN
-						WHEN s.ProductId = 1 AND b.statusId = 111 THEN 0 -- SB draw
-						WHEN s.ProductId = 1 AND b.StatusId IN (112, 113) AND b.modds IN (-0.25, 0.25) THEN ABS(b.stake)/2 -- SB half won/lose
-						ELSE ABS(b.stake)
-					END) AS TurnoverNoDraw,
-				gc.GrossComm,
+				SUM(b.stake) AS Turnover,
+				SUM(TurnoverNoDraw) AS TurnoverNoDraw,
+				SUM(CASE 
+						WHEN b.RefTable IN (1, 2) THEN 0
+						ELSE b.GrossComm
+					END) AS GrossComm,
 				sum(MemberWinlost), --MemberWinlost
 				sum(playercomm), -- PlayerComm
 				SUM(isnull(MemberWinlost, 0)) + SUM(isnull(playercomm, 0)), --MemberTotal
@@ -373,13 +347,13 @@ BEGIN
 									CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.MemberWinlost END
 								END
 								* 
-								CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+								CASE WHEN b.ExtraPT2 IS NOT NULL THEN b.ExtraPT2 ELSE ISNULL(b.epositiontaking, 0) END
 								),0) AS ExtraWinloss,
 				ISNULL(-1 * SUM(CASE 
 								/*IBCBet Live Casino*/
 								WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
 							WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298, 4599, 4600) THEN 0
-								ELSE  ec.GrossCommExpt2 * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+								ELSE  b.GrossComm * CASE WHEN b.ExtraPT2 IS NOT NULL THEN b.ExtraPT2 ELSE ISNULL(b.epositiontaking, 0) END
 								END
 								), 0) AS ExtraComm,
 				-1 * (
@@ -392,14 +366,14 @@ BEGIN
 									CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.MemberWinlost END
 								END
 								*	 
-								CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+								CASE WHEN b.ExtraPT2 IS NOT NULL THEN b.ExtraPT2 ELSE ISNULL(b.epositiontaking, 0) END
 								),0)
 					+
 					ISNULL(SUM(CASE 
 								/*IBCBet Live Casino*/
 								WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
 							WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298, 4599, 4600) THEN 0
-								ELSE ec.GrossCommExpt2 * CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+								ELSE b.GrossComm * CASE WHEN b.ExtraPT2 IS NOT NULL THEN b.ExtraPT2 ELSE ISNULL(b.epositiontaking, 0) END
 								END
 								), 0)
 					) AS ExtraTotal,
@@ -417,37 +391,21 @@ BEGIN
 											CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.MemberWinlost END
 										END
 										* 
-										CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+										CASE WHEN b.ExtraPT2 IS NOT NULL THEN b.ExtraPT2 ELSE ISNULL(b.epositiontaking, 0) END
 										),0)
 							+
 							ISNULL(SUM(CASE 
 										/*IBCBet Live Casino*/
 										WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
 									WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298, 4599, 4600) THEN 0
-										ELSE ec.GrossCommExpt2* CASE WHEN tbl.ExtraPT IS NOT NULL THEN tbl.ExtraPT ELSE ISNULL(b.epositiontaking, 0) END
+										ELSE b.GrossComm* CASE WHEN b.ExtraPT2 IS NOT NULL THEN b.ExtraPT2 ELSE ISNULL(b.epositiontaking, 0) END
 										END
 									), 0)
 						)
 					) AS CompanyAfterExtraPT				
 			FROM
 				#ComWinLossDetails_bettrans b WITH (NOLOCK)
-				INNER JOIN #SportBettype s ON b.bettype = s.bettype AND (s.ProductID <> 1 OR (s.ProductID = 1 AND b.sporttype = s.SportType AND b.LeagueGroupID = s.LeagueGroupID AND b.TicketType = s.TicketType))
-				INNER JOIN #superGrossComm AS gc ON gc.SRecommend = b.SRecommend
-				OUTER APPLY (
-					SELECT CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END AS GrossCommExpt2
-				) AS ec
-				OUTER APPLY 
-				(
-					SELECT expt2.SuperId, expt2.ExtraPT
-					FROM dbo.Acc_GroupExtraPT2Setting expt2 WITH (NOLOCK)
-					WHERE
-					(b.Winlostdate BETWEEN expt2.FromDate AND  expt2.ToDate  )
-							AND expt2.ProductID = s.ProductID
-							AND b.srecommend = expt2.SuperId 
-							AND ISNULL(expt2.SubProduct,'') = ''
-							AND expt2.Sporttype = 0
-				) tbl
-			GROUP BY b.SRecommend, gc.GrossComm
+			GROUP BY b.SRecommend
 
 			TRUNCATE TABLE #ComWinLossDetails_bettrans
 
@@ -547,7 +505,7 @@ BEGIN
 		IF @ToDate >= DATEADD(dd, -1, @BalanceUpDay)
 			SELECT @TDate = DATEADD(dd, -1, @BalanceUpDay)
 		
-	DECLARE @winlostdateTable TABLE (winlostdate smalldatetime)
+		DECLARE @winlostdateTable TABLE (winlostdate smalldatetime)
 
 		;WITH CTE_Winlostdate (winlostdate ) AS
 		(
@@ -558,7 +516,7 @@ BEGIN
 			WHERE winlostdate < @TDate
 		)
 		INSERT INTO @winlostdateTable(winlostdate)
-		select * from CTE_Winlostdate
+		SELECT * FROM CTE_Winlostdate
 		OPTION (MAXRECURSION 0)
 
 		INSERT INTO #ComWinLossDetails
@@ -626,14 +584,8 @@ BEGIN
 		SUM(w.Company) AS Company,
 		SUM(w.CompanyAfterExtraPT) as CompanyAfterExtraPT	
 	FROM #ComWinLossDetails w INNER JOIN bodb02.dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID 
-	Group by w.CustID, c.UserName
-	order by c.Username
-
-	DROP TABLE #ComWinLossDetails
-
-	DROP TABLE #tmpSuperList
-	DROP TABLE #SportBettype
-	DROP TABLE #TmpCondSumWL
+	GROUP BY w.CustID, c.UserName
+	ORDER BY c.Username
 
 END
 GO
