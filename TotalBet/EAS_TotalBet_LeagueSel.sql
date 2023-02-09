@@ -35,5 +35,6 @@ BEGIN
 		AND l.IsActive		= 1
 		AND ck.IsRunning	= 1
 		AND l.IsTest		= IIF(@ckIsTest = 1, l.IsTest, @ckIsTest)
+		AND l.LeagueGroupID  NOT IN (113 ) -- Exclude Saba PinGoal
 END
 GO

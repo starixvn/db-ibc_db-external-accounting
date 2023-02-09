@@ -131,7 +131,7 @@ BEGIN
 			b.livehomescore,						
 			b.liveawayscore						
 	)
-	SELECT e.leagueid, e.matchid, e.homeid,	e.awayid, e.showtime, e.matchcode, tb.liveindicator, tb.livehomescore, tb.liveawayscore
+	SELECT e.leagueid, e.matchid, e.homeid,	e.awayid, e.showtime, e.matchcode, e.IsNeutral, tb.liveindicator, tb.livehomescore, tb.liveawayscore
 		, CAST(IIF(tb.home_odds_HDP <> 0 OR tb.away_odds_HDP <> 0 ,tb.home_odds_HDP - tb.away_odds_HDP, IIF(tb.count_odds_HDP > 0, 0, NULL)) AS MONEY) AS HDPFT
 		, CAST(IIF(tb.home_odds_OU <> 0 OR tb.away_odds_OU <> 0, tb.home_odds_OU - tb.away_odds_OU, IIF(tb.count_odds_OU > 0, 0, NULL)) AS MONEY) AS OUFT
 		, CAST(IIF(tb.home_odds_HTHDP <> 0 OR tb.away_odds_HTHDP <> 0, tb.home_odds_HTHDP - tb.away_odds_HTHDP, IIF(tb.count_odds_HTHDP > 0, 0, NULL)) AS MONEY) AS HDPHT

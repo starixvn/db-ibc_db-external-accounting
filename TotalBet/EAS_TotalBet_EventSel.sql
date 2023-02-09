@@ -16,7 +16,7 @@ BEGIN
 	--- SB only
 	DECLARE @sporttype TINYINT = 1;
 
-	SELECT m.matchid, m.matchcode, m.homeid, m.awayid
+	SELECT m.matchid, m.matchcode, m.homeid, m.awayid, m.IsNeutral
 	FROM dbo.match m WITH(NOLOCK) 
 	OUTER APPLY ( 
 		SELECT TOP 1 1 AS IsRunning 
