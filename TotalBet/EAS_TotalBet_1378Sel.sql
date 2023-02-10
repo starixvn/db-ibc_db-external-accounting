@@ -62,10 +62,10 @@ BEGIN
 								
 	-- filter running events
 	DROP TABLE IF EXISTS #cteEvent;								
-	CREATE TABLE #cteEvent(matchid INT PRIMARY KEY);								
+	CREATE TABLE #cteEvent(matchid INT PRIMARY KEY, showtime NVARCHAR(250));								
 	
 	WITH cte_match AS (
-		SELECT m.matchid								
+		SELECT m.matchid, m.showtime								
 		FROM dbo.match m WITH(NOLOCK)	
 		OUTER APPLY (SELECT TOP 1 1 AS IsExist FROM @leagueList t WHERE t.leagueid = m.leagueid) AS lc
 		WHERE m.sporttype =  1								
@@ -73,7 +73,7 @@ BEGIN
 			AND @MatchIds IS NULL							
 			AND m.eventstatus = 'running'	
 		UNION								
-		SELECT m.matchid								
+		SELECT m.matchid, m.showtime					
 		FROM dbo.match m WITH(NOLOCK)								
 		INNER JOIN @matchList t on t.matchid = m.matchid	
 		OUTER APPLY (SELECT TOP 1 1 AS IsExist FROM @leagueList t WHERE t.leagueid = m.leagueid) AS lc								
@@ -82,8 +82,8 @@ BEGIN
 			AND @MatchIds IS NOT NULL							
 			AND m.eventstatus = 'running'	
 	)
-	INSERT INTO #cteEvent (matchid)	
-	SELECT m.matchid
+	INSERT INTO #cteEvent (matchid, showtime)	
+	SELECT m.matchid, m.showtime
 	FROM cte_match m
 	CROSS APPLY ( 
 		SELECT TOP 1 1 AS IsRunning 
@@ -98,7 +98,11 @@ BEGIN
 	;WITH totalbet AS (								
 		SELECT							
 			b.matchid,						
-			b.liveindicator,						
+			CASE 
+				WHEN e.showtime LIKE '%LIVE%' AND b.liveindicator = 0 THEN 1
+				WHEN b.liveindicator = 1 THEN 2
+				ELSE b.liveindicator 
+			END AS liveindicator,
 			b.livehomescore,						
 			b.liveawayscore,						
 			SUM(IIF(b.bettype = 1 AND b.betteam = 'h', cal.stakePT, 0)) AS home_odds_HDP,						
@@ -127,7 +131,10 @@ BEGIN
 								
 		GROUP BY							
 			b.matchid,						
-			b.liveindicator,						
+			CASE 
+				WHEN e.showtime LIKE '%LIVE%' AND b.liveindicator = 0 THEN 1
+				WHEN b.liveindicator = 1 THEN 2
+				ELSE b.liveindicator END,						
 			b.livehomescore,						
 			b.liveawayscore						
 	)
