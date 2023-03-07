@@ -15,6 +15,7 @@ AS
 		- 20210505@Sol: NAP - Alpha - Allow more time for transfer - [Redmine: #149927]
 		- 20211122@Danny: Split transfer tickets out of bettrans [Redmine: #164196]
 		- 20221128@Evan: Enhance performance get max transid [RedmineID: #180141]
+		- 20230227@Evan: Balance-Up support transfer 247 [Redmine: #173554]
 
 */
 
@@ -95,7 +96,6 @@ BEGIN
 			SUM(winlost), SUM(actual_stake), SUM(swinlost), SUM(mwinlost), SUM(awinlost), SUM(scomm), SUM(acomm), SUM(ABS(actual_stake) * spositiontaking)
 		FROM dbo.bettrans WITH (NOLOCK)
 		WHERE srecommend = @CustId
-			AND bettype < 19999
 			AND  winlostdate > @moveBetsDay
 		GROUP BY winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 4 ELSE 0 END
 
@@ -107,7 +107,9 @@ BEGIN
 		FROM dbo.transfer t WITH(NOLOCK)
 		LEFT JOIN dbo.transferInfo ti WITH(NOLOCK) ON t.TransId = ti.TransId
 		WHERE srecommend = @CustId
-		AND ((bettype = 19999 AND winlostdate <= @moveBetsDay) OR (bettype > 19999))
+			AND 1 = CASE WHEN bettype = 20000 AND winlostdate > @balanceUpDay THEN 0 --> new bal
+						WHEN winlostdate < @balanceUpDay THEN 0 --> old data
+					ELSE 1 END
 		GROUP BY winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 4 ELSE 0 END
 
 		DELETE b
@@ -199,7 +201,6 @@ BEGIN
 			SUM(winlost), SUM(actual_stake), SUM(mwinlost), SUM(awinlost), SUM(acomm), SUM(comm), SUM(ABS(actual_stake) * mpositiontaking)
 		FROM dbo.bettrans WITH (NOLOCK)
 		WHERE mrecommend = @CustId
-			AND bettype < 19999
 			AND winlostdate > @moveBetsDay
 		GROUP BY
 			winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 3 ELSE 0 END
@@ -212,7 +213,9 @@ BEGIN
 		FROM dbo.transfer t WITH (NOLOCK)
 		LEFT JOIN dbo.transferInfo ti WITH(NOLOCK) ON t.TransId = ti.TransId
 		WHERE mrecommend = @CustId
-			AND ((bettype = 19999 AND winlostdate <= @moveBetsDay) OR (bettype > 19999))	
+			AND 1 = CASE WHEN bettype = 20000 AND winlostdate > @balanceUpDay THEN 0 --> new bal
+						WHEN winlostdate < @balanceUpDay THEN 0 --> old data
+					ELSE 1 END
 		GROUP BY winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 3 ELSE 0 END
 
 		DELETE b
@@ -303,7 +306,6 @@ BEGIN
 			SUM(winlost), SUM(actual_stake), SUM(awinlost), SUM(comm), SUM(playercomm), SUM(ABS(actual_stake) * apositiontaking)
 		FROM dbo.bettrans WITH (NOLOCK)
 		WHERE recommend = @CustId
-			AND bettype < 19999
 			AND winlostdate > @moveBetsDay
 		GROUP BY winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 2 ELSE 0 END
 
@@ -315,7 +317,9 @@ BEGIN
 		FROM dbo.Transfer t WITH (NOLOCK)
 		LEFT JOIN dbo.transferInfo ti WITH(NOLOCK) ON t.TransId = ti.TransId
 		WHERE recommend = @CustId
-			AND ((bettype = 19999 AND winlostdate <= @moveBetsDay) OR (bettype > 19999))
+			AND 1 = CASE WHEN bettype = 20000 AND winlostdate > @balanceUpDay THEN 0 --> new bal
+						WHEN winlostdate < @balanceUpDay THEN 0 --> old data
+					ELSE 1 END
 		GROUP BY winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 2 ELSE 0 END
 
 		DELETE b
@@ -407,7 +411,6 @@ BEGIN
 			SUM(winlost), SUM(actual_stake), SUM(playercomm)
 		FROM dbo.bettrans WITH (NOLOCK)
 		WHERE custid = @CustId AND statusID NOT IN (0,1)
-			AND bettype < 19999
 			AND winlostdate > @moveBetsDay
 		GROUP BY winlostdate, bettype, statusID
 
@@ -419,7 +422,9 @@ BEGIN
 		FROM dbo.transfer WITH (NOLOCK)
 		WHERE custid = @CustId AND statusID NOT IN (0,1)
 			AND bettype NOT IN (21008, 21009) -- BBIN Transfer
-			AND ((bettype = 19999 AND winlostdate <= @moveBetsDay) OR (bettype > 19999))
+			AND 1 = CASE WHEN bettype = 20000 AND winlostdate > @balanceUpDay THEN 0 --> new bal
+						WHEN winlostdate < @balanceUpDay THEN 0 --> old data
+					ELSE 1 END
 		GROUP BY winlostdate, bettype, statusID
 
 		DELETE b
