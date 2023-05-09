@@ -107,7 +107,8 @@ BEGIN
 		FROM dbo.transfer t WITH(NOLOCK)
 		LEFT JOIN dbo.transferInfo ti WITH(NOLOCK) ON t.TransId = ti.TransId
 		WHERE srecommend = @CustId
-			AND 1 = CASE WHEN bettype = 20000 AND winlostdate > @balanceUpDay THEN 0 --> new bal
+			AND 1 = CASE WHEN bettype = 19999 AND winlostdate > @moveBetsDay THEN 0 --> new sum 
+						WHEN bettype = 20000 AND winlostdate > @balanceUpDay THEN 0 --> new bal
 						WHEN winlostdate < @balanceUpDay THEN 0 --> old data
 					ELSE 1 END
 		GROUP BY winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 4 ELSE 0 END
@@ -213,7 +214,8 @@ BEGIN
 		FROM dbo.transfer t WITH (NOLOCK)
 		LEFT JOIN dbo.transferInfo ti WITH(NOLOCK) ON t.TransId = ti.TransId
 		WHERE mrecommend = @CustId
-			AND 1 = CASE WHEN bettype = 20000 AND winlostdate > @balanceUpDay THEN 0 --> new bal
+			AND 1 = CASE WHEN bettype = 19999 AND winlostdate > @moveBetsDay THEN 0 --> new sum 
+						WHEN bettype = 20000 AND winlostdate > @balanceUpDay THEN 0 --> new bal
 						WHEN winlostdate < @balanceUpDay THEN 0 --> old data
 					ELSE 1 END
 		GROUP BY winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 3 ELSE 0 END
@@ -317,7 +319,8 @@ BEGIN
 		FROM dbo.Transfer t WITH (NOLOCK)
 		LEFT JOIN dbo.transferInfo ti WITH(NOLOCK) ON t.TransId = ti.TransId
 		WHERE recommend = @CustId
-			AND 1 = CASE WHEN bettype = 20000 AND winlostdate > @balanceUpDay THEN 0 --> new bal
+			AND 1 = CASE WHEN bettype = 19999 AND winlostdate > @moveBetsDay THEN 0 --> new sum 
+						WHEN bettype = 20000 AND winlostdate > @balanceUpDay THEN 0 --> new bal
 						WHEN winlostdate < @balanceUpDay THEN 0 --> old data
 					ELSE 1 END
 		GROUP BY winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 2 ELSE 0 END
@@ -422,7 +425,8 @@ BEGIN
 		FROM dbo.transfer WITH (NOLOCK)
 		WHERE custid = @CustId AND statusID NOT IN (0,1)
 			AND bettype NOT IN (21008, 21009) -- BBIN Transfer
-			AND 1 = CASE WHEN bettype = 20000 AND winlostdate > @balanceUpDay THEN 0 --> new bal
+			AND 1 = CASE WHEN bettype = 19999 AND winlostdate > @moveBetsDay THEN 0 --> new sum
+						WHEN bettype = 20000 AND winlostdate > @balanceUpDay THEN 0 --> new bal
 						WHEN winlostdate < @balanceUpDay THEN 0 --> old data
 					ELSE 1 END
 		GROUP BY winlostdate, bettype, statusID
