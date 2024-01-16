@@ -19,6 +19,7 @@ AS
 	Original: [EAS_Rpt_WinLossDetailByCurrency_MAg]
 	Revisions:
 		- 20231205@Lewis: Initialize SP [RedmineID: #196959]
+		- 20240116@Lewis: Sort by Username [RedmineID: #196959]
 	
 	Param's Explanation:
 		@BaseCurrency:  0 unchecked
@@ -621,8 +622,8 @@ BEGIN
 		INNER JOIN #tmp_Oanda o 
 			ON c.currency = o.CurrencyId
 			AND w.winlostdate = o.ExchangeDate
-		Group by w.winlostdate,w.CustID, c.UserName,c.currency,o.CurrencyName
-		order by c.Username
+		GROUP BY w.winlostdate,w.CustID, c.UserName,c.currency,o.CurrencyName
+		
 	--Grid--
 		SELECT CustID 
 				, UserName 
@@ -646,6 +647,7 @@ BEGIN
 				, UserName 
 				, CurrencyID 
 				, CurrencyName
+		ORDER BY Username
 
 	-- Total --
 			IF @BaseCurrency = 0

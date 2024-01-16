@@ -20,6 +20,7 @@ AS
 	Original: [EAS_Rpt_WinLossDetail_Com]
 	Revisions:
 		- 20231205@Lewis: Initialize SP [RedmineID: #196959]
+		- 20240116@Lewis: Sort by Username [RedmineID: #196959]
 	
 	Param's Explanation:
 		@BaseCurrency:  0 unchecked
@@ -545,7 +546,7 @@ BEGIN
 				AND w.winlostdate = o.ExchangeDate
 		WHERE c.currency IN (SELECT CurrencyId FROM #tmp_currencylist)
 		GROUP BY w.winlostdate,w.CustID, c.UserName,c.currency,o.CurrencyName
-		ORDER BY c.Username
+		
 	
 	--Result--
 		SELECT CustID 
@@ -573,6 +574,7 @@ BEGIN
 				, UserName 
 				, CurrencyID 
 				, CurrencyName
+		ORDER BY Username
 
 	-- Total --
 			IF @BaseCurrency = 0
