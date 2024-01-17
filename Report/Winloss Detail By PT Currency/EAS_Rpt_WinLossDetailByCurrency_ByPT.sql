@@ -18,6 +18,7 @@ AS
 	DB: DBAGE/bodb02
 	Revisions:
 		- 20231218@Lewis: Initialize SPs [RedmineID : #196959]
+		- 20240116@Lewis: Sort by Username [RedmineID: #196959]
 
 	Param's Explanation:
 		@BaseCurrency:  0 unchecked
@@ -504,7 +505,7 @@ BEGIN
 	INNER JOIN dbo.Products p WITH(NOLOCK) ON w.ProductId = p.ProductID
 	WHERE c.currency IN (SELECT CurrencyId FROM #tmp_currencylist)
 	GROUP BY w.winlostdate,w.CustID,c.UserName,w.ProductID, p.ProductName,o.CurrencyId,o.CurrencyName
-	ORDER BY c.UserName
+	
 
 
 	SELECT	CustID,
@@ -536,6 +537,7 @@ BEGIN
 			ProductName,
 			CurrencyId,
 			CurrencyName
+	ORDER BY Username
 
 	-- Total --
 	IF @BaseCurrency = 0
