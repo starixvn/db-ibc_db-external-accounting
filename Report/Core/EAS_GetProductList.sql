@@ -1,4 +1,4 @@
-/*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBAGE-bodb02" executers="wsv_xnap" isFunction="0" isNested="0"></info>*/
 CREATE PROCEDURE [dbo].[EAS_GetProductList]
 	@GroupID	INT = NULL
 AS
@@ -12,10 +12,19 @@ AS
 		- 20191106@Percy: Initialize SP [Redmine: #118699]
 		- 20200922@Danny: re-order products and filter by @GroupId [Redmine : #141832]
 		- 20201224@Malcolm: re-order products and filter by @GroupId [Redmine : #142459]
+		- 20240226@Lewis: add condition for productlist - RealGroup vs TestGroup [Redmine : #199912]
+	Description:
+		- Environment : 0 - PROD
+						1 - UAT
 */
 
 BEGIN
 	SET NOCOUNT ON
+
+	DECLARE @GroupName VARCHAR(100)
+
+	SELECT @GroupName = GroupName FROM DBPOL.NAP_UserControl.dbo.eaGroup WITH (NOLOCK) WHERE GroupID = @GroupID
+
 	SELECT
 			CAST(ISNULL(gp.GroupProductId, p.ProductID) AS INT) AS ProductID
 		   ,p.ProductName
@@ -28,6 +37,8 @@ BEGIN
 	LEFT JOIN dbo.f_GroupProduct() gp ON p.ProductID = gp.ProductId AND gp.ProductId <> gp.GroupProductId
 	WHERE p.GroupType = 0 AND gp.ProductId IS NULL
 		AND p.Enabled = 1
+		AND Environment = CASE WHEN @GroupName NOT IN ('ACCUUS','ACCTEST') THEN 0
+							   ELSE Environment END
 	ORDER BY [Type],OrderNo
 
 
