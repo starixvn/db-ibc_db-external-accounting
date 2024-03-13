@@ -15,6 +15,7 @@ AS
 	Revisions:
 		- 20130121@Malcolm: intiate SPs [RedmineID : #135593]
 		- 20211122@Percy: Enhance gross comm formula [RedmineID: #164479]
+		- 20240125@Lewis: Show Archived User [RedmineID: #199410]
 */
 
 SET NOCOUNT ON
@@ -136,7 +137,7 @@ BEGIN
 END
 
 SELECT
-	w.CustID				AS CustId, 
+	c.CustID				AS CustId, 
 	c.UserName				AS Username, 
 	SUM(Turnover)			AS Turnover,
 	SUM(TurnoverNoDraw)		AS TurnoverNoDraw, --(Net Turnover)
@@ -152,9 +153,9 @@ SELECT
 	SUM(ExtraTotal)			AS ExtTotal,
 	SUM(NetCompany)			AS NetCompany
 FROM #ComWinLossDetails w 
-	INNER JOIN bodb02.dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID 
-GROUP BY w.CustID, c.UserName
-ORDER BY c.Username
+	LEFT JOIN bodb02.dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID 
+GROUP BY c.CustID, c.UserName
+ORDER BY IIF(c.Username IS NULL,1,0),c.Username;
 
 
 DROP TABLE #ComWinLossDetails

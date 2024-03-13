@@ -66,6 +66,7 @@ AS
 		- 20221222@Bobby: Fix GrossComm on WinLossDetail_Com report [RedmineID: #181912]
 		- 20221229@Bobby: Enhance GrossComm figure [RedmineID: #182155]
 		- 20230630@Lewis: Add Saba Tennis [RedmineID: #190459]
+		- 20240125@Lewis: Show Archived User [RedmineID: #199410]
 	
 	Param's Explanation:
 	 @ProductDetails:		
@@ -564,8 +565,8 @@ BEGIN
 	END	
 
 	SELECT
-		w.CustID, 
-		c.UserName, 
+		c.CustID, 
+		c.UserName,  
 		sum(TurnOver) as Turnover,
 		SUM(TurnoverNoDraw) as TurnoverNoDraw,
 		sum(GrossComm) as GrossComm,
@@ -586,9 +587,9 @@ BEGIN
 		SUM(w.ExtraTotal) AS ExtraTotal,
 		SUM(w.Company) AS Company,
 		SUM(w.CompanyAfterExtraPT) as CompanyAfterExtraPT	
-	FROM #ComWinLossDetails w INNER JOIN bodb02.dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID 
-	GROUP BY w.CustID, c.UserName
-	ORDER BY c.Username
+	FROM #ComWinLossDetails w LEFT JOIN bodb02.dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID 
+	GROUP BY c.CustID, c.UserName
+	ORDER BY IIF(c.Username IS NULL,1,0),c.Username;
 
 END
 GO
