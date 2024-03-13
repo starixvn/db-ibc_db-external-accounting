@@ -55,6 +55,7 @@ Revisions:
 	- 20221208@Eddie: Add New SABA ESports PinGoal [RedmineID: #181383]
 	- 20221229@Bobby: Enhance GrossComm figure [RedmineID: #182155]
 	- 20230630@Lewis: Add Saba Tennis [RedmineID: #190459]
+	- 20240125@Lewis: Show Archived User [RedmineID: #199410]
 	
 	Param's Explanation:
 	 @ProductDetails:		
@@ -556,8 +557,8 @@ BEGIN
 	BEGIN
 
 		SELECT
-			w.CustID, 
-			c.UserName, 
+			c.CustID, 
+			c.UserName,  
 			sum(TurnOver) as TurnOver,
 			SUM(TurnoverNoDraw) as TurnoverNoDraw,
 			sum(GrossComm) as GrossComm,
@@ -568,9 +569,9 @@ BEGIN
 			sum(AgComm) as AgComm,
 			sum(AgTotal) as AgTotal,
 			sum(Company) as Company
-		FROM @AgWinLossDetails w INNER JOIN bodb02.dbo.Customer c WITH(NOLOCK) ON w.CustID = c.CustID 
-		Group by w.CustID, c.UserName
-		order by c.Username
+		FROM @AgWinLossDetails w LEFT JOIN bodb02.dbo.Customer c WITH(NOLOCK) ON w.CustID = c.CustID 
+		Group by c.CustID, c.UserName
+		ORDER BY IIF(c.Username IS NULL,1,0),c.Username;
 
 		RETURN
 	END
@@ -592,8 +593,8 @@ BEGIN
 	FROM
 		(
 		SELECT
-			w.CustID, 
-			c.UserName, 
+			c.CustID, 
+			c.UserName,  
 			sum(TurnOver) as TurnOver,
 			SUM(TurnoverNoDraw) as TurnoverNoDraw,
 			sum(GrossComm) as GrossComm,
@@ -604,12 +605,12 @@ BEGIN
 			sum(AgComm) as AgComm,
 			sum(AgTotal) as AgTotal,
 			sum(Company) as Company,
-			ROW_NUMBER() over (order by c.UserName) as RowNum	
-		FROM @AgWinLossDetails w INNER JOIN bodb02.dbo.Customer c WITH(NOLOCK) ON w.CustID = c.CustID 
-		Group by w.CustID, c.UserName
+			ROW_NUMBER() over (order by IIF(c.Username IS NULL,1,0),c.UserName) as RowNum	
+		FROM @AgWinLossDetails w LEFT JOIN bodb02.dbo.Customer c WITH(NOLOCK) ON w.CustID = c.CustID 
+		Group by c.CustID, c.UserName
 		) wl
 	    
-	WHERE wl.RowNum between @RowStart and @RowEnd
+	WHERE wl.RowNum between @RowStart and @RowEnd;
 
 END	
 GO

@@ -30,6 +30,7 @@ AS
 		- 20221208@Eddie: Add New SABA ESports PinGoal [RedmineID: #181383]
 		- 20221229@Bobby: Enhance GrossComm figure [RedmineID: #182155]
 		- 20230630@Lewis: Add Saba Tennis [RedmineID: #190459]
+		- 20240125@Lewis: Show Archived User [RedmineID: #199410]
 
 	 @ProductDetails:		
 		N'<ROOT>
@@ -135,7 +136,7 @@ BEGIN
 	CREATE TABLE #ComWinLossDetailsSuperList
 	(
 		CustID			INT, 
-		Name			NVARCHAR(100)
+		UserName			NVARCHAR(100)
 	);
 
 	DROP TABLE IF EXISTS #GrossComm;
@@ -438,30 +439,23 @@ BEGIN
 		GROUP BY b.CustID,  w.ProductID;
 	END
 
-	IF @TotalRecords = 0  
-	BEGIN  
 	
-		INSERT INTO #ComWinLossDetailsSuperList(CustID,Name)
-		SELECT	w.CustID, c.UserName  	
-		FROM #ComWinLossDetails w 	
-		INNER JOIN dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID
-		GROUP BY w.CustID, c.UserName 
+	INSERT INTO #ComWinLossDetailsSuperList(CustID,UserName)
+	SELECT	w.CustID,c.UserName
+	FROM #ComWinLossDetails w 	
+	LEFT JOIN dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID
+	GROUP BY w.CustID, c.UserName
 
-		SELECT @TotalRecords = count(CustID)
-		FROM #ComWinLossDetailsSuperList;
-
-		--SELECT @TotalRecords = count(distinct CustID)
-		--FROM #ComWinLossDetails;
-
-	END
+	SELECT @TotalRecords = count(distinct(isnull(UserName,'')))
+	FROM #ComWinLossDetailsSuperList;
 
 	IF ((@PageSize <= 0) AND (@PageIndex <= 0))
 	BEGIN
 
-		SELECT 	w.CustID,
+		SELECT 	c.CustID,
 				c.UserName,
-				w.ProductID,
-				p.ProductName,
+				CASE WHEN c.custid IS NULL THEN NULL ELSE w.ProductID END AS ProductID,
+				CASE WHEN c.custid IS NULL THEN NULL ELSE p.ProductName END AS ProductName,
 				SUM(Turnover) Turnover,
 				SUM(TurnoverNoDraw) TurnoverNoDraw,
 				SUM(GrossComm) GrossComm, 
@@ -479,10 +473,13 @@ BEGIN
 				SUM(SAgTotal) SAgTotal, 
 				SUM(Company) Company
 		FROM #ComWinLossDetails w
-		INNER JOIN dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID
+		LEFT JOIN dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID
 		INNER JOIN dbo.Products p WITH(NOLOCK) ON w.ProductId = p.ProductID
-		GROUP BY w.CustID,c.UserName,w.ProductID, p.ProductName
-		ORDER BY c.UserName
+		GROUP BY c.CustID
+				, c.UserName
+				, CASE WHEN c.custid IS NULL THEN NULL ELSE w.ProductID END
+				, CASE WHEN c.custid IS NULL THEN NULL ELSE p.ProductName END
+		ORDER BY IIF(c.Username IS NULL,1,0),c.Username;
 
 		SELECT	NULL AS CustId,
 				'Total' AS UserName,
@@ -509,18 +506,18 @@ BEGIN
 		RETURN
 	END
 
-	;WITH CTE_filter(CustID) AS
-	(	SELECT CustID FROM
+	;WITH CTE_filter AS
+	(	SELECT CustID,UserName FROM
 		(
-			SELECT CustID,  ROW_NUMBER() OVER(ORDER BY name ASC) as rownum FROM #ComWinLossDetailsSuperList
+			SELECT CustID,UserName,  ROW_NUMBER() OVER(ORDER BY IIF(Username IS NULL,1,0),UserName ASC) as rownum FROM #ComWinLossDetailsSuperList
 		) sort
 		WHERE sort.rownum BETWEEN @RowStart AND @RowEnd
 		
 	)
-	SELECT 	w.CustID,
-			c.UserName,
-			w.ProductID,
-			p.ProductName,
+	SELECT 	CASE WHEN f.UserName IS NULL THEN NULL ELSE w.CustID END AS CustID,
+			f.UserName,
+			CASE WHEN f.UserName IS NULL THEN NULL ELSE w.ProductID END AS ProductID,
+			CASE WHEN f.UserName IS NULL THEN NULL ELSE p.ProductName END AS ProductName,
 			SUM(Turnover) Turnover,
 			SUM(TurnoverNoDraw) TurnoverNoDraw,
 			SUM(GrossComm) GrossComm, 
@@ -539,10 +536,13 @@ BEGIN
 			SUM(Company) Company
 	FROM #ComWinLossDetails w
 	INNER JOIN CTE_filter f ON f.CustID = w.CustID
-	INNER JOIN dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID
 	INNER JOIN dbo.Products p WITH(NOLOCK) ON w.ProductId = p.ProductID
-	GROUP BY w.CustID, c.UserName, w.ProductID, p.ProductName
-	ORDER BY c.UserName
+	GROUP BY 
+			CASE WHEN f.UserName IS NULL THEN NULL ELSE w.CustID END
+			, f.UserName
+			, CASE WHEN f.UserName IS NULL THEN NULL ELSE w.ProductID END
+			, CASE WHEN f.UserName IS NULL THEN NULL ELSE p.ProductName END
+	ORDER BY IIF(f.Username IS NULL,1,0),f.UserName
 
 	SELECT	NULL AS CustId,
 			'Total' AS UserName,
