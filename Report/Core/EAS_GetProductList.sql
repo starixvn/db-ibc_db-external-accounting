@@ -13,6 +13,7 @@ AS
 		- 20200922@Danny: re-order products and filter by @GroupId [Redmine : #141832]
 		- 20201224@Malcolm: re-order products and filter by @GroupId [Redmine : #142459]
 		- 20240226@Lewis: add condition for productlist - RealGroup vs TestGroup [Redmine : #199912]
+		- 20240226@Lewis: version test - UAT environment [Redmine : #198960]
 	Description:
 		- Environment : 0 - PROD
 						1 - UAT
@@ -29,8 +30,8 @@ BEGIN
 			CAST(ISNULL(gp.GroupProductId, p.ProductID) AS INT) AS ProductID
 		   ,p.ProductName
 		   ,ISNULL(p.OrderNo,0) AS OrderNo
-		   ,CASE WHEN p.CasinoType = 1 THEN 53
-				 WHEN p.CasinoType = 2 THEN 41
+		   ,CASE WHEN p.CasinoType = 1 OR p.ProductID IN (38,42,50,66,86) THEN 53
+				 WHEN p.CasinoType = 2 OR p.ProductID IN (70) THEN 41
 				 ELSE 0 END AS [Type]
 	INTO #ProductList	
 	FROM dbo.Products p WITH (NOLOCK)
@@ -45,7 +46,7 @@ BEGIN
 	IF @GroupID IS NULL
 		SELECT	 ProductID, ProductName, OrderNo, [Type]	
 		FROM 	 #ProductList
-		ORDER BY OrderNo, Type
+		ORDER BY Type,OrderNo
 	ELSE
 		BEGIN
 			CREATE TABLE #tmpProducts
@@ -60,7 +61,7 @@ BEGIN
 			SELECT		p.ProductID, p.ProductName, p.OrderNo, p.[Type]	 
 			FROM		#ProductList p
 			INNER JOIN	#tmpProducts  t ON p.ProductID = t.ProductID
-			ORDER BY p.OrderNo, p.Type
+			ORDER BY p.Type,p.OrderNo
 			DROP TABLE #tmpProducts
 		END
 
