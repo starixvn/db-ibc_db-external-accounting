@@ -69,6 +69,7 @@ AS
 		- 20240125@Lewis: Show Archived User [RedmineID: #199410]
 		- 20240306@Lewis: Add Virtual Ice Hockey [RedmineID: #201129]
 		- 20240515@Lewis: Add SABA Kabaddi [RedmineID: #203763]
+		- 20240617@Sophia: deploy version Xtest to keep original SP[RedmineID: #206644]
 	
 	Param's Explanation:
 	 @ProductDetails:		
