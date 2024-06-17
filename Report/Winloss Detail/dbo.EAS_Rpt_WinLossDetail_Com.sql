@@ -69,6 +69,7 @@ AS
 		- 20240125@Lewis: Show Archived User [RedmineID: #199410]
 		- 20240306@Lewis: Add Virtual Ice Hockey [RedmineID: #201129]
 		- 20240515@Lewis: Add SABA Kabaddi [RedmineID: #203763]
+		- 20240617@Sophia: Bettrans_compact [redmine: 206610]
 	
 	Param's Explanation:
 	 @ProductDetails:		
@@ -248,174 +249,49 @@ BEGIN
 				MAgComm			MONEY, 
 				SAgWinlost		MONEY, 
 				SAgComm			MONEY,
-				betid			MONEY, 
+				ExtraWinloss	MONEY, 
 				GrossComm		MONEY
 			)
 
-			INSERT #ComWinLossDetails_bettrans(
-				SRecommend, bettype, tpositiontaking, epositiontaking, RefTable, ExtraPT2
-				,TurnoverNoDraw,stake, scomm, MemberWinlost, playercomm, AgWinlost, AgComm, MAgWinlost, MAgComm, SAgWinlost, SAgComm, betid, GrossComm
-			)
-			 SELECT
-				SRecommend,
-				bettype,
-				tpositiontaking,
-				epositiontaking,
-				sl.RefTable,
-				sl.ExtraPT,
-				SUM(CASE
-					WHEN sl.RefTable IN (1, 2) THEN 0 -- bettransRnG/bettransLC
-					WHEN sl.ProductId = 47 THEN b.oddsspread -- BBIN
-					WHEN sl.ProductId = 1 AND b.statusId = 111 THEN 0 -- SB draw
-					WHEN sl.ProductId = 1 AND b.StatusId IN (112, 113) AND b.modds IN (-0.25, 0.25) THEN ABS(b.stake)/2 -- SB half won/lose
-					ELSE ABS(b.stake)
-				END) AS TurnoverNoDraw,
-				SUM(ABS(b.stake)),	
-				SUM(scomm),
-				sum(winlost-actual_stake), --MemberWinlost
-				sum(playercomm), -- PlayerComm
-				sum(awinlost), -- AgWinlost
-				isnull(sum(comm-playercomm),0), --AgComm	
-				sum(mwinlost), -- MAgWinlost
-				sum(acomm)-sum(comm), --MAgComm
-				sum(swinlost), -- SAgWinlost
-				isnull(sum(scomm),0) -isnull(sum(acomm),0), --SAgComm
-				SUM(ISNULL(b.betid/CONVERT(DECIMAL(19,8), 100000000), 0)),    
-				SUM(CASE WHEN tpositiontaking = 1 THEN 0 ELSE scomm/(1-tpositiontaking) END) AS GrossComm
-			FROM bodb02.dbo.bettrans b WITH (NOLOCK)
-				LEFT JOIN dbo.match m WITH(NOLOCK) ON b.matchid = m.matchid AND m.eventdate = b.winlostdate AND m.sporttype IN (1,2,50,43,5,4,47)
-				LEFT JOIN (
-					SELECT LeagueGroupID, leagueid
-					FROM dbo.League l WITH(NOLOCK) WHERE l.LeagueGroupID IN (42,74,108,113,122,151)
-				) AS l  ON m.leagueid = l.leagueid
-				OUTER APPLY (
-					SELECT CASE WHEN ( 
-								(l.LeagueGroupID IN (42,74,108,113) AND m.sporttype = 1 ) 
-									OR (l.LeagueGroupID IN (122, 42) AND m.sporttype = 2 )
-									OR (l.LeagueGroupID = 42 AND m.sporttype = 50)
-									OR (l.LeagueGroupID = 42 AND m.sporttype = 5) --SabaTennis
-									OR (l.LeagueGroupID = 42 AND m.sporttype = 4) --Virtual Ice Hockey
-									OR (l.LeagueGroupID = 42 AND m.sporttype = 47) --SABA Kabaddi
-									OR (l.LeagueGroupID = 151 AND m.sporttype = 43)
-								) AND b.betdaqid <> -2 AND b.winlostdate >= @SeparateSabaSport_Cutoff THEN l.LeagueGroupID
-					ELSE 0 END AS LeagueGroupID,
-					CASE WHEN ( 
-								(l.LeagueGroupID IN (42,74,108,113) AND m.sporttype = 1 ) 
-									OR (l.LeagueGroupID IN (122, 42) AND m.sporttype = 2 )
-									OR (l.LeagueGroupID = 42 AND m.sporttype = 50)
-									OR (l.LeagueGroupID = 42 AND m.sporttype = 5) --SabaTennis
-									OR (l.LeagueGroupID = 42 AND m.sporttype = 4) --Virtual Ice Hockey
-									OR (l.LeagueGroupID = 42 AND m.sporttype = 47) --SABA Kabaddi
-									OR (l.LeagueGroupID = 151 AND m.sporttype = 43)
-								) AND b.betdaqid <> -2 AND b.winlostdate >= @SeparateSabaSport_Cutoff THEN m.sporttype
-					ELSE 0 END  AS sporttype, 
-					CASE WHEN b.betdaqid = -2 THEN 1 ELSE 0 END AS TicketType
-				) AS et
-				INNER JOIN #tmpSuperExtraPT sl ON sl.SuperId = b.srecommend 
-					AND sl.Winlostdate = b.winlostdate
-					AND sl.bettypePT = b.bettype
-					AND (sl.ProductID <> 1 OR (sl.ProductID = 1 AND et.sporttype = sl.SportType AND et.LeagueGroupID = sl.LeagueGroupID AND et.TicketType = sl.TicketType))
-			
-			WHERE b.statusID IN (111,112,113)
-			GROUP BY b.SRecommend, b.bettype
-				, b.tpositiontaking
-				, b.epositiontaking
-				, sl.RefTable
-				, sl.ExtraPT
-			OPTION (MAXDOP 8);
-
+			 
 			INSERT INTO #ComWinLossDetails 	(
 					CustID, Turnover, TurnoverNoDraw, GrossComm, MemberWinLost, PlayerComm, MemberTotal, AgWinLost, AgComm, 
 					AgTotal, MAgWinLost, MAgComm, MAgTotal, SAgWinLost, SAgComm, SAgTotal,	ExtraWinloss, ExtraComm, ExtraTotal, Company, CompanyAfterExtraPT  
 				)
 			SELECT
-				b.SRecommend,
-				SUM(b.stake) AS Turnover,
-				SUM(TurnoverNoDraw) AS TurnoverNoDraw,
-				SUM(CASE 
-						WHEN b.RefTable IN (1, 2) THEN 0
-						ELSE b.GrossComm
-					END) AS GrossComm,
-				sum(MemberWinlost), --MemberWinlost
-				sum(playercomm), -- PlayerComm
-				SUM(isnull(MemberWinlost, 0)) + SUM(isnull(playercomm, 0)), --MemberTotal
-				sum(AgWinlost), -- AgWinlost
-				sum(AgComm), --AgComm
-				sum(AgWinlost+ AgComm), --AgTotal			
-				sum(MAgWinlost), -- MAgWinlost
-				sum(MAgComm), --MAgComm
-				sum(MAgWinlost + MAgComm), --MAgTotal
-				sum(SAgWinlost), -- SAgWinlost
-				sum(SAgComm), --SAgComm
-				sum(SAgWinlost + SAgComm), --SAgTotal
-				ISNULL(-1 * SUM(CASE
-								-- Jackpot
-							WHEN b.bettype IN (2198, 2398, 2998, 4297, 4599) THEN
-									CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.betid END
-							WHEN b.bettype IN (2199, 2399, 2999, 4298, 4600) THEN 0
-								ELSE 
-									CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.MemberWinlost END
-								END
-								* 
-								CASE WHEN b.ExtraPT2 IS NOT NULL THEN b.ExtraPT2 ELSE ISNULL(b.epositiontaking, 0) END
-								),0) AS ExtraWinloss,
-				ISNULL(-1 * SUM(CASE 
-								/*IBCBet Live Casino*/
-								WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
-							WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298, 4599, 4600) THEN 0
-								ELSE  b.GrossComm * CASE WHEN b.ExtraPT2 IS NOT NULL THEN b.ExtraPT2 ELSE ISNULL(b.epositiontaking, 0) END
-								END
-								), 0) AS ExtraComm,
-				-1 * (
-					ISNULL(SUM(CASE 
-								-- Jackpot
-							WHEN b.bettype IN (2198, 2398, 2998, 4297, 4599) THEN
-									CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.betid END
-							WHEN b.bettype IN (2199, 2399, 2999, 4298, 4600) THEN 0
-								ELSE 
-									CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.MemberWinlost END
-								END
-								*	 
-								CASE WHEN b.ExtraPT2 IS NOT NULL THEN b.ExtraPT2 ELSE ISNULL(b.epositiontaking, 0) END
-								),0)
+				b.CustID
+				,SUM(b.Turnover) AS Turnover
+				,SUM(TurnoverNoDraw) AS TurnoverNoDraw
+				,SUM(GrossComm) AS GrossComm
+				,SUM(winlost)
+				,SUM(playercomm)
+				,SUM(winlost+playercomm)
+				 ,SUM(awinlost)
+				 ,SUM(comm)
+				 ,SUM(awinlost+comm)
+				 ,SUM(mwinlost)
+				 ,SUM(acomm)
+				 ,SUM(mwinlost + acomm)
+				 ,SUM(swinlost)
+				 ,SUM(scomm)
+				 ,SUM(swinlost+scomm)
+				 ,SUM(extraWinloss)
+				 ,SUM(extraComm)
+				 ,SUM(extraWinloss+extraComm) AS ExtraTotal 
+				 ,-ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(b.winlost), 0)
+				 ,-1
+					* (ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(b.winlost), 0)
 					+
-					ISNULL(SUM(CASE 
-								/*IBCBet Live Casino*/
-								WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
-							WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298, 4599, 4600) THEN 0
-								ELSE b.GrossComm * CASE WHEN b.ExtraPT2 IS NOT NULL THEN b.ExtraPT2 ELSE ISNULL(b.epositiontaking, 0) END
-								END
-								), 0)
-					) AS ExtraTotal,
-				-(isnull(sum(SAgWinlost), 0) + isnull(sum(AgWinlost), 0) + isnull(sum(MAgWinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(b.MemberWinlost), 0)), --Company				
-				-1 * (
-						ISNULL(SUM(SAgWinlost), 0) + ISNULL(SUM(AgWinlost), 0) + ISNULL(SUM(MAgWinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(b.MemberWinlost), 0)
-						+ 
-						-1 * (
-							ISNULL(SUM(CASE
-										-- Jackpot
-									WHEN b.bettype IN (2198, 2398, 2998, 4297, 4599) THEN
-											CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.betid END
-									WHEN b.bettype IN (2199, 2399, 2999, 4298, 4600) THEN 0
-										ELSE 
-											CASE WHEN b.tpositiontaking = 1 THEN 0 ELSE b.MemberWinlost END
-										END
-										* 
-										CASE WHEN b.ExtraPT2 IS NOT NULL THEN b.ExtraPT2 ELSE ISNULL(b.epositiontaking, 0) END
-										),0)
-							+
-							ISNULL(SUM(CASE 
-										/*IBCBet Live Casino*/
-										WHEN b.bettype BETWEEN 3201 AND 3299 THEN b.scomm
-									WHEN b.bettype IN (2198, 2398, 2998, 2199, 2399, 2999, 4297, 4298, 4599, 4600) THEN 0
-										ELSE b.GrossComm* CASE WHEN b.ExtraPT2 IS NOT NULL THEN b.ExtraPT2 ELSE ISNULL(b.epositiontaking, 0) END
-										END
-									), 0)
-						)
+					-1 *
+					(
+						SUM(extraWinloss + extraComm)
+					)
 					) AS CompanyAfterExtraPT				
-			FROM
-				#ComWinLossDetails_bettrans b WITH (NOLOCK)
-			GROUP BY b.SRecommend
+			FROM bodb_AGE.dbo.bettrans_compact b WITH(NOLOCK)			
+			 INNER JOIN #tmpSuperExtraPT sl ON sl.SuperId = b.custid  
+					AND sl.Winlostdate = b.winlostdate
+					AND sl.bettypePT = b.bettype
+					GROUP BY b.CustID
 
 			TRUNCATE TABLE #ComWinLossDetails_bettrans
 
