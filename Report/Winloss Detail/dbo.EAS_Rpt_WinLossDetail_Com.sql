@@ -199,9 +199,8 @@ BEGIN
 			),
 			superBet AS (
 				SELECT sw.SuperID, sw.winlostdate, b.bettype
-				FROM dbo.bettrans b WITH(NOLOCK)
-				INNER JOIN superWLD sw ON sw.SuperID = b.srecommend AND sw.winlostdate = b.winlostdate
-				WHERE b.statusID IN (111,112,113)
+				FROM bodb_Age.dbo.bettrans_compact b WITH(NOLOCK)
+				INNER JOIN superWLD sw ON sw.SuperID = b.custid AND sw.winlostdate = b.winlostdate
 				GROUP BY sw.SuperID, sw.winlostdate, b.bettype
 			)
 			INSERT INTO #tmpSuperExtraPT(SuperId, winlostdate, productId, Sporttype, bettypePT, ExtraPT, RefTable, LeagueGroupID, TicketType)
@@ -258,7 +257,7 @@ BEGIN
 					CustID, Turnover, TurnoverNoDraw, GrossComm, MemberWinLost, PlayerComm, MemberTotal, AgWinLost, AgComm, 
 					AgTotal, MAgWinLost, MAgComm, MAgTotal, SAgWinLost, SAgComm, SAgTotal,	ExtraWinloss, ExtraComm, ExtraTotal, Company, CompanyAfterExtraPT  
 				)
-			 SELECT b.custid
+			 SELECT 
 				b.CustID
 				,SUM(b.Turnover) AS Turnover
 				,SUM(TurnoverNoDraw) AS TurnoverNoDraw
@@ -279,23 +278,19 @@ BEGIN
 				 ,SUM(extraComm)
 				 ,SUM(extraWinloss+extraComm) AS ExtraTotal 
 				 ,-(ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(b.winlost), 0))
-				 ,-1
-					* (ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(b.winlost), 0)
-					+  SUM(extraWinloss + extraComm)
-				
-			 FROM bodb_Age.dbo.bettrans_compact b WITH(NOLOCK) 
-			FROM bodb_AGE.dbo.bettrans_compact b WITH(NOLOCK)			
+				 ,-1*(
+						ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(b.winlost), 0)
+						+  SUM(extraWinloss + extraComm)
+					 )
+			 FROM bodb_Age.dbo.bettrans_compact b WITH(NOLOCK) 		
 			 INNER JOIN #tmpSuperExtraPT sl ON sl.SuperId = b.custid  
 					AND sl.Winlostdate = b.winlostdate
 					AND sl.bettypePT = b.bettype
 					AND (sl.ProductID <> 1 OR (sl.ProductID = 1 AND b.sporttype = sl.SportType AND b.LeagueGroupID = sl.LeagueGroupID AND b.TicketType = sl.TicketType))
-			
 			GROUP BY b.CustID
 -- =====================
-			
 
 			TRUNCATE TABLE #ComWinLossDetails_bettrans
-
 			IF EXISTS (SELECT 1 FROM #SportBettype WHERE RefTable = 1) -- bettransRnG
 			BEGIN
 				INSERT INTO #ComWinLossDetails_bettrans (SRecommend, bettype, stake, GrossComm) -- use stake for Net Stake
