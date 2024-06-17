@@ -252,13 +252,13 @@ BEGIN
 				ExtraWinloss	MONEY, 
 				GrossComm		MONEY
 			)
-
+-- =====================
 			 
 			INSERT INTO #ComWinLossDetails 	(
 					CustID, Turnover, TurnoverNoDraw, GrossComm, MemberWinLost, PlayerComm, MemberTotal, AgWinLost, AgComm, 
 					AgTotal, MAgWinLost, MAgComm, MAgTotal, SAgWinLost, SAgComm, SAgTotal,	ExtraWinloss, ExtraComm, ExtraTotal, Company, CompanyAfterExtraPT  
 				)
-			SELECT
+			 SELECT b.custid
 				b.CustID
 				,SUM(b.Turnover) AS Turnover
 				,SUM(TurnoverNoDraw) AS TurnoverNoDraw
@@ -283,7 +283,7 @@ BEGIN
 					* (ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(b.winlost), 0)
 					+  SUM(extraWinloss + extraComm)
 				
-					) AS CompanyAfterExtraPT				
+			 FROM bodb_Age.dbo.bettrans_compact b WITH(NOLOCK) 
 			FROM bodb_AGE.dbo.bettrans_compact b WITH(NOLOCK)			
 			 INNER JOIN #tmpSuperExtraPT sl ON sl.SuperId = b.custid  
 					AND sl.Winlostdate = b.winlostdate
@@ -291,6 +291,8 @@ BEGIN
 					AND (sl.ProductID <> 1 OR (sl.ProductID = 1 AND b.sporttype = sl.SportType AND b.LeagueGroupID = sl.LeagueGroupID AND b.TicketType = sl.TicketType))
 			
 			GROUP BY b.CustID
+-- =====================
+			
 
 			TRUNCATE TABLE #ComWinLossDetails_bettrans
 
