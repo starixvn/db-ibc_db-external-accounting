@@ -267,31 +267,30 @@ BEGIN
 				,SUM(playercomm)
 				,SUM(winlost+playercomm)
 				 ,SUM(awinlost)
-				 ,SUM(comm)
-				 ,SUM(awinlost+comm)
+				 ,SUM(comm-playercomm)
+				 ,SUM(awinlost+comm-playercomm)
 				 ,SUM(mwinlost)
-				 ,SUM(acomm)
-				 ,SUM(mwinlost + acomm)
+				 ,SUM(acomm-comm)
+				 ,SUM(mwinlost + acomm-comm)
 				 ,SUM(swinlost)
-				 ,SUM(scomm)
-				 ,SUM(swinlost+scomm)
+				 ,SUM(scomm-acomm)
+				 ,SUM(swinlost+scomm-acomm)
 				 ,SUM(extraWinloss)
 				 ,SUM(extraComm)
 				 ,SUM(extraWinloss+extraComm) AS ExtraTotal 
-				 ,-ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(b.winlost), 0)
+				 ,-(ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(b.winlost), 0))
 				 ,-1
 					* (ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(b.winlost), 0)
-					+
-					-1 *
-					(
-						SUM(extraWinloss + extraComm)
-					)
+					+  SUM(extraWinloss + extraComm)
+				
 					) AS CompanyAfterExtraPT				
 			FROM bodb_AGE.dbo.bettrans_compact b WITH(NOLOCK)			
 			 INNER JOIN #tmpSuperExtraPT sl ON sl.SuperId = b.custid  
 					AND sl.Winlostdate = b.winlostdate
 					AND sl.bettypePT = b.bettype
-					GROUP BY b.CustID
+					AND (sl.ProductID <> 1 OR (sl.ProductID = 1 AND b.sporttype = sl.SportType AND b.LeagueGroupID = sl.LeagueGroupID AND b.TicketType = sl.TicketType))
+			
+			GROUP BY b.CustID
 
 			TRUNCATE TABLE #ComWinLossDetails_bettrans
 
