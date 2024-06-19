@@ -61,6 +61,7 @@ Revisions:
 	- 20240125@Lewis: Show Archived User [RedmineID: #199410]
 	- 20240306@Lewis: Add Virtual Ice Hockey [RedmineID: #201129]
 	- 20240515@Lewis: Add SABA Kabaddi [RedmineID: #203763]
+	- 20240619@Lewis: deploy ver _xtest to keep original - bettrans [RedmineID: #206610]
 	
 	Param's Explanation:
 	  @ProductDetails:		
