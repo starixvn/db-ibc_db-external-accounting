@@ -70,6 +70,7 @@ AS
 		- 20240306@Lewis: Add Virtual Ice Hockey [RedmineID: #201129]
 		- 20240515@Lewis: Add SABA Kabaddi [RedmineID: #203763]
 		- 20240617@Sophia: Bettrans_compact [redmine: 206610]
+		- 20240624@Lewis: cte_superBet => Bettrans_compact [redmine: 206610]
 	
 	Param's Explanation:
 	 @ProductDetails:		
@@ -199,9 +200,8 @@ BEGIN
 			),
 			superBet AS (
 				SELECT sw.SuperID, sw.winlostdate, b.bettype
-				FROM dbo.bettrans b WITH(NOLOCK)
-				INNER JOIN superWLD sw ON sw.SuperID = b.srecommend AND sw.winlostdate = b.winlostdate
-				WHERE b.statusID IN (111,112,113)
+				FROM bodb_Age.dbo.bettrans_compact b WITH(NOLOCK)
+				INNER JOIN superWLD sw ON sw.SuperID = b.custid AND sw.winlostdate = b.winlostdate
 				GROUP BY sw.SuperID, sw.winlostdate, b.bettype
 			)
 			INSERT INTO #tmpSuperExtraPT(SuperId, winlostdate, productId, Sporttype, bettypePT, ExtraPT, RefTable, LeagueGroupID, TicketType)
