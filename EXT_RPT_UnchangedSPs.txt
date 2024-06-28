@@ -1,4 +1,3 @@
-Report/Core/EAS_GetProductList.sql
 Report/Winloss Detail By Currency/dbo.EAS_Rpt_WinLossDetailByCurrency_Ag.sql
 Report/Winloss Detail By Currency/dbo.EAS_Rpt_WinLossDetailByCurrency_Com.sql
 Report/Winloss Detail By Currency/dbo.EAS_Rpt_WinLossDetailByCurrency_MAg.sql
@@ -6,7 +5,6 @@ Report/Winloss Detail By Currency/dbo.EAS_Rpt_WinLossDetailByCurrency_SAg.sql
 Report/Winloss Detail By PT Currency/EAS_Rpt_WinLossDetailByCurrency_ByPT.sql
 Report/Winloss Detail By PT/EAS_Rpt_WinLossDetail_byPT.sql
 Report/Winloss Detail By Subgroup/EAS_Rpt_WinLossDetail_bySubGroup.sql
-Report/Winloss Detail/dbo.EAS_Rpt_ViewExtraPT2.sql
 Report/Winloss Detail/dbo.EAS_Rpt_WinLossDetail_Ag.sql
 Report/Winloss Detail/dbo.EAS_Rpt_WinLossDetail_Com.sql
 Report/Winloss Detail/dbo.EAS_Rpt_WinLossDetail_MAg.sql
