@@ -11,7 +11,6 @@ AS
   
 	Revisions:
 		- 20240624@Bobby: Initialize SP [Redmine: #206055]
-		- 20240717@Lewis: Version testing at UAT env [Redmine: #207082]
 */
 
 BEGIN
@@ -29,7 +28,7 @@ BEGIN
 
 	-- TODO: Call Age_GetOfferedProductBySiteCurrency
 	INSERT INTO #ProductList
-	EXEC [dbo].[Age_GetOfferedProductBySiteCurrency] @Site = @SiteName,	@Currency = @Currency, @SettingStatus = 1;
+	EXEC [dbo].[Age_GetOfferedProductBySiteCurrency] @Site = @SiteName,	@Currency = @Currency;
 
 
 	--TODO: Merge product code & check IsHidden
