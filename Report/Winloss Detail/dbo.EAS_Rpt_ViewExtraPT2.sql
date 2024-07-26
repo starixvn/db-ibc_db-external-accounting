@@ -1,4 +1,4 @@
-/*<info serverAlias="DBCUST-CUSTDB" executers="bodbExtAccNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBCUST-CUSTDB" executers="wsv_xnap" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE EAS_Rpt_ViewExtraPT2
 (
 	@GroupName VARCHAR(50) = ''
