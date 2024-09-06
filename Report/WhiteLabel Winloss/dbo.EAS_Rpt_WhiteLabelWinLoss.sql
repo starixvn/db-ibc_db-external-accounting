@@ -46,10 +46,10 @@ BEGIN
 	END
 
 	DROP TABLE IF EXISTS #WhiteLabelList
-	CREATE TABLE #WhiteLabelList (custID INT, WhiteLabel NVARCHAR(50))
+	CREATE TABLE #WhiteLabelList (custID INT, WhiteLabel NVARCHAR(50), LaunchedDate SMALLDATETIME)
 
-	INSERT INTO #WhiteLabelList (custID, WhiteLabel)
-	SELECT wl.custID, wl.WhiteLabel
+	INSERT INTO #WhiteLabelList (custID, WhiteLabel, LaunchedDate)
+	SELECT wl.custID, wl.WhiteLabel, wl.LaunchedDate
 	FROM  WhiteLabelInfo wl WITH(NOLOCK)
 	INNER JOIN CustInfo ci WITH(NOLOCK) ON wl.CustID = ci.custid
 	INNER JOIN #tmpSuperList ts ON ci.srecommend = ts.custID
@@ -69,12 +69,12 @@ BEGIN
 			SUM( CASE WHEN TypeID IN (2,3,4,5,6) THEN  WinLoss ELSE 0 END) AS Promotion
 	FROM   WhiteLabelWinloss w WITH(NOLOCK)
 	INNER JOIN #WhiteLabelList wlb ON w.CustID = wlb.custID
-	LEFT JOIN bodb02.dbo.Customer cs WITH(NOLOCK) ON w.MRecommend = cs.CustID
+	LEFT JOIN bodb02.dbo.Customer cs WITH(NOLOCK) ON w.SRecommend = cs.CustID
 	LEFT JOIN bodb02.dbo.Customer cm WITH(NOLOCK) ON w.MRecommend = cm.CustID
 	LEFT JOIN bodb02.dbo.Customer cr WITH(NOLOCK) ON w.Recommend = cr.CustID
-	WHERE  w.WinlostDate BETWEEN @FDate AND @TDate AND w.TypeId NOT IN (1,5)
+	WHERE  w.WinlostDate BETWEEN @FDate AND @TDate AND w.WinlostDate >= wlb.LaunchedDate 
 	GROUP BY w.WinlostDate, cs.username, cm.username, cr.username, wlb.WhiteLabel
-	ORDER BY  w.WinlostDate, cs.username, cm.username, cr.username
+	ORDER BY  w.WinlostDate, cs.username, cm.username, wlb.WhiteLabel
 
 
 END
