@@ -1,9 +1,10 @@
-/*<info serverAlias="DBBOF-bodb02" executers="bodbExtAccNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBBOF-bodb02" executers="wsv_xnap" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[EAS_TotalBet_1378Sel] 	
 	@GroupName		VARCHAR(50),
-	@LeagueIds		VARCHAR(1000) = NULL,
-	@MatchIds		VARCHAR(1000) = NULL,
-	@ViewMode		TINYINT = 1
+	@LeagueIds		VARCHAR(MAX) = NULL,
+	@MatchIds		VARCHAR(MAX) = NULL,
+	@ViewMode		TINYINT = 1,
+	@BaseCurrency	INT = 0 --MYR
 AS
 /*
 	Created by: Bobby@20221215
@@ -11,11 +12,19 @@ AS
 	DB: DBBOF/bodb02
 	Revisions:
 		- 20221215@Bobby: Initialize SPs
+		- 20231219@Lewis: Imlement Maylasia headline [RedmineID: #196959]
+		- 20240912@Bobby: Multiple leagues [RedmineID : #210635]
 
 	Explanation:
 		- @ViewMode: TINYINT
 			+ 1 -> View by headline [actual_stake * epositiontaking|ExtraPT2]
 			+ 2 -> View by super [actual_stake * spositiontaking]
+		- @BaseCurrency:	0 unchecked
+							1 MYR
+							2 CNY
+							3 THB
+							4 IDR
+
 */
 BEGIN
 	SET NOCOUNT ON;
@@ -27,6 +36,7 @@ BEGIN
 		, @LeagueIds	= IIF(@LeagueIds = 'ALL', NULL, @LeagueIds)
 		, @MatchIds		= IIF(@MatchIds = 'ALL', NULL, @MatchIds)
 		, @winlostdate	= CAST(GETDATE() AS DATE)
+		, @BaseCurrency	= ISNULL(@BaseCurrency, 0)
 
 	-- filter league								
 	DECLARE @leagueList TABLE  (leagueid INT);								
@@ -123,8 +133,11 @@ BEGIN
 		FROM dbo.bettrans b WITH(NOLOCK, INDEX = IX_betrunning_srecommend)							
 		INNER JOIN #super super ON super.CustID = b.srecommend							
 		INNER JOIN #cteEvent e ON e.matchid = b.matchid							
+		LEFT JOIN dbo.EAS_f_GetExchangeRate(@winlostdate, @winlostdate,@GroupName, @BaseCurrency) o ON b.currency = o.CurrencyId
 		CROSS APPLY (							
-			SELECT b.actual_stake * IIF(@ViewMode = 1, ISNULL(super.ExtraPT2, b.epositiontaking), b.spositiontaking) AS stakePT					
+			SELECT b.actual_stake 
+								* IIF(@ViewMode = 1, ISNULL(super.ExtraPT2, b.epositiontaking), b.spositiontaking)
+								* o.Rate AS stakePT
 		) AS cal							
 		WHERE b.statusID IN (0,1)							
 			AND b.bettype IN (1,3,7,8)				
@@ -146,6 +159,7 @@ BEGIN
 		, ROW_NUMBER() OVER (PARTITION BY tb.liveindicator, e.matchcode ORDER BY tb.liveindicator DESC, e.matchcode ASC, (tb.liveawayscore + tb.livehomescore) DESC) AS RIdx
 	FROM totalbet tb								
 	INNER JOIN dbo.match e WITH(NOLOCK) ON e.matchid = tb.matchid
-	ORDER BY tb.liveindicator DESC;				
+	ORDER BY tb.liveindicator DESC;		
+	
 END
 GO
