@@ -1,6 +1,7 @@
 /*<info serverAlias="DBAGE-bodb02" executers="wsv_xnap" isFunction="0" isNested="0"></info>*/
 CREATE PROCEDURE [dbo].[EAS_GetProductList]
-	@GroupID	INT = NULL
+	@GroupName	VARCHAR(50) = NULL,
+	@Products	NVARCHAR(MAX) = ''
 AS
 
 /*  
@@ -13,6 +14,7 @@ AS
 		- 20200922@Danny: re-order products and filter by @GroupId [Redmine : #141832]
 		- 20201224@Malcolm: re-order products and filter by @GroupId [Redmine : #142459]
 		- 20240226@Lewis: add condition for productlist - RealGroup vs TestGroup [Redmine : #199912]
+		- 20240729@Lewis: Scale Out DBCust - Remove Linked Server [Redmine : #206895]
 	Description:
 		- Environment : 0 - PROD
 						1 - UAT
@@ -21,51 +23,40 @@ AS
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @GroupName VARCHAR(100)
+	DROP TABLE IF EXISTS #ProductList
+	CREATE TABLE #ProductList (
+		ProductID INT 
+		,ProductName VARCHAR(50)
+		,OrderNo INT
+		,Type INT
+	)
 
-	SELECT @GroupName = GroupName FROM DBPOL.NAP_UserControl.dbo.eaGroup WITH (NOLOCK) WHERE GroupID = @GroupID
-
+	INSERT INTO #ProductList (ProductID,ProductName,OrderNo,Type)
 	SELECT
 			CAST(ISNULL(gp.GroupProductId, p.ProductID) AS INT) AS ProductID
 		   ,p.ProductName
 		   ,ISNULL(p.OrderNo,0) AS OrderNo
 		   ,CASE WHEN p.CasinoType = 1 THEN 53
 				 WHEN p.CasinoType = 2 THEN 41
-				 ELSE 0 END AS [Type]
-	INTO #ProductList	
+				 ELSE 0 END AS Type
 	FROM dbo.Products p WITH (NOLOCK)
 	LEFT JOIN dbo.f_GroupProduct() gp ON p.ProductID = gp.ProductId AND gp.ProductId <> gp.GroupProductId
 	WHERE p.GroupType = 0 AND gp.ProductId IS NULL
-		AND p.Enabled = 1
-		AND Environment = CASE WHEN @GroupName NOT IN ('ACCUUS','ACCTEST') THEN 0
-							   ELSE Environment END
-	ORDER BY [Type],OrderNo
-
-
-	IF @GroupID IS NULL
-		SELECT	 ProductID, ProductName, OrderNo, [Type]	
-		FROM 	 #ProductList
-		ORDER BY OrderNo, Type
-	ELSE
-		BEGIN
-			CREATE TABLE #tmpProducts
-			(
-				ProductID INT 
+		AND (
+				p.ProductID IN (SELECT value FROM string_split(@Products,','))
+				OR 
+				ISNULL(@Products,'') =''
 			)
-			DECLARE @Query NVARCHAR(MAX)='SELECT ProductId FROM OPENQUERY (DBPOL,''select ProductId from NAP_UserControl.dbo.eaGroupConfiguration WITH(NOLOCK) WHERE IsShow = 1 AND GroupId =' 
-											+ CAST(@GroupID AS VARCHAR(5)) + ''')'
-
-			INSERT INTO #tmpProducts EXECUTE (@Query)
-
-			SELECT		p.ProductID, p.ProductName, p.OrderNo, p.[Type]	 
-			FROM		#ProductList p
-			INNER JOIN	#tmpProducts  t ON p.ProductID = t.ProductID
-			ORDER BY p.OrderNo, p.Type
-			DROP TABLE #tmpProducts
-		END
-
-		
-		DROP TABLE #ProductList
+		AND p.Enabled = 1
+		AND Environment = CASE WHEN @GroupName IN ('ACCUUS','ACCTEST') THEN Environment
+							   ELSE 0 END
+	
+	SELECT ProductID
+			,ProductName
+			,OrderNo
+			,Type
+	FROM #ProductList
+	ORDER BY OrderNo, Type
 
 	SET NOCOUNT OFF
 END

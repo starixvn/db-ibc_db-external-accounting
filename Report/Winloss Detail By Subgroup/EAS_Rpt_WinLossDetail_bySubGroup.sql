@@ -6,6 +6,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_bySubGroup]
 	@ProductDetails NVARCHAR(MAX) = 'All',
 	@GroupName		VARCHAR(50) = 'ACCINDO',
 	@SubGroup		VARCHAR(50) = NULL,
+	@SubGroupList   NVARCHAR(MAX) = '',
 	@BalanceUpDay	SMALLDATETIME,
 	@MoveBetsDay	SMALLDATETIME,
 	@PageSize		INT = 0,
@@ -25,6 +26,7 @@ AS
 		- 20230630@Lewis: Add Saba Tennis [RedmineID: #190459]
 		- 20240306@Lewis: Add Virtual Ice Hockey [RedmineID: #201129]
 		- 20240515@Lewis: Add SABA Kabaddi [RedmineID: #203763]
+		- 20240729@Lewis: Scale Out DBCust - Remove Linked Server [Redmine : #206895]
 
 	Param's Explanation:  
 		@FromDate, @ToDate: date range  
@@ -66,21 +68,21 @@ BEGIN
 
 	DROP TABLE IF EXISTS #tmpSuperList;
 	CREATE TABLE #tmpSuperList (custID INT PRIMARY KEY)
-
-	DECLARE @ParentID INT
-
-	SELECT @ParentID = GroupID FROM DBCUST.NAP_UserControl.dbo.eaGroup WITH(NOLOCK) WHERE GroupName = @GroupName
+	 -- ========================================
 
 	-- Get list of subgroup
 	DROP TABLE IF EXISTS #tmpSubGroup;
 	CREATE TABLE #tmpSubGroup (SubGroup VARCHAR(50))
 	
-	INSERT INTO #tmpSubGroup
-	SELECT	GroupName
-	FROM	DBCUST.NAP_UserControl.dbo.eaGroup WITH(NOLOCK)
-	WHERE	ParentID = @ParentID
-			AND GroupName = ISNULL(@SubGroup,GroupName);
-
+	IF ISNULL(@SubGroupList,'')<>''
+	BEGIN
+		INSERT INTO #tmpSubGroup
+		SELECT	SubGroup
+		FROM	OPENJSON (@SubGroupList)
+		WITH (SubGroup VARCHAR(50))
+		WHERE	SubGroup = ISNULL(@SubGroup,SubGroup);
+	END
+	 -- ========================================
 	-- Get list of super, avoid case SubGroup not belong to MainGroup
 
 	IF EXISTS (	SELECT TOP 1 1 FROM #tmpSubGroup)
