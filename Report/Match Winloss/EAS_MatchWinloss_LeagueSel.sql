@@ -34,16 +34,16 @@ BEGIN
 	CREATE TABLE #tmpLeague (leagueid INT, leagueGroupId INT)
 	
 	--TODO Saba's sports if any
-	DECLARE @sportTypeList TABLE(SportType INT, leagueGroupId INT);
+	DECLARE @sportTypeList TABLE(SportType INT, leagueGroupId INT, SabaGroupType INT);
 	IF @SportType > 0
 	BEGIN
-		INSERT INTO @sportTypeList(SportType, leagueGroupId)
-		VALUES (@SportType, 0)
+		INSERT INTO @sportTypeList(SportType, leagueGroupId, SabaGroupType)
+		VALUES (@SportType, 0, 0)
 	END
 	ELSE 
 	BEGIN 
-		INSERT INTO @sportTypeList(SportType, leagueGroupId)
-		SELECT ref.Sporttype, ref.leagueGroupId
+		INSERT INTO @sportTypeList(SportType, leagueGroupId, SabaGroupType)
+		SELECT ref.Sporttype, ref.leagueGroupId, saba.SabaGroupType
 		FROM [dbo].[EAS_f_SabaSportSel] () AS saba
 		OUTER APPLY
 		(
@@ -54,8 +54,9 @@ BEGIN
 			)
 			OUTER APPLY OPENJSON(leagueGroupIds) WITH (leagueGroupId INT '$')
 		) AS ref
-		WHERE saba.SabaGroupType = @SportType
-			AND ref.Sporttype > 0
+		WHERE ref.Sporttype > 0
+			--AND saba.SabaGroupType = @SportType
+		;
 		
 	END
 
@@ -78,11 +79,17 @@ BEGIN
 		SELECT DISTINCT rpt.leagueid, rpt.leagueGroupId
 		FROM bodb_Summary.dbo.rptMatchWinloss_compact rpt WITH(NOLOCK)
 			INNER JOIN #tmpSuperList sl ON sl.custID = rpt.custid
-			INNER JOIN @sportTypeList st ON st.SportType = rpt.SportType AND st.leagueGroupId = rpt.leagueGroupId
+			LEFT JOIN @sportTypeList st ON st.SportType = rpt.SportType AND st.leagueGroupId = rpt.leagueGroupId
 			LEFT JOIN dbo.[match] m WITH(NOLOCK) ON m.matchid = rpt.matchid
 		WHERE rpt.winlostdate BETWEEN @fromDateCheck AND @toDateCheck
 			AND NOT (m.eventstatus <> 'Completed')
 			AND rpt.bettype NOT IN (9, 29)
+			AND 1 = CASE 
+						WHEN @SportType > 0		AND st.SportType > 0 THEN 1 --normal sports
+						WHEN @SportType <> -99	AND st.SabaGroupType = @SportType AND st.leagueGroupId > 0 THEN 1 --Saba defined sports
+						WHEN @SportType = -99	AND rpt.leagueGroupId > 0 AND st.leagueGroupId IS NULL THEN 1 --Saba others sports
+						ELSE 0
+					END
 			
 	END
 
@@ -98,6 +105,12 @@ BEGIN
 			INNER JOIN @sportTypeList st ON st.SportType = rpt.SportType AND st.leagueGroupId = rpt.leagueGroupId
 		WHERE rpt.winlostdate BETWEEN @fromDateCheck AND @toDateCheck
 			AND rpt.bettype NOT IN (9, 29)
+			AND 1 = CASE 
+						WHEN @SportType > 0		AND st.SportType > 0 THEN 1 --normal sports
+						WHEN @SportType <> -99	AND st.SabaGroupType = @SportType AND st.leagueGroupId > 0 THEN 1 --Saba defined sports
+						WHEN @SportType = -99	AND rpt.leagueGroupId > 0 AND st.leagueGroupId IS NULL THEN 1 --Saba others sports
+						ELSE 0
+					END
 			
 	END
 
@@ -113,6 +126,12 @@ BEGIN
 			INNER JOIN @sportTypeList st ON st.SportType = rpt.SportType AND st.leagueGroupId = rpt.leagueGroupId
 		WHERE rpt.winlostdate BETWEEN @fromDateCheck AND @toDateCheck
 			AND rpt.bettype NOT IN (9, 29)
+			AND 1 = CASE 
+						WHEN @SportType > 0		AND st.SportType > 0 THEN 1 --normal sports
+						WHEN @SportType <> -99	AND st.SabaGroupType = @SportType AND st.leagueGroupId > 0 THEN 1 --Saba defined sports
+						WHEN @SportType = -99	AND rpt.leagueGroupId > 0 AND st.leagueGroupId IS NULL THEN 1 --Saba others sports
+						ELSE 0
+					END
 	END
 	
 	SELECT tmp.leagueid

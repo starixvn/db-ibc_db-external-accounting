@@ -1,4 +1,4 @@
-/*<info serverAlias="DBEXT-bodb02" selecters="wsv_xnap" viewers="" isFunction="1" isNested="1"></info>*/
+/*<info serverAlias="DBAGE-bodb02" selecters="wsv_xnap" viewers="" isFunction="1" isNested="1"></info>*/
 ALTER FUNCTION [dbo].[EAS_f_SabaSportSel] ()
 RETURNS TABLE
 AS
@@ -38,15 +38,15 @@ RETURN
 		UNION ALL
 		SELECT 1, 'Sportsbook', -7, 'SABA ESports PinGoal', 'SB', 908,
 			'{"Sporttype":43, "LeagueGroupID": [151]}', -7
-		UNION ALL
-		SELECT 1, 'Sportsbook', -8, 'SABA Cricket', 'SB', 909,
-			'{"Sporttype":50, "LeagueGroupID": [42]}', -99
-		UNION ALL
-		SELECT 1, 'Sportsbook', -10, 'SABA Ice Hockey', 'SB', 910, 
-			'{"Sporttype":4, "LeagueGroupID": [42]}', -99
-		UNION ALL
-		SELECT 1, 'Sportsbook', -11, 'SABA Kabaddi', 'SB', 911, 
-			'{"Sporttype":47, "LeagueGroupID": [42]}', -99
+		--UNION ALL
+		--SELECT 1, 'Sportsbook', -8, 'SABA Cricket', 'SB', 909,
+		--	'{"Sporttype":50, "LeagueGroupID": [42]}', -99
+		--UNION ALL
+		--SELECT 1, 'Sportsbook', -10, 'SABA Ice Hockey', 'SB', 910, 
+		--	'{"Sporttype":4, "LeagueGroupID": [42]}', -99
+		--UNION ALL
+		--SELECT 1, 'Sportsbook', -11, 'SABA Kabaddi', 'SB', 911, 
+		--	'{"Sporttype":47, "LeagueGroupID": [42]}', -99
 		UNION ALL
 		SELECT 1, 'Sportsbook', -99, 'SABA Orther Sports', 'SB', 999, 
 			'{"Sporttype":0, "LeagueGroupID": [0]}', -99

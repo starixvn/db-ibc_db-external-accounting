@@ -34,16 +34,16 @@ BEGIN
 	CREATE TABLE #tmpMatch(matchid INT PRIMARY KEY, matchcode NVARCHAR(50), homeid INT, awayid INT, isNeutral BIT);
 	
 	--TODO Saba's sports if any
-	DECLARE @sportTypeList TABLE(SportType INT, leagueGroupId INT);
+	DECLARE @sportTypeList TABLE(SportType INT, leagueGroupId INT, SabaGroupType INT);
 	IF @SportType > 0
 	BEGIN
-		INSERT INTO @sportTypeList(SportType, leagueGroupId)
-		VALUES (@SportType, 0)
+		INSERT INTO @sportTypeList(SportType, leagueGroupId, SabaGroupType)
+		VALUES (@SportType, 0, 0)
 	END
 	ELSE 
 	BEGIN 
-		INSERT INTO @sportTypeList(SportType, leagueGroupId)
-		SELECT ref.Sporttype, ref.leagueGroupId
+		INSERT INTO @sportTypeList(SportType, leagueGroupId, SabaGroupType)
+		SELECT ref.Sporttype, ref.leagueGroupId, saba.SabaGroupType
 		FROM [dbo].[EAS_f_SabaSportSel] () AS saba
 		OUTER APPLY
 		(
@@ -54,8 +54,7 @@ BEGIN
 			)
 			OUTER APPLY OPENJSON(leagueGroupIds) WITH (leagueGroupId INT '$')
 		) AS ref
-		WHERE saba.SabaGroupType = @SportType
-			AND ref.Sporttype > 0
+		WHERE ref.Sporttype > 0
 		
 	END
 
@@ -76,38 +75,56 @@ BEGIN
 	IF @fromDateCheck > @moveBetDate
 	BEGIN
 		INSERT INTO #tmpMatch
-		SELECT DISTINCT rpt.matchid, rpt.matchcode, rpt.homeid, rpt.awayid, rpt.isNeutral
+		SELECT DISTINCT IIF(rpt.ChildMatchType = 200, rpt.parentid, rpt.matchid) AS matchid, rpt.matchcode, rpt.homeid, rpt.awayid, rpt.isNeutral
 		FROM bodb_Summary.dbo.rptMatchWinloss_compact rpt WITH(NOLOCK)
 			INNER JOIN #tmpSuperList sl ON sl.custID = rpt.custid
-			INNER JOIN @sportTypeList st ON st.SportType = rpt.SportType AND st.leagueGroupId = rpt.leagueGroupId
+			LEFT JOIN @sportTypeList st ON st.SportType = rpt.SportType AND st.leagueGroupId = rpt.leagueGroupId
 			INNER JOIN #tmpLeague tl ON tl.leagueid = rpt.leagueid
-			INNER JOIN dbo.[match] m WITH(NOLOCK) ON m.matchid = rpt.matchid
+			INNER JOIN dbo.[match] m WITH(NOLOCK) ON m.matchid = IIF(rpt.ChildMatchType = 200, rpt.parentid, rpt.matchid)
 		WHERE rpt.winlostdate = @fromDateCheck
 			AND NOT (m.eventstatus <> 'Completed')
+			AND 1 = CASE 
+						WHEN @SportType > 0		AND st.SportType > 0 THEN 1 --normal sports
+						WHEN @SportType <> -99	AND st.SabaGroupType = @SportType AND st.leagueGroupId > 0 THEN 1 --Saba defined sports
+						WHEN @SportType = -99	AND rpt.leagueGroupId > 0 AND st.leagueGroupId IS NULL THEN 1 --Saba others sports
+						ELSE 0
+					END
 	END
 
 	IF @fromDateCheck BETWEEN @balanceUpDate AND @moveBetDate
 	BEGIN
 		INSERT INTO #tmpMatch
-		SELECT DISTINCT rpt.matchid, rpt.matchcode, rpt.homeid, rpt.awayid, rpt.isNeutral
+		SELECT DISTINCT IIF(rpt.ChildMatchType = 200, rpt.parentid, rpt.matchid) AS matchid, rpt.matchcode, rpt.homeid, rpt.awayid, rpt.isNeutral
 		FROM bodb_Summary.dbo.rptMatchWinloss rpt WITH(NOLOCK)
 			INNER JOIN #tmpSuperList sl ON sl.custID = rpt.custid
-			INNER JOIN @sportTypeList st ON st.SportType = rpt.SportType AND st.leagueGroupId = rpt.leagueGroupId
+			LEFT JOIN @sportTypeList st ON st.SportType = rpt.SportType AND st.leagueGroupId = rpt.leagueGroupId
 			INNER JOIN #tmpLeague tl ON tl.leagueid = rpt.leagueid
 		WHERE rpt.winlostdate = @fromDateCheck
 			AND rpt.bettype NOT IN (9, 29, 10)
+			AND 1 = CASE 
+						WHEN @SportType > 0		AND st.SportType > 0 THEN 1 --normal sports
+						WHEN @SportType <> -99	AND st.SabaGroupType = @SportType AND st.leagueGroupId > 0 THEN 1 --Saba defined sports
+						WHEN @SportType = -99	AND rpt.leagueGroupId > 0 AND st.leagueGroupId IS NULL THEN 1 --Saba others sports
+						ELSE 0
+					END
 	END
 
 	IF @fromDateCheck < @balanceUpDate
 	BEGIN
 		INSERT INTO #tmpMatch
-		SELECT DISTINCT rpt.matchid, rpt.matchcode, rpt.homeid, rpt.awayid, rpt.isNeutral
+		SELECT DISTINCT IIF(rpt.ChildMatchType = 200, rpt.parentid, rpt.matchid) AS matchid, rpt.matchcode, rpt.homeid, rpt.awayid, rpt.isNeutral
 		FROM bodb_Summary.dbo.rptMatchWinloss_old rpt WITH(NOLOCK)
 			INNER JOIN #tmpSuperList sl ON sl.custID = rpt.custid
-			INNER JOIN @sportTypeList st ON st.SportType = rpt.SportType AND st.leagueGroupId = rpt.leagueGroupId
+			LEFT JOIN @sportTypeList st ON st.SportType = rpt.SportType AND st.leagueGroupId = rpt.leagueGroupId
 			INNER JOIN #tmpLeague tl ON tl.leagueid = rpt.leagueid
 		WHERE rpt.winlostdate = @fromDateCheck
 			AND rpt.bettype NOT IN (9, 29, 10)
+			AND 1 = CASE 
+						WHEN @SportType > 0		AND st.SportType > 0 THEN 1 --normal sports
+						WHEN @SportType <> -99	AND st.SabaGroupType = @SportType AND st.leagueGroupId > 0 THEN 1 --Saba defined sports
+						WHEN @SportType = -99	AND rpt.leagueGroupId > 0 AND st.leagueGroupId IS NULL THEN 1 --Saba others sports
+						ELSE 0
+					END
 	END
 
 	SELECT matchid

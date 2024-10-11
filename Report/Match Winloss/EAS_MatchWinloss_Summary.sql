@@ -85,16 +85,16 @@ BEGIN
 	CREATE TABLE #tmpExchangeRate(CurrencyId INT, ExchangeDate SMALLDATETIME, Rate MONEY);
 
 	--TODO Saba's sports if any
-	DECLARE @sportTypeList TABLE(SportType INT, LeagueGroupId INT);
+	DECLARE @sportTypeList TABLE(SportType INT, LeagueGroupId INT, SabaGroupType INT);
 	IF @SportType > 0
 	BEGIN
-		INSERT INTO @sportTypeList(SportType, LeagueGroupId)
-		VALUES (@SportType, 0)
+		INSERT INTO @sportTypeList(SportType, LeagueGroupId, SabaGroupType)
+		VALUES (@SportType, 0, 0)
 	END
 	ELSE 
 	BEGIN 
-		INSERT INTO @sportTypeList(SportType, LeagueGroupId)
-		SELECT ref.Sporttype, ref.LeagueGroupID
+		INSERT INTO @sportTypeList(SportType, LeagueGroupId, SabaGroupType)
+		SELECT ref.Sporttype, ref.LeagueGroupID, saba.SabaGroupType
 		FROM [dbo].[EAS_f_SabaSportSel] () AS saba
 		OUTER APPLY
 		(
@@ -105,8 +105,7 @@ BEGIN
 			)
 			OUTER APPLY OPENJSON(LeagueGroupIDs) WITH (LeagueGroupID INT '$')
 		) AS ref
-		WHERE saba.SabaGroupType = @SportType
-			AND ref.Sporttype > 0
+		WHERE ref.Sporttype > 0
 	END
 
 	----TODO: Headline
@@ -160,10 +159,11 @@ BEGIN
 			CASE 
 				WHEN rpt.bettype IN (9,29) THEN 29
 				WHEN rpt.bettype IN (10) THEN rpt.bettype
+				WHEN rpt.ChildMatchType = 200 THEN rpt.parentid
 				ELSE rpt.matchid END AS matchid
 			,rpt.leagueid
 			,rpt.matchcode
-			,ISNULL(m.GlobalShowTime, 0) AS kickofftime ---> admin can change KO time any time
+			,ISNULL(DATEADD(HOUR, 12, m.kickofftime), 0) AS kickofftime ---> admin can change KO time any time
 			,rpt.homeid, rpt.awayid, rpt.isNeutral
 			,AVG((rpt.turnover * ex.Rate)/rpt.betCount)	AS stakeAvg
 			,SUM(rpt.betCount)	AS betCount
@@ -215,13 +215,20 @@ BEGIN
 						WHEN st.sporttype > 0 AND tl.leagueid > 0 THEN 1
 						ELSE 0
 					END
+			AND 1 = CASE 
+						WHEN @SportType > 0		AND st.SportType > 0 THEN 1 --normal sports
+						WHEN @SportType <> -99	AND st.SabaGroupType = @SportType AND st.leagueGroupId > 0 THEN 1 --Saba defined sports
+						WHEN @SportType = -99	AND rpt.leagueGroupId > 0 AND st.leagueGroupId IS NULL THEN 1 --Saba others sports
+						ELSE 0
+					END
 		GROUP BY 
 			CASE 
 				WHEN rpt.bettype IN (9,29) THEN 29
 				WHEN rpt.bettype IN (10) THEN rpt.bettype
+				WHEN rpt.ChildMatchType = 200 THEN rpt.parentid
 				ELSE rpt.matchid END
 			, rpt.leagueid
-			, rpt.matchcode, ISNULL(m.GlobalShowTime, 0), rpt.homeid, rpt.awayid, rpt.isNeutral;
+			, rpt.matchcode, ISNULL(DATEADD(HOUR, 12, m.kickofftime), 0), rpt.homeid, rpt.awayid, rpt.isNeutral;
 	END
 
 	IF @FromDate <= @moveBetDate
@@ -235,9 +242,10 @@ BEGIN
 			CASE 
 				WHEN rpt.bettype IN (9,29) THEN 29
 				WHEN rpt.bettype IN (10) THEN rpt.bettype
+				WHEN rpt.ChildMatchType = 200 THEN rpt.parentid
 				ELSE rpt.matchid END AS matchid
 			,rpt.leagueid
-			,rpt.matchcode, rpt.kickofftime, rpt.homeid, rpt.awayid, rpt.isNeutral
+			,rpt.matchcode, DATEADD(HOUR, 12, rpt.kickofftime) AS kickofftime, rpt.homeid, rpt.awayid, rpt.isNeutral
 			,AVG((rpt.turnover * ex.Rate)/rpt.betCount)	AS stakeAvg
 			,SUM(rpt.betCount)	AS betCount
 			,SUM(ABS(rpt.turnover * ex.Rate))	AS turnover
@@ -286,13 +294,20 @@ BEGIN
 						WHEN st.sporttype > 0 AND tl.leagueid > 0 THEN 1
 						ELSE 1
 					END
+			AND 1 = CASE 
+						WHEN @SportType > 0		AND st.SportType > 0 THEN 1 --normal sports
+						WHEN @SportType <> -99	AND st.SabaGroupType = @SportType AND st.leagueGroupId > 0 THEN 1 --Saba defined sports
+						WHEN @SportType = -99	AND rpt.leagueGroupId > 0 AND st.leagueGroupId IS NULL THEN 1 --Saba others sports
+						ELSE 0
+					END
 		GROUP BY 
 			CASE 
 				WHEN rpt.bettype IN (9,29) THEN 29
 				WHEN rpt.bettype IN (10) THEN rpt.bettype
+				WHEN rpt.ChildMatchType = 200 THEN rpt.parentid
 				ELSE rpt.matchid END
 			, rpt.leagueid
-			, rpt.matchcode, rpt.kickofftime, rpt.homeid, rpt.awayid, rpt.isNeutral;
+			, rpt.matchcode, DATEADD(HOUR, 12, rpt.kickofftime), rpt.homeid, rpt.awayid, rpt.isNeutral;
 	END
 
 	--TODO: rptMatchWinloss_old
@@ -307,9 +322,10 @@ BEGIN
 			CASE 
 				WHEN rpt.bettype IN (9,29) THEN 29
 				WHEN rpt.bettype IN (10) THEN rpt.bettype
+				WHEN rpt.ChildMatchType = 200 THEN rpt.parentid
 				ELSE rpt.matchid END AS matchid
 			,rpt.leagueid
-			,rpt.matchcode, rpt.kickofftime, rpt.homeid, rpt.awayid, rpt.isNeutral
+			,rpt.matchcode, DATEADD(HOUR, 12, rpt.kickofftime) AS kickofftime, rpt.homeid, rpt.awayid, rpt.isNeutral
 			,AVG((rpt.turnover * ex.Rate)/rpt.betCount)	AS stakeAvg
 			,SUM(rpt.betCount)	AS betCount
 			,SUM(ABS(rpt.turnover * ex.Rate))	AS turnover
@@ -358,13 +374,20 @@ BEGIN
 						WHEN st.sporttype > 0 AND tl.leagueid > 0 THEN 1
 						ELSE 0
 					END
+			AND 1 = CASE 
+						WHEN @SportType > 0		AND st.SportType > 0 THEN 1 --normal sports
+						WHEN @SportType <> -99	AND st.SabaGroupType = @SportType AND st.leagueGroupId > 0 THEN 1 --Saba defined sports
+						WHEN @SportType = -99	AND rpt.leagueGroupId > 0 AND st.leagueGroupId IS NULL THEN 1 --Saba others sports
+						ELSE 0
+					END
 		GROUP BY 
 			CASE 
 				WHEN rpt.bettype IN (9,29) THEN 29
 				WHEN rpt.bettype IN (10) THEN rpt.bettype
+				WHEN rpt.ChildMatchType = 200 THEN rpt.parentid
 				ELSE rpt.matchid END
 			, rpt.leagueid
-			, rpt.matchcode, rpt.kickofftime, rpt.homeid, rpt.awayid, rpt.isNeutral;
+			, rpt.matchcode, DATEADD(HOUR, 12, rpt.kickofftime), rpt.homeid, rpt.awayid, rpt.isNeutral;
 	END
 
 	-- TODO: Sorting all columns
