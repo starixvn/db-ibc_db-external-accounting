@@ -11,47 +11,20 @@ AS
 		- 20240718@Bobby: Initialize SPs
 */
 RETURN
-	WITH CTE_SabaSport AS (
-		SELECT 1 AS ProductId, 
-			'Sportsbook' AS ProductName, 
-			-2 AS SabaSportType, 
-			'SABA Soccer' AS SportName, 
-			'SB' AS ProductCode, 
-			902 AS SportOrder, 
-			'{"Sporttype":1, "LeagueGroupID": [42,74]}' AS SporttypeRef,
-			-2 AS SabaGroupType
-		UNION ALL
-		SELECT 1, 'Sportsbook', -3, 'SABA Futsal', 'SB', 903,
-			'{"Sporttype":1, "LeagueGroupID": [108]}', -2
-		UNION ALL
-		SELECT 1, 'Sportsbook', -5, 'SABA Basketball', 'SB', 904,
-			'{"Sporttype":2, "LeagueGroupID": [42]}', -5
-		UNION ALL	
-		SELECT 1, 'Sportsbook', -9, 'SABA Tennis', 'SB', 905,
-			'{"Sporttype":5, "LeagueGroupID": [42]}', -9
-		UNION ALL
-		SELECT 1, 'Sportsbook', -4, 'SABA Soccer PinGoal', 'SB', 906,
-			'{"Sporttype":1, "LeagueGroupID": [113]}', -4
-		UNION ALL
-		SELECT 1, 'Sportsbook', -6, 'SABA Basketball PinGoal', 'SB', 907,
-			'{"Sporttype":2, "LeagueGroupID": [122]}', -6
-		UNION ALL
-		SELECT 1, 'Sportsbook', -7, 'SABA ESports PinGoal', 'SB', 908,
-			'{"Sporttype":43, "LeagueGroupID": [151]}', -7
-		--UNION ALL
-		--SELECT 1, 'Sportsbook', -8, 'SABA Cricket', 'SB', 909,
-		--	'{"Sporttype":50, "LeagueGroupID": [42]}', -99
-		--UNION ALL
-		--SELECT 1, 'Sportsbook', -10, 'SABA Ice Hockey', 'SB', 910, 
-		--	'{"Sporttype":4, "LeagueGroupID": [42]}', -99
-		--UNION ALL
-		--SELECT 1, 'Sportsbook', -11, 'SABA Kabaddi', 'SB', 911, 
-		--	'{"Sporttype":47, "LeagueGroupID": [42]}', -99
-		UNION ALL
-		SELECT 1, 'Sportsbook', -99, 'SABA Orther Sports', 'SB', 999, 
-			'{"Sporttype":0, "LeagueGroupID": [0]}', -99
-		
-	)
-	SELECT ProductID, SabaSportType, SabaGroupType, ProductName, SportName, ProductCode, SportOrder, SporttypeRef
-	FROM CTE_SabaSport;
+	SELECT RefId, Sporttype
+		, LeagueGroupID	
+		, CASE 
+			WHEN Sporttype = 1 AND LeagueGroupID IN (42,74,108) THEN -2 --SABA Soccer & Futsal
+			WHEN Sporttype = 2 AND LeagueGroupID IN (42) THEN -3 -- SABA Basketball
+			WHEN Sporttype = 5 AND LeagueGroupID IN (42) THEN -4 -- SABA Tennis
+			WHEN Sporttype = 1 AND LeagueGroupID IN (113) THEN -5 -- SABA Soccer PinGoal
+			WHEN Sporttype = 2 AND LeagueGroupID IN (122) THEN -6 --SABA Basketball PinGoal
+			WHEN Sporttype = 43 AND LeagueGroupID IN (151) THEN -7 --SABA E-Sports PinGoal
+			ELSE -99
+		END AS SabaGroupType -- SABA defined sports
+		, ResourceId
+		, ResourceId AS SportOrder
+	FROM dbo.f_GetProductDetail() f
+	WHERE ProductId = 1 --SB only
+		AND LeagueGroupID > 0
 GO

@@ -18,16 +18,28 @@ BEGIN
 	DECLARE @isTest BIT = 0
 	SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
 
-	SELECT DISTINCT 
-		bt.typeid AS Bettype
-		,bt.typenamee AS BettypeName
-	FROM dbo.SportBettypeMatrix sb WITH (NOLOCK)
-		INNER JOIN dbo.Products p WITH (NOLOCK)	ON p.ProductID = sb.ProductID
-		LEFT JOIN dbo.f_GroupBettype() bg ON bg.bettype = sb.bettype
-		INNER JOIN dbo.Bettype bt WITH (NOLOCK)	ON bt.typeid = ISNULL(bg.GroupTypeId, sb.bettype)
-	WHERE p.ProductID = @ProductId
-		AND sb.IsTest <= @isTest
-	
-	ORDER BY bt.typeid
+	;
+	WITH CTE_Bettype AS (
+		SELECT TypeId 
+		FROM [dbo].[EAS_f_MatchWinloss_BettypeSel] ()
+	)
+	SELECT Bettype, BettypeName
+	FROM (
+		SELECT DISTINCT 
+			ISNULL(bg.GroupTypeId, bt.typeid) AS Bettype
+			,bt.typenamee AS BettypeName
+		FROM dbo.SportBettypeMatrix sb WITH (NOLOCK)
+			INNER JOIN CTE_Bettype cte ON cte.TypeId = sb.BetType
+			INNER JOIN dbo.Bettype bt WITH (NOLOCK)	ON bt.typeid = cte.TypeId
+			LEFT JOIN dbo.f_GroupBettype() bg ON bg.bettype = bt.typeid
+			
+		WHERE sb.ProductID = @ProductId
+			AND sb.IsTest <= @isTest
+
+		UNION ALL
+		SELECT 9999, 'Others'
+	) AS t
+	ORDER BY CASE WHEN Bettype = 9999 THEN 1 ELSE 0 END ASC
+		, Bettype
 END
 GO

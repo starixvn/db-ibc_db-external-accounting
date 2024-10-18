@@ -1,5 +1,5 @@
-/*<info serverAlias="DBAGE-bodb02,DBBOF-bodb02" selecters="wsv_xnap" isFunction="1" isNested="0"></info>*/
-ALTER FUNCTION EAS_f_GetExchangeRate
+/*<info serverAlias="DBAGE-bodb02,DBBOF-bodb02" selecters="bodbExtAccNet" isFunction="1" isNested="0"></info>*/
+CREATE FUNCTION EAS_f_GetExchangeRate
 (
 	@FromDate SMALLDATETIME
 	,@ToDate SMALLDATETIME
@@ -13,8 +13,6 @@ ALTER FUNCTION EAS_f_GetExchangeRate
   
 	Revisions:
 		- 20231204@Lewis: Initialize SP [Redmine: #196959]
-		- 20240718@Bobby: Implement match winloss reports [RedmineID : #205355]
-
 	Param's Explanation:
 		@BaseCurrency:  0 unchecked
 						1 MYR

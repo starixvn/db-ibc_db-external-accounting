@@ -19,27 +19,37 @@ BEGIN
 	SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
 
 	;WITH CTE_SabaSport AS (
-		SELECT DISTINCT sb.SabaSportType AS SportType, sb.SportName, sb.SportOrder 
-		FROM dbo.[EAS_f_SabaSportSel]() sb
-		INNER JOIN dbo.[EAS_f_SabaSportSel]() sg ON sg.SabaGroupType = sb.SabaSportType
+		SELECT DISTINCT IIF(SabaGroupType = -99, 'SABA Other Sports', RefId) AS RefId,
+			SabaGroupType AS Sporttype,
+			ResourceId,
+			SabaGroupType AS SportOrder
+		FROM [dbo].[EAS_f_SabaSportSel] ()
 	)
-	SELECT SportType, SportName, SportOrder
+	SELECT RefId, SportType, ResourceId
 	FROM (
-		SELECT DISTINCT 
-			sb.SportType
-			,s.SportName
+		SELECT DISTINCT 'Normal' AS RefId
+			,sb.SportType
 			,sb.SportType AS SportOrder
+			,sb.SportType AS ResourceId
 		FROM dbo.SportBettypeMatrix sb WITH (NOLOCK)
 			INNER JOIN dbo.Products p WITH (NOLOCK)	ON p.ProductID = sb.ProductID
 			INNER JOIN dbo.Sports s WITH (NOLOCK)	ON s.SportType = sb.SportType
 		WHERE p.ProductID = @ProductId
 			AND sb.IsTest <= @isTest
-		UNION ALL 
-		SELECT SportType, SportName, SportOrder 
-		FROM CTE_SabaSport
 
+		UNION ALL --SABA Sports
+		SELECT RefId, SportType, SportOrder, ResourceId
+		FROM CTE_SabaSport
 	) AS t
-	ORDER BY t.SportOrder
+	WHERE t.SportType NOT IN (27) -- Exclude old Criket
+	ORDER BY 
+		CASE 
+			WHEN SportType IN (1,2,9,43) THEN 1
+			WHEN SportType IN (5) THEN 2
+			ELSE 3 END
+		, CASE WHEN SportType < 0 THEN 1 ELSE 0 END
+		, CASE WHEN SportType < 0 THEN SportOrder ELSE 0 END DESC
+		, t.SportType
 
 END
 GO

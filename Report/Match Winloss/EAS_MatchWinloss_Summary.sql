@@ -4,7 +4,7 @@ ALTER PROCEDURE [dbo].[EAS_MatchWinloss_Summary]
 	@FromDate		SMALLDATETIME,
 	@ToDate			SMALLDATETIME,
 	@SportType		SMALLINT,
-	@LeagueIds		VARCHAR(1000),
+	@LeagueIds		VARCHAR(1000)	= '',
 	@Currencies		VARCHAR(1000)	= '',
 	@BaseCurrency	VARCHAR(5)		= '',
 	@SortBy			VARCHAR(30)		= 'kickofftime',
@@ -31,7 +31,7 @@ BEGIN
 		@baseCurrencyId		INT;
 
 	SELECT @fromDateCheck	= CAST(ISNULL(@FromDate, GETDATE()) AS DATE),
-		@toDateCheck		= CASt(ISNULL(@toDateCheck, GETDATE()) AS DATE),
+		@toDateCheck		= CASt(ISNULL(@ToDate, GETDATE()) AS DATE),
 		@Currencies			= ISNULL(@Currencies, ''),
 		@BaseCurrency		= ISNULL(@BaseCurrency, '')
 	;
@@ -42,7 +42,7 @@ BEGIN
 	DROP TABLE IF EXISTS #tmpExchangeRate;
 
 	CREATE TABLE #tmpSuperList(custID INT PRIMARY KEY, Currency INT)
-	CREATE TABLE #tmpLeague(leagueid INT PRIMARY KEY);
+	CREATE TABLE #tmpLeague(leagueid INT, SportType INT, LeagueGroupId INT, SabaGroupType INT, PRIMARY KEY (leagueid, SportType, LeagueGroupId));
 	CREATE TABLE #tmpReportData (
 		matchid INT 
 		,leagueid INT
@@ -73,15 +73,15 @@ BEGIN
 		,masterTotal DECIMAL(24, 4)
 
 		----super
-		,snetTurnover DECIMAL(24, 4)
 		,superWinloss DECIMAL(24, 4)
 		,superComm DECIMAL(24, 4)
 		,superTotal DECIMAL(24, 4)
 
 		----company
-		,companyComm DECIMAL(24, 4)
-		,PRIMARY KEY (matchid)
+		,companyTotal DECIMAL(24, 4)
 	);
+	CREATE CLUSTERED INDEX CIX_matchid ON #tmpReportData(matchid);
+
 	CREATE TABLE #tmpExchangeRate(CurrencyId INT, ExchangeDate SMALLDATETIME, Rate MONEY);
 
 	--TODO Saba's sports if any
@@ -94,18 +94,8 @@ BEGIN
 	ELSE 
 	BEGIN 
 		INSERT INTO @sportTypeList(SportType, LeagueGroupId, SabaGroupType)
-		SELECT ref.Sporttype, ref.LeagueGroupID, saba.SabaGroupType
+		SELECT Sporttype, LeagueGroupID, SabaGroupType
 		FROM [dbo].[EAS_f_SabaSportSel] () AS saba
-		OUTER APPLY
-		(
-			SELECT Sporttype, LeagueGroupID
-			FROM OPENJSON(saba.SporttypeRef)
-			WITH (Sporttype INT '$.Sporttype', 
-				LeagueGroupIDs NVARCHAR(MAX) '$.LeagueGroupID' AS JSON
-			)
-			OUTER APPLY OPENJSON(LeagueGroupIDs) WITH (LeagueGroupID INT '$')
-		) AS ref
-		WHERE ref.Sporttype > 0
 	END
 
 	----TODO: Headline
@@ -117,30 +107,31 @@ BEGIN
 	;
 
 	--TODO: @LeaguaIds filetring
-	INSERT INTO #tmpLeague (leagueid)
-	SELECT DISTINCT value FROM STRING_SPLIT(@LeagueIds, ',');
-
+	INSERT INTO #tmpLeague (leagueid, SportType, LeagueGroupId, SabaGroupType)
+	SELECT lt.leagueid, sl.SportType, sl.LeagueGroupId, sl.SabaGroupType
+	FROM @sportTypeList sl
+	OUTER APPLY (
+		SELECT DISTINCT CAST(value  AS INT) AS leagueid
+		FROM STRING_SPLIT(@LeagueIds, ',')
+	) AS lt
+	;
+	
 	--TODO: Filter by Currency if ANY
 	IF @Currencies <> ''
 	BEGIN
 		DELETE sl
 		FROM #tmpSuperList sl
 		INNER JOIN dbo.Exchange ex WITH(NOLOCK) ON ex.ExchangeId = sl.Currency
-		LEFT JOIN STRING_SPLIT(@Currencies, ',') cl ON cl.[value] = ex.Code
+		LEFT JOIN STRING_SPLIT(@Currencies, ',') cl ON cl.[value] = ex.Currency
 		WHERE cl.[value] IS NULL
 	END
 
 	--TODO: Exchange rate
 	IF @BaseCurrency <> ''
 	BEGIN
-		SELECT TOP 1 
-			@BaseCurrencyId = CASE WHEN @BaseCurrency = @Currencies THEN 0 ELSE ex.ExchangeId END
-		FROM dbo.Exchange ex WITH (NOLOCK)
-		WHERE ex.Code = @BaseCurrency;
-
-		INSERT INTo #tmpExchangeRate(CurrencyId, ExchangeDate, Rate)
-		SELECT CurrencyId, ExchangeDate, ISNULL(Rate, 1) AS Rate
-		FROM dbo.EAS_f_GetExchangeRate (@fromDateCheck, @toDateCheck, @GroupName, ISNULL(@BaseCurrencyId,0));
+		INSERT INTO #tmpExchangeRate(CurrencyId, ExchangeDate, Rate)
+		SELECT CurrencyId, ExchangeDate, Rate
+		FROM dbo.EAS_f_GetDailyExchangeRate (@fromDateCheck, @toDateCheck, @GroupName, @BaseCurrency);
 	END
 
 	--TODO: get BU/MB days
@@ -165,10 +156,10 @@ BEGIN
 			,rpt.matchcode
 			,ISNULL(DATEADD(HOUR, 12, m.kickofftime), 0) AS kickofftime ---> admin can change KO time any time
 			,rpt.homeid, rpt.awayid, rpt.isNeutral
-			,AVG((rpt.turnover * ex.Rate)/rpt.betCount)	AS stakeAvg
+			,SUM(rpt.turnover * ex.Rate)/SUM(rpt.betCount)	AS stakeAvg
 			,SUM(rpt.betCount)	AS betCount
-			,SUM(ABS(rpt.turnover * ex.Rate))	AS turnover
-			,SUM(rpt.netTurnover * ex.Rate)	AS netTurnover
+			,SUM(rpt.turnover * ex.Rate)	AS turnover
+			,SUM(rpt.turnoverNoDraw * ex.Rate)	AS netTurnover
 			,SUM(rpt.grossComm * ex.Rate) AS grossComm
 
 			----member
@@ -187,19 +178,18 @@ BEGIN
 			,SUM((rpt.mwinlost + rpt.acomm - rpt.comm) * ex.Rate) AS masterTotal
 
 			----super
-			,SUM(rpt.netTurnover * ex.Rate) AS snetTurnover
 			,SUM(rpt.swinlost * ex.Rate) AS superWinloss
 			,SUM((rpt.scomm - rpt.acomm) * ex.Rate) AS superComm
 			,SUM((rpt.swinlost + rpt.scomm - rpt.acomm) * ex.Rate) AS superTotal
 		
 			----company
-			,SUM(rpt.scomm * ex.Rate) AS companyComm
+			,-SUM((rpt.swinlost+rpt.mwinlost+rpt.awinlost+rpt.winlost+rpt.scomm) * ex.Rate) AS companyTotal
 	
 		FROM bodb_Summary.dbo.rptMatchWinloss_compact rpt WITH(NOLOCK)
 			INNER JOIN #tmpSuperList sl ON sl.custID = rpt.custid
-			LEFT JOIN @sportTypeList st ON st.SportType = rpt.sporttype AND st.LeagueGroupId = rpt.leaguegroupid
-			LEFT JOIN #tmpLeague tl ON tl.leagueid = rpt.leagueid
+			LEFT JOIN #tmpLeague tl ON tl.leagueid = rpt.leagueid AND tl.SportType = rpt.sporttype AND tl.LeagueGroupId = rpt.leaguegroupid
 			LEFT JOIN dbo.[match] m WITH(NOLOCK) ON m.matchid = rpt.matchid
+			LEFT JOIN dbo.[outright] o WITH(NOLOCK) ON o.orid = rpt.matchid
 			LEFT JOIN #tmpExchangeRate tx  ON tx.currencyId = rpt.currency AND tx.ExchangeDate = rpt.winlostdate
 			OUTER APPLY (
 				SELECT 
@@ -209,16 +199,12 @@ BEGIN
 			) AS ex(Rate)
 		WHERE 
 			rpt.winlostdate BETWEEN @fromDateCheck AND @toDateCheck
-			AND NOT (m.eventstatus <> 'Completed')
-			AND 1 = CASE 
+			AND NOT (rpt.bettype NOT IN (10, 29) AND (m.eventstatus <> 'Completed'))
+			AND NOT (rpt.bettype = 10 AND (o.oddsstatus <> 'Completed')) 
+			AND 1 = CASE
 						WHEN rpt.bettype IN (9,29) THEN 1
-						WHEN st.sporttype > 0 AND tl.leagueid > 0 THEN 1
-						ELSE 0
-					END
-			AND 1 = CASE 
-						WHEN @SportType > 0		AND st.SportType > 0 THEN 1 --normal sports
-						WHEN @SportType <> -99	AND st.SabaGroupType = @SportType AND st.leagueGroupId > 0 THEN 1 --Saba defined sports
-						WHEN @SportType = -99	AND rpt.leagueGroupId > 0 AND st.leagueGroupId IS NULL THEN 1 --Saba others sports
+						WHEN @SportType > 0	AND tl.SportType > 0 THEN 1 --normal sports
+						WHEN @SportType < 0	AND tl.SabaGroupType = @SportType AND tl.SportType > 0 THEN 1 --Saba sports
 						ELSE 0
 					END
 		GROUP BY 
@@ -246,10 +232,10 @@ BEGIN
 				ELSE rpt.matchid END AS matchid
 			,rpt.leagueid
 			,rpt.matchcode, DATEADD(HOUR, 12, rpt.kickofftime) AS kickofftime, rpt.homeid, rpt.awayid, rpt.isNeutral
-			,AVG((rpt.turnover * ex.Rate)/rpt.betCount)	AS stakeAvg
+			,SUM(rpt.turnover * ex.Rate)/SUM(rpt.betCount)	AS stakeAvg
 			,SUM(rpt.betCount)	AS betCount
-			,SUM(ABS(rpt.turnover * ex.Rate))	AS turnover
-			,SUM(rpt.netTurnover * ex.Rate)	AS netTurnover
+			,SUM(rpt.turnover * ex.Rate)	AS turnover
+			,SUM(rpt.turnoverNoDraw * ex.Rate)	AS netTurnover
 			,SUM(rpt.grossComm * ex.Rate) AS grossComm
 
 			----member
@@ -268,18 +254,16 @@ BEGIN
 			,SUM((rpt.mwinlost + rpt.acomm - rpt.comm) * ex.Rate) AS masterTotal
 
 			----super
-			,SUM(rpt.netTurnover * ex.Rate) AS snetTurnover
 			,SUM(rpt.swinlost * ex.Rate) AS superWinloss
 			,SUM((rpt.scomm - rpt.acomm) * ex.Rate) AS superComm
 			,SUM((rpt.swinlost + rpt.scomm - rpt.acomm) * ex.Rate) AS superTotal
 		
 			----company
-			,SUM(rpt.scomm * ex.Rate) AS companyComm
+			,-SUM((rpt.swinlost+rpt.mwinlost+rpt.awinlost+rpt.winlost+rpt.scomm) * ex.Rate) AS companyTotal
 	
 		FROM bodb_Summary.dbo.rptMatchWinloss rpt WITH(NOLOCK)
 			INNER JOIN #tmpSuperList sl ON sl.custID = rpt.custid
-			LEFT JOIN @sportTypeList st ON st.SportType = rpt.sporttype AND st.LeagueGroupId = rpt.leaguegroupid
-			LEFT JOIN #tmpLeague tl ON tl.leagueid = rpt.leagueid
+			LEFT JOIN #tmpLeague tl ON tl.leagueid = rpt.leagueid AND tl.SportType = rpt.sporttype AND tl.LeagueGroupId = rpt.leaguegroupid
 			LEFT JOIN #tmpExchangeRate tx  ON tx.currencyId = rpt.currency AND tx.ExchangeDate = rpt.winlostdate
 			OUTER APPLY (
 				SELECT 
@@ -291,13 +275,8 @@ BEGIN
 			rpt.winlostdate BETWEEN @fromDateCheck AND @toDateCheck
 			AND 1 = CASE 
 						WHEN rpt.bettype IN (9,29) THEN 1
-						WHEN st.sporttype > 0 AND tl.leagueid > 0 THEN 1
-						ELSE 1
-					END
-			AND 1 = CASE 
-						WHEN @SportType > 0		AND st.SportType > 0 THEN 1 --normal sports
-						WHEN @SportType <> -99	AND st.SabaGroupType = @SportType AND st.leagueGroupId > 0 THEN 1 --Saba defined sports
-						WHEN @SportType = -99	AND rpt.leagueGroupId > 0 AND st.leagueGroupId IS NULL THEN 1 --Saba others sports
+						WHEN @SportType > 0	AND tl.SportType > 0 THEN 1 --normal sports
+						WHEN @SportType < 0	AND tl.SabaGroupType = @SportType AND tl.SportType > 0 THEN 1 --Saba sports
 						ELSE 0
 					END
 		GROUP BY 
@@ -326,10 +305,10 @@ BEGIN
 				ELSE rpt.matchid END AS matchid
 			,rpt.leagueid
 			,rpt.matchcode, DATEADD(HOUR, 12, rpt.kickofftime) AS kickofftime, rpt.homeid, rpt.awayid, rpt.isNeutral
-			,AVG((rpt.turnover * ex.Rate)/rpt.betCount)	AS stakeAvg
+			,SUM(rpt.turnover * ex.Rate)/SUM(rpt.betCount)	AS stakeAvg
 			,SUM(rpt.betCount)	AS betCount
-			,SUM(ABS(rpt.turnover * ex.Rate))	AS turnover
-			,SUM(rpt.netTurnover * ex.Rate)	AS netTurnover
+			,SUM(rpt.turnover * ex.Rate)	AS turnover
+			,SUM(rpt.turnoverNoDraw * ex.Rate)	AS netTurnover
 			,SUM(rpt.grossComm * ex.Rate) AS grossComm
 
 			----member
@@ -348,18 +327,16 @@ BEGIN
 			,SUM((rpt.mwinlost + rpt.acomm - rpt.comm) * ex.Rate) AS masterTotal
 
 			----super
-			,SUM(rpt.netTurnover * ex.Rate) AS snetTurnover
 			,SUM(rpt.swinlost * ex.Rate) AS superWinloss
 			,SUM((rpt.scomm - rpt.acomm) * ex.Rate) AS superComm
 			,SUM((rpt.swinlost + rpt.scomm - rpt.acomm) * ex.Rate) AS superTotal
 		
 			----company
-			,SUM(rpt.scomm * ex.Rate) AS companyComm
+			,-SUM((rpt.swinlost+rpt.mwinlost+rpt.awinlost+rpt.winlost+rpt.scomm) * ex.Rate) AS companyTotal
 	
 		FROM bodb_Summary.dbo.rptMatchWinloss_old rpt WITH(NOLOCK)
 			INNER JOIN #tmpSuperList sl ON sl.custID = rpt.custid
-			LEFT JOIN @sportTypeList st ON st.SportType = rpt.sporttype AND st.leaguegroupid = rpt.leaguegroupid
-			LEFT JOIN #tmpLeague tl ON tl.leagueid = rpt.leagueid
+			LEFT JOIN #tmpLeague tl ON tl.leagueid = rpt.leagueid AND tl.SportType = rpt.sporttype AND tl.LeagueGroupId = rpt.leaguegroupid
 			LEFT JOIN #tmpExchangeRate tx  ON tx.currencyId = rpt.currency AND tx.ExchangeDate = rpt.winlostdate
 			OUTER APPLY (
 				SELECT 
@@ -369,15 +346,10 @@ BEGIN
 			) AS ex(Rate)
 		WHERE 
 			rpt.winlostdate BETWEEN @fromDateCheck AND @toDateCheck
-			AND 1 = CASE 
+			AND 1 = CASE
 						WHEN rpt.bettype IN (9,29) THEN 1
-						WHEN st.sporttype > 0 AND tl.leagueid > 0 THEN 1
-						ELSE 0
-					END
-			AND 1 = CASE 
-						WHEN @SportType > 0		AND st.SportType > 0 THEN 1 --normal sports
-						WHEN @SportType <> -99	AND st.SabaGroupType = @SportType AND st.leagueGroupId > 0 THEN 1 --Saba defined sports
-						WHEN @SportType = -99	AND rpt.leagueGroupId > 0 AND st.leagueGroupId IS NULL THEN 1 --Saba others sports
+						WHEN @SportType > 0	AND tl.SportType > 0 THEN 1 --normal sports
+						WHEN @SportType < 0	AND tl.SabaGroupType = @SportType AND tl.SportType > 0 THEN 1 --Saba sports
 						ELSE 0
 					END
 		GROUP BY 
@@ -397,33 +369,34 @@ BEGIN
 	INSERT INTO #tmpSortValue
 	SELECT matchid,
 		(CASE 
-			WHEN @SortBy = 'betcount' THEN (betcount)
-			WHEN @SortBy = 'stakeAvg' THEN (stakeAvg)
-			WHEN @SortBy = 'turnover' THEN (turnover)
-			WHEN @SortBy = 'netTurnover' THEN (netTurnover)
-			WHEN @SortBy = 'grossComm' THEN (grossComm)
+			WHEN @SortBy = 'betcount' THEN SUM(betcount)
+			WHEN @SortBy = 'stakeAvg' THEN SUM(stakeAvg)
+			WHEN @SortBy = 'turnover' THEN SUM(turnover)
+			WHEN @SortBy = 'netTurnover' THEN SUM(netTurnover)
+			WHEN @SortBy = 'grossComm' THEN SUM(grossComm)
 
-			WHEN @SortBy = 'memberWinloss' THEN (memberWinloss)
-			WHEN @SortBy = 'memberComm' THEN (memberComm)
-			WHEN @SortBy = 'memberTotal' THEN (memberTotal)
+			WHEN @SortBy = 'memberWinloss' THEN SUM(memberWinloss)
+			WHEN @SortBy = 'memberComm' THEN SUM(memberComm)
+			WHEN @SortBy = 'memberTotal' THEN SUM(memberTotal)
 
-			WHEN @SortBy = 'agentWinloss' THEN (agentWinloss)
-			WHEN @SortBy = 'agentComm' THEN (agentComm)
-			WHEN @SortBy = 'agentTotal' THEN (agentTotal)
+			WHEN @SortBy = 'agentWinloss' THEN SUM(agentWinloss)
+			WHEN @SortBy = 'agentComm' THEN SUM(agentComm)
+			WHEN @SortBy = 'agentTotal' THEN SUM(agentTotal)
 
-			WHEN @SortBy = 'masterWinloss' THEN (masterWinloss)
-			WHEN @SortBy = 'masterComm' THEN (masterComm)
-			WHEN @SortBy = 'masterTotal' THEN (masterTotal)
+			WHEN @SortBy = 'masterWinloss' THEN SUM(masterWinloss)
+			WHEN @SortBy = 'masterComm' THEN SUM(masterComm)
+			WHEN @SortBy = 'masterTotal' THEN SUM(masterTotal)
 
-			WHEN @SortBy = 'superWinloss' THEN (superWinloss)
-			WHEN @SortBy = 'superComm' THEN (superComm)
-			WHEN @SortBy = 'superTotal' THEN (superTotal)
-			WHEN @SortBy = 'superMargin' THEN IIF(snetTurnover=0, 0, (superTotal*100/snetTurnover))
+			WHEN @SortBy = 'superWinloss' THEN SUM(superWinloss)
+			WHEN @SortBy = 'superComm' THEN SUM(superComm)
+			WHEN @SortBy = 'superTotal' THEN SUM(superTotal)
+			WHEN @SortBy = 'memberMargin' THEN IIF(SUM(netTurnover)=0, 0, (SUM(memberTotal)*100/SUM(netTurnover)))
 
-			WHEN @SortBy = 'companyComm' THEN (companyComm)
-			ELSE DATEDIFF(MINUTE, '2020-01-01', rpt.kickofftime) END --KO time
+			WHEN @SortBy = 'companyTotal' THEN SUM(companyTotal)
+			ELSE DATEDIFF(MINUTE, '2020-01-01', MAX(rpt.kickofftime)) END --KO time
 		) AS SortValue
 	FROM #tmpReportData rpt
+	GROUP BY matchid
 
 
 	-- TODO: paging match
@@ -470,14 +443,13 @@ BEGIN
 		,(masterTotal) AS masterTotal
 
 		----super
-		,(snetTurnover) AS snetTurnover
 		,(superWinloss) AS superWinloss
 		,(superComm) AS superComm
 		,(superTotal) AS superTotal
-		,IIF(snetTurnover = 0, 0, CONVERT(SMALLMONEY, (superTotal*100/snetTurnover))) AS superMargin
+		,IIF(netTurnover = 0, 0, CONVERT(SMALLMONEY, (memberTotal*100/netTurnover))) AS memberMargin
 
 		----company
-		,(companyComm) AS companyComm
+		,(companyTotal) AS companyTotal
 	FROM #tmpReportData rpt
 	INNER JOIN #tmpPaging p ON p.matchid = rpt.matchid
 	ORDER BY p.pIdx ASC
@@ -485,7 +457,7 @@ BEGIN
 
 	--Sum Total of matches
 	SELECT 
-		AVG(stakeAvg) AS stakeAvg
+		SUM(turnover)/SUM(betCount) AS stakeAvg
 		,SUM(betCount) AS betCount
 		,SUM(turnover) AS turnover
 		,SUM(netTurnover) AS netTurnover
@@ -507,60 +479,20 @@ BEGIN
 		,SUM(masterTotal) AS masterTotal
 
 		----super
-		,SUM(snetTurnover) AS snetTurnover
 		,SUM(superWinloss) AS superWinloss
 		,SUM(superComm) AS superComm
 		,SUM(superTotal) AS superTotal
-		,IIF(SUM(snetTurnover) = 0, 0, CONVERT(SMALLMONEY, SUM(superTotal)*100/SUM(snetTurnover))) AS superMargin
+		,IIF(SUM(netTurnover) = 0, 0, CONVERT(SMALLMONEY, SUM(memberTotal)*100/SUM(netTurnover))) AS memberMargin
 
 		----company
-		,SUM(companyComm) AS companyComm
+		,SUM(companyTotal) AS companyTotal
 	FROM #tmpReportData rpt
 	INNER JOIN #tmpPaging p ON p.matchid = rpt.matchid
 
 	--Parlay vs Outright
 	SELECT 
 		rpt.matchid  AS bettype
-		,(stakeAvg) AS stakeAvg
-		,(betCount) AS betCount
-		,(turnover) AS turnover
-		,(netTurnover) AS netTurnover
-		,(grossComm) AS grossComm
-		
-		----member
-		,(memberWinloss) AS memberWinloss
-		,(memberComm) AS memberComm
-		,(memberTotal) AS memberTotal
-		
-		----agent
-		,(agentWinloss) AS agentWinloss
-		,(agentComm) AS agentComm
-		,(agentTotal) AS agentTotal
-
-		----master
-		,(masterWinloss) AS masterWinloss
-		,(masterComm) AS masterComm
-		,(masterTotal) AS masterTotal
-
-		----super
-		,(snetTurnover)
-		,(superWinloss) AS superWinloss
-		,(superComm) AS superComm
-		,(superTotal) AS superTotal
-		,IIF(snetTurnover = 0, 0, CONVERT(SMALLMONEY, (superTotal*100/snetTurnover))) AS superMargin
-
-		----company
-		,(companyComm) AS companyComm
-	FROM #tmpReportData rpt
-	INNER JOIN #tmpSortValue s ON s.matchid = rpt.matchid
-	WHERE rpt.matchid IN (29, 10)
-	ORDER BY 
-		CASE WHEN @SortType = 0 THEN s.SortValue ELSE 0 END ASC,
-		CASE WHEN @SortType = 1 THEN s.SortValue ELSE 0 END DESC
-
-	--Sum Total
-	SELECT 
-		AVG(stakeAvg) AS stakeAvg
+		,SUM(turnover)/SUM(betCount) AS stakeAvg
 		,SUM(betCount) AS betCount
 		,SUM(turnover) AS turnover
 		,SUM(netTurnover) AS netTurnover
@@ -582,14 +514,52 @@ BEGIN
 		,SUM(masterTotal) AS masterTotal
 
 		----super
-		,SUM(snetTurnover) AS snetTurnover
 		,SUM(superWinloss) AS superWinloss
 		,SUM(superComm) AS superComm
 		,SUM(superTotal) AS superTotal
-		,IIF(SUM(snetTurnover) =0, 0, CONVERT(SMALLMONEY,SUM(superTotal)*100 / SUM(snetTurnover))) AS superMargin
+		,IIF(SUM(netTurnover) = 0, 0, CONVERT(SMALLMONEY, (SUM(memberTotal)*100/SUM(netTurnover)))) AS memberMargin
 
 		----company
-		,SUM(companyComm) AS companyComm
+		,SUM(companyTotal) AS companyTotal
+	FROM #tmpReportData rpt
+	INNER JOIN #tmpSortValue s ON s.matchid = rpt.matchid
+	WHERE rpt.matchid IN (29, 10)
+	GROUP BY rpt.matchid, s.SortValue
+	ORDER BY 
+		CASE WHEN @SortType = 0 THEN s.SortValue ELSE 0 END ASC,
+		CASE WHEN @SortType = 1 THEN s.SortValue ELSE 0 END DESC
+
+	--Sum Total
+	SELECT 
+		SUM(turnover)/SUM(betCount) AS stakeAvg
+		,SUM(betCount) AS betCount
+		,SUM(turnover) AS turnover
+		,SUM(netTurnover) AS netTurnover
+		,SUM(grossComm) AS grossComm
+		
+		----member
+		,SUM(memberWinloss) AS memberWinloss
+		,SUM(memberComm) AS memberComm
+		,SUM(memberTotal) AS memberTotal
+		
+		----agent
+		,SUM(agentWinloss) AS agentWinloss
+		,SUM(agentComm) AS agentComm
+		,SUM(agentTotal) AS agentTotal
+
+		----master
+		,SUM(masterWinloss) AS masterWinloss
+		,SUM(masterComm) AS masterComm
+		,SUM(masterTotal) AS masterTotal
+
+		----super
+		,SUM(superWinloss) AS superWinloss
+		,SUM(superComm) AS superComm
+		,SUM(superTotal) AS superTotal
+		,IIF(SUM(netTurnover) =0, 0, CONVERT(SMALLMONEY,SUM(memberTotal)*100 / SUM(netTurnover))) AS memberMargin
+
+		----company
+		,SUM(companyTotal) AS companyTotal
 	FROM #tmpReportData
 
 END
