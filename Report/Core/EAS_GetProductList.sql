@@ -15,6 +15,7 @@ AS
 		- 20201224@Malcolm: re-order products and filter by @GroupId [Redmine : #142459]
 		- 20240226@Lewis: add condition for productlist - RealGroup vs TestGroup [Redmine : #199912]
 		- 20240729@Lewis: Scale Out DBCust - Remove Linked Server [Redmine : #206895]
+		- 20241107@Lewis: get all products with Groupname = null [Redmine : #213464]
 	Description:
 		- Environment : 0 - PROD
 						1 - UAT
@@ -48,7 +49,7 @@ BEGIN
 				ISNULL(@Products,'') =''
 			)
 		AND p.Enabled = 1
-		AND Environment = CASE WHEN @GroupName IN ('ACCUUS','ACCTEST') THEN Environment
+		AND Environment = CASE WHEN ISNULL(@GroupName,'') IN ('','ACCUUS','ACCTEST','ACCYNG') THEN Environment
 							   ELSE 0 END
 	
 	SELECT ProductID
