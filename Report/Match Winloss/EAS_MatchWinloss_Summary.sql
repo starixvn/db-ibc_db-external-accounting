@@ -420,38 +420,51 @@ BEGIN
 	SELECT TOP(1) @TotalRows = TotalRows FROM #tmpPaging;
 
 	--FETCH rows
-	SELECT p.pIdx, leagueid, p.matchid, matchcode, kickofftime, homeid, awayid, isNeutral
-		,(stakeAvg) AS stakeAvg
-		,(betCount) AS betCount
-		,(turnover) AS turnover
-		,(netTurnover) AS netTurnover
-		,(grossComm) AS grossComm
+	WITH CTE_MatchInfo AS (
+		SELECT matchid, matchcode, kickofftime
+			, ROW_NUMBER() OVER (PARTITION BY matchid ORDER BY kickofftime DESC) AS rIdx
+		FROM (
+			SELECT matchid, matchcode, kickofftime
+			FROM #tmpReportData
+			GROUP BY matchid, matchcode, kickofftime
+		) AS t
+	)
+	SELECT p.pIdx, p.matchid, rpt.leagueid, rpt.homeid, rpt.awayid, rpt.isNeutral
+		,mi.matchcode, mi.kickofftime
+		,SUM(stakeAvg) AS stakeAvg
+		,SUM(betCount) AS betCount
+		,SUM(turnover) AS turnover
+		,SUM(netTurnover) AS netTurnover
+		,SUM(grossComm) AS grossComm
 		
 		----member
-		,(memberWinloss) AS memberWinloss
-		,(memberComm) AS memberComm
-		,(memberTotal) AS memberTotal
+		,SUM(memberWinloss) AS memberWinloss
+		,SUM(memberComm) AS memberComm
+		,SUM(memberTotal) AS memberTotal
 		
 		----agent
-		,(agentWinloss) AS agentWinloss
-		,(agentComm) AS agentComm
-		,(agentTotal) AS agentTotal
+		,SUM(agentWinloss) AS agentWinloss
+		,SUM(agentComm) AS agentComm
+		,SUM(agentTotal) AS agentTotal
 
 		----master
-		,(masterWinloss) AS masterWinloss
-		,(masterComm) AS masterComm
-		,(masterTotal) AS masterTotal
+		,SUM(masterWinloss) AS masterWinloss
+		,SUM(masterComm) AS masterComm
+		,SUM(masterTotal) AS masterTotal
 
 		----super
-		,(superWinloss) AS superWinloss
-		,(superComm) AS superComm
-		,(superTotal) AS superTotal
-		,IIF(netTurnover = 0, 0, CONVERT(SMALLMONEY, (memberTotal*100/netTurnover))) AS memberMargin
+		,SUM(superWinloss) AS superWinloss
+		,SUM(superComm) AS superComm
+		,SUM(superTotal) AS superTotal
+		,IIF(SUM(netTurnover) = 0, 0, CONVERT(SMALLMONEY, (SUM(memberTotal)*100/SUM(netTurnover)))) AS memberMargin
 
 		----company
-		,(companyTotal) AS companyTotal
+		,SUM(companyTotal) AS companyTotal
 	FROM #tmpReportData rpt
-	INNER JOIN #tmpPaging p ON p.matchid = rpt.matchid
+		INNER JOIN #tmpPaging p ON p.matchid = rpt.matchid
+		INNER JOIN CTE_MatchInfo mi ON mi.matchid = p.matchid AND mi.rIdx = 1
+	GROUP BY p.pIdx, p.matchid, rpt.leagueid, rpt.homeid, rpt.awayid, rpt.isNeutral
+		,mi.matchcode, mi.kickofftime
 	ORDER BY p.pIdx ASC
 
 

@@ -469,7 +469,17 @@ BEGIN
 	SELECT TOP(1) @TotalRows = TotalRows FROM #tmpPaging;
 	
 	-- Paging by match - level 1
-	SELECT p.pIdx, rpt.matchid, leagueid, matchcode, kickofftime, homeid, awayid, isNeutral
+	WITH CTE_MatchInfo AS (
+		SELECT matchid, matchcode, kickofftime
+			, ROW_NUMBER() OVER (PARTITION BY matchid ORDER BY kickofftime DESC) AS rIdx
+		FROM (
+			SELECT matchid, matchcode, kickofftime
+			FROM #tmpReportData
+			GROUP BY matchid, matchcode, kickofftime
+		) AS t
+	)
+	SELECT p.pIdx, rpt.matchid, rpt.leagueid, rpt.homeid, rpt.awayid, rpt.isNeutral
+		,mi.matchcode, mi.kickofftime
 		,SUM(turnover)/SUM(betCount)	AS stakeAvg
 		,SUM(betCount)	AS betCount
 		,SUM(turnover)	AS turnover
@@ -501,8 +511,10 @@ BEGIN
 		,SUM(companyTotal) AS companyTotal
 	
 	FROM #tmpReportData rpt
-	INNER JOIN #tmpPaging p ON p.matchid = rpt.matchid
-	GROUP BY p.pIdx, rpt.matchid,leagueid, matchcode, kickofftime, homeid, awayid, isNeutral
+		INNER JOIN #tmpPaging p ON p.matchid = rpt.matchid
+		INNER JOIN CTE_MatchInfo mi ON mi.matchid = p.matchid AND mi.rIdx = 1
+	GROUP BY p.pIdx,rpt.matchid,rpt.leagueid,rpt.homeid,rpt.awayid,rpt.isNeutral
+		, mi.matchcode, mi.kickofftime
 	ORDER BY p.pIdx ASC
 
 	--Paging: match-bettype Level 2

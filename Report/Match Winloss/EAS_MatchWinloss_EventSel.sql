@@ -31,7 +31,7 @@ BEGIN
 
 	CREATE TABLE #tmpSuperList(custID INT PRIMARY KEY);
 	CREATE TABLE #tmpLeague(leagueid INT PRIMARY KEY);
-	CREATE TABLE #tmpMatch(matchid INT PRIMARY KEY, matchcode NVARCHAR(50), homeid INT, awayid INT, isNeutral BIT);
+	CREATE TABLE #tmpMatch(matchid INT, matchcode NVARCHAR(50), homeid INT, awayid INT, isNeutral BIT, kickofftime DATETIME);
 	
 	--TODO Saba's sports if any
 	DECLARE @sportTypeList TABLE(SportType INT, leagueGroupId INT, SabaGroupType INT);
@@ -64,7 +64,7 @@ BEGIN
 	IF @fromDateCheck > @moveBetDate
 	BEGIN
 		INSERT INTO #tmpMatch
-		SELECT DISTINCT IIF(rpt.ChildMatchType = 200, rpt.parentid, rpt.matchid) AS matchid, rpt.matchcode, rpt.homeid, rpt.awayid, rpt.isNeutral
+		SELECT DISTINCT IIF(rpt.ChildMatchType = 200, rpt.parentid, rpt.matchid) AS matchid, rpt.matchcode, rpt.homeid, rpt.awayid, rpt.isNeutral, rpt.kickofftime
 		FROM bodb_Summary.dbo.rptMatchWinloss_compact rpt WITH(NOLOCK)
 			INNER JOIN #tmpSuperList sl ON sl.custID = rpt.custid
 			LEFT JOIN @sportTypeList st ON st.SportType = rpt.SportType AND st.leagueGroupId = rpt.leagueGroupId
@@ -82,7 +82,7 @@ BEGIN
 	IF @fromDateCheck BETWEEN @balanceUpDate AND @moveBetDate
 	BEGIN
 		INSERT INTO #tmpMatch
-		SELECT DISTINCT IIF(rpt.ChildMatchType = 200, rpt.parentid, rpt.matchid) AS matchid, rpt.matchcode, rpt.homeid, rpt.awayid, rpt.isNeutral
+		SELECT DISTINCT IIF(rpt.ChildMatchType = 200, rpt.parentid, rpt.matchid) AS matchid, rpt.matchcode, rpt.homeid, rpt.awayid, rpt.isNeutral, rpt.kickofftime
 		FROM bodb_Summary.dbo.rptMatchWinloss rpt WITH(NOLOCK)
 			INNER JOIN #tmpSuperList sl ON sl.custID = rpt.custid
 			LEFT JOIN @sportTypeList st ON st.SportType = rpt.SportType AND st.leagueGroupId = rpt.leagueGroupId
@@ -99,7 +99,7 @@ BEGIN
 	IF @fromDateCheck < @balanceUpDate
 	BEGIN
 		INSERT INTO #tmpMatch
-		SELECT DISTINCT IIF(rpt.ChildMatchType = 200, rpt.parentid, rpt.matchid) AS matchid, rpt.matchcode, rpt.homeid, rpt.awayid, rpt.isNeutral
+		SELECT DISTINCT IIF(rpt.ChildMatchType = 200, rpt.parentid, rpt.matchid) AS matchid, rpt.matchcode, rpt.homeid, rpt.awayid, rpt.isNeutral, rpt.kickofftime
 		FROM bodb_Summary.dbo.rptMatchWinloss_old rpt WITH(NOLOCK)
 			INNER JOIN #tmpSuperList sl ON sl.custID = rpt.custid
 			LEFT JOIN @sportTypeList st ON st.SportType = rpt.SportType AND st.leagueGroupId = rpt.leagueGroupId
@@ -113,12 +113,19 @@ BEGIN
 					END
 	END
 
+	--TODO: output result
 	SELECT matchid
 		, matchcode
 		, homeid
 		, awayid
 		, isNeutral
-	FROM #tmpMatch tmp
-	ORDER BY matchid
+		, kickofftime
+	FROM (
+		SELECT tmp.*
+			, ROW_NUMBER() OVER (PARTITION BY matchid ORDER BY kickofftime DESC) AS rIdx
+		FROM #tmpMatch tmp
+	) AS m
+	WHERE rIdx = 1
+	ORDER BY matchid;
 END
 GO
