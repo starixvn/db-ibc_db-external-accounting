@@ -4,7 +4,7 @@ ALTER PROCEDURE [dbo].[EAS_MatchWinloss_Summary]
 	@FromDate		SMALLDATETIME,
 	@ToDate			SMALLDATETIME,
 	@SportType		SMALLINT,
-	@LeagueIds		VARCHAR(1000)	= '',
+	@LeagueIds		VARCHAR(MAX)	= '',
 	@Currencies		VARCHAR(1000)	= '',
 	@BaseCurrency	VARCHAR(5)		= '',
 	@SortBy			VARCHAR(30)		= 'kickofftime',
@@ -51,38 +51,38 @@ BEGIN
 		,homeid INT
 		,awayid INT
 		,isNeutral BIT
-		,stakeAvg DECIMAL(24, 4)
+		,stakeAvg DECIMAL(19, 8)
 		,betCount INT
-		,turnover DECIMAL(24, 4)
-		,netTurnover DECIMAL(24, 4)
-		,grossComm DECIMAL(24, 4)
+		,turnover DECIMAL(19, 8)
+		,netTurnover DECIMAL(19, 8)
+		,grossComm DECIMAL(19, 8)
 		
 		----member
-		,memberWinloss DECIMAL(24, 4)
-		,memberComm DECIMAL(24, 4)
-		,memberTotal DECIMAL(24, 4)
+		,memberWinloss DECIMAL(19, 8)
+		,memberComm DECIMAL(19, 8)
+		,memberTotal DECIMAL(19, 8)
 		
 		----agent
-		,agentWinloss DECIMAL(24, 4)
-		,agentComm DECIMAL(24, 4)
-		,agentTotal DECIMAL(24, 4)
+		,agentWinloss DECIMAL(19, 8)
+		,agentComm DECIMAL(19, 8)
+		,agentTotal DECIMAL(19, 8)
 
 		----master
-		,masterWinloss DECIMAL(24, 4)
-		,masterComm DECIMAL(24, 4)
-		,masterTotal DECIMAL(24, 4)
+		,masterWinloss DECIMAL(19, 8)
+		,masterComm DECIMAL(19, 8)
+		,masterTotal DECIMAL(19, 8)
 
 		----super
-		,superWinloss DECIMAL(24, 4)
-		,superComm DECIMAL(24, 4)
-		,superTotal DECIMAL(24, 4)
+		,superWinloss DECIMAL(19, 8)
+		,superComm DECIMAL(19, 8)
+		,superTotal DECIMAL(19, 8)
 
 		----company
-		,companyTotal DECIMAL(24, 4)
+		,companyTotal DECIMAL(19, 8)
 	);
 	CREATE CLUSTERED INDEX CIX_matchid ON #tmpReportData(matchid);
 
-	CREATE TABLE #tmpExchangeRate(CurrencyId INT, ExchangeDate SMALLDATETIME, Rate MONEY);
+	CREATE TABLE #tmpExchangeRate(CurrencyId INT, ExchangeDate SMALLDATETIME, Rate FLOAT);
 
 	--TODO Saba's sports if any
 	DECLARE @sportTypeList TABLE(SportType INT, LeagueGroupId INT, SabaGroupType INT);
@@ -364,7 +364,7 @@ BEGIN
 
 	-- TODO: Sorting all columns
 	DROP TABLE IF EXISTS #tmpSortValue;
-	CREATE TABLE #tmpSortValue (matchid INT, SortValue DECIMAL(24, 4));
+	CREATE TABLE #tmpSortValue (matchid INT, SortValue DECIMAL(19, 8));
 
 	INSERT INTO #tmpSortValue
 	SELECT matchid,
@@ -500,7 +500,7 @@ BEGIN
 		----company
 		,SUM(companyTotal) AS companyTotal
 	FROM #tmpReportData rpt
-	INNER JOIN #tmpPaging p ON p.matchid = rpt.matchid
+	WHERE rpt.matchid NOT IN (29, 10)
 
 	--Parlay vs Outright
 	SELECT 
