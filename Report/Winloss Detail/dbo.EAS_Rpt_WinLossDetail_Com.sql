@@ -72,6 +72,7 @@ AS
 		- 20240617@Sophia: Bettrans_compact [redmine: 206610]
 		- 20240624@Lewis: cte_superBet => Bettrans_compact [redmine: 206610]
 	    - 20240918@Lewis: Rebate Retention - Reward [RedmineId: #208503]
+		- 20241113@Lewis: Clean code [RedmineID: #203763]
 	
 	Param's Explanation:
 	 @ProductDetails:		
@@ -135,12 +136,6 @@ BEGIN
 	SELECT ProductId,Sporttype,Bettype,LeagueGroupID,TicketType
 	FROM dbo.f_ProductDetail_ConditionSel(@ProductDetails, @__ProductDetails)
 
-	DECLARE @SeparateSabaSport_Cutoff SMALLDATETIME 
-
-	SELECT @SeparateSabaSport_Cutoff = CutoffDate
-	FROM dbo.f_GetCutoffDate()
-	WHERE TypeName = 'SabaSport'
-
 	----Get Sport Bettype Matrix------
 	DECLARE @isTest BIT = 0
 	SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID)
@@ -172,9 +167,6 @@ BEGIN
 								)
 						)
 				)
-
-	--Force optimizer to seek on IX_srecommend index
-	DECLARE @n BIGINT = 2147483647
 
 	--TODO: bettrans_compact
 	IF @Todate >= @BalanceUpDay

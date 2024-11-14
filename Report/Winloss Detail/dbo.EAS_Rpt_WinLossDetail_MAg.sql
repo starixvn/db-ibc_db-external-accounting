@@ -61,6 +61,7 @@ Revisions:
 	- 20240515@Lewis: Add SABA Kabaddi [RedmineID: #203763]
 	- 20240617@Lewis: Use bettrans_compact [RedmineID: #206610]
     - 20240918@Lewis: Rebate Retention - Reward [RedmineId: #208503]
+	- 20241113@Lewis: Clean code [RedmineID: #203763]
 	
 	Param's Explanation:
 			N'<ROOT>
@@ -108,12 +109,6 @@ BEGIN
 	INSERT INTO @ExistingProductDetails(ProductId,Sporttype,Bettype,LeagueGroupID,TicketType)
 	SELECT ProductId,Sporttype,Bettype,LeagueGroupID,TicketType
 	FROM dbo.f_ProductDetail_ConditionSel(@ProductDetails, @__ProductDetails)
-
-	DECLARE @SeparateSabaSport_Cutoff SMALLDATETIME 
-
-	SELECT @SeparateSabaSport_Cutoff = CutoffDate
-	FROM dbo.f_GetCutoffDate()
-	WHERE TypeName = 'SabaSport'
 
 	DECLARE @TmpCondSumWL TABLE(sporttype INT, bettype INT,	LeagueGroupID SMALLINT, TicketType TINYINT)
 
@@ -187,40 +182,6 @@ BEGIN
 				WHERE b.winlostdate between @FDate and @TDate 
 				GROUP BY b.custid
 
-				-- bettransRnG
-				INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
-				SELECT b.mrecommend AS CustId
-					,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.BetStake ELSE 0 END) AS TurnoverNoDraw
-					,SUM(b.BetStake * b.sdiscount) AS GrossComm
-				FROM dbo.bettransRnG b WITH(NOLOCK)
-					INNER JOIN (
-									SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
-									FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
-										LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
-										LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
-									WHERE EXISTS(SELECT 1
-												 WHERE e.ProductId IS NULL 
-													OR 
-														(
-															e.Bettype = f.BetType 
-																	OR (
-																	e.Bettype = 0  AND  (e.ProductId = 1 OR  f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g WHERE g.ProductId <> 1) )
-																	)
-														)
-												)
-										AND f.RefTable = 1
-									) s ON b.gameID = s.Bettype
-					OUTER APPLY 
-					(
-						SELECT f.Bettype AS ContributionBettype
-						FROM dbo.f_BettypePrizeGroup() f
-						WHERE f.BettypeGroup = 'Contribution'
-							AND f.Bettype = b.gameID
-					) cont
-				WHERE winlostdate BETWEEN @FDate AND @TDate
-					AND statusID IN (111, 112, 113) 
-					AND srecommend = @custid
-				GROUP BY b.mrecommend
 				-- bettransRnG
 				INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
 				SELECT b.recommend AS CustId
