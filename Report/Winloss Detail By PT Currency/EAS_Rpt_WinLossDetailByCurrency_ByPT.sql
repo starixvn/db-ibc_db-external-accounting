@@ -8,8 +8,8 @@ CREATE PROCEDURE [dbo].[EAS_Rpt_WinLossDetailByCurrency_ByPT]
 	@ProductDetails NVARCHAR(MAX),
 	@BalanceUpDay	SMALLDATETIME,
 	@MoveBetsDay	SMALLDATETIME,
-	@BaseCurrency	INT = 1, --MYR
-	@CurrencyIds	NVARCHAR(MAX)
+	@BaseCurrency	VARCHAR(5) = 'MYR', --MYR
+	@CurrencyIds	NVARCHAR(MAX) = ''
 AS
 /*
 	Created by: Lewis
@@ -21,13 +21,16 @@ AS
 		- 20240116@Lewis: Sort by Username [RedmineID: #196959]
 		- 20240306@Lewis: Add Virtual Ice Hockey [RedmineID: #201129]
 		- 20240515@Lewis: Add SABA Kabaddi [RedmineID: #203763]
-
+		- 20241113@Lewis: Enhance:											[RedmineID: #203763]
+								+ SabaSport hardcode
+								+ New Currency ExchangeRate
+								+ Decimal(24,4)
 	Param's Explanation:
-		@BaseCurrency:  0 unchecked
-						1 MYR
-						2 CNY
-						3 THB
-						4 IDR
+		@BaseCurrency:  NULL - unchecked
+						 MYR
+						 CNY
+						 THB
+						 IDR
 
 */
 BEGIN
@@ -52,7 +55,7 @@ BEGIN
 		,CurrencyName
 		,Code
 		,Rate 
-	FROM dbo.EAS_f_GetExchangeRate(@FromDate,@ToDate,@GroupName,@BaseCurrency) 
+	FROM dbo.EAS_f_GetDailyExchangeRate(@FromDate,@ToDate,@GroupName,@BaseCurrency) 
 	OPTION (MAXRECURSION 0);
 
 	CREATE TABLE #tmp_currencylist(CurrencyId INT)  
@@ -63,9 +66,12 @@ BEGIN
 	CREATE TABLE #tmpSuperList (custID INT PRIMARY KEY)
 
 	INSERT INTO #tmpSuperList(CustID)
-	SELECT custID 
-	FROM bodb02.dbo.Acc_CustGroup WITH(NOLOCK)
-	WHERE (@custid IS NULL OR custid = @custid) AND GroupName = @GroupName
+	SELECT cg.custID 
+	FROM bodb02.dbo.Acc_CustGroup cg WITH(NOLOCK)
+	INNER JOIN custinfo c WITH (NOLOCK) ON c.custid = cg.CustId
+	WHERE (@custid IS NULL OR cg.custid = @custid) 
+		AND GroupName = @GroupName
+		AND c.Currency IN (SELECT CurrencyId FROM #tmp_currencylist)
 
 	DECLARE @ExistingProductDetails TABLE (ProductId INT,Sporttype INT,Bettype INT, LeagueGroupID SMALLINT, TicketType TINYINT)
 	DECLARE @isTest BIT, @__ProductDetails XML;
@@ -77,12 +83,6 @@ BEGIN
 	INSERT INTO @ExistingProductDetails(ProductId, Sporttype,Bettype,LeagueGroupID,TicketType)
 	SELECT ProductId,Sporttype,Bettype,LeagueGroupID,TicketType
 	FROM dbo.f_ProductDetail_ConditionSel(@ProductDetails, @__ProductDetails)
-
-	DECLARE @SeparateSabaSport_Cutoff SMALLDATETIME 
-
-	SELECT @SeparateSabaSport_Cutoff = CutoffDate
-	FROM dbo.f_GetCutoffDate()
-	WHERE TypeName = 'SabaSport'
 
 	DROP TABLE IF EXISTS #TmpCondSumWL;
 	CREATE TABLE #TmpCondSumWL(
@@ -188,34 +188,20 @@ BEGIN
 					SUM(mwinlost) mwinlost,
 					SUM(awinlost) awinlost
 			FROM	bodb02.dbo.bettrans b WITH (NOLOCK)
-				LEFT JOIN dbo.match m WITH(NOLOCK) ON b.matchid = m.matchid AND m.eventdate = b.winlostdate AND m.sporttype IN (1,2,50,43,5,4,47)
+				LEFT JOIN dbo.match m WITH(NOLOCK) ON b.matchid = m.matchid AND m.eventdate = b.winlostdate
+				LEFT JOIN dbo.League l WITH(NOLOCK) ON m.leagueid = l.leagueid
 				LEFT JOIN (
-					SELECT LeagueGroupID, leagueid
-					FROM dbo.League l WITH(NOLOCK) WHERE l.LeagueGroupID IN (42,74,108,113,122,151)
-				) AS l  ON m.leagueid = l.leagueid
+							SELECT DISTINCT Sporttype, LeagueGroupId 
+							FROM @ExistingProductDetails
+							WHERE ProductId = 1 AND LeagueGroupID > 0
+						  ) pdt 
+					ON m.sporttype = pdt.Sporttype AND l.LeagueGroupID = pdt.LeagueGroupID
 				OUTER APPLY (
-					 SELECT CASE WHEN ( 
-										(l.LeagueGroupID IN (42,74,108,113) AND m.sporttype = 1 ) 
-										 OR (l.LeagueGroupID IN (122, 42) AND m.sporttype = 2 )
-										 OR (l.LeagueGroupID = 42 AND m.sporttype = 50)
-										 OR (l.LeagueGroupID = 42 AND m.sporttype = 5) --SabaTennis
-										 OR (l.LeagueGroupID = 42 AND m.sporttype = 4) --Virtual Ice Hockey
-										 OR (l.LeagueGroupID = 42 AND m.sporttype = 47) --SABA Kabaddi
-										 OR (l.LeagueGroupID = 151 AND m.sporttype = 43)
-									  ) AND b.betdaqid <> -2 AND b.winlostdate >= @SeparateSabaSport_Cutoff  THEN m.sporttype
-						ELSE 0 END  sporttype, 
-						CASE WHEN ( 
-										(l.LeagueGroupID IN (42,74,108,113) AND m.sporttype = 1 ) 
-										 OR (l.LeagueGroupID IN (122, 42) AND m.sporttype = 2 )
-										 OR (l.LeagueGroupID = 42 AND m.sporttype = 50)
-										 OR (l.LeagueGroupID = 42 AND m.sporttype = 5) --SabaTennis
-										 OR (l.LeagueGroupID = 42 AND m.sporttype = 4) --Virtual Ice Hockey
-										 OR (l.LeagueGroupID = 42 AND m.sporttype = 47) --SABA Kabaddi
-										 OR (l.LeagueGroupID = 151 AND m.sporttype = 43)
-									  ) AND b.betdaqid <> -2 AND b.winlostdate >= @SeparateSabaSport_Cutoff  THEN l.LeagueGroupID
-						ELSE 0 END LeagueGroupID,
-						CASE WHEN b.betdaqid = -2 THEN 1 ELSE 0 END TicketType
-				) AS et
+								SELECT 
+									CASE WHEN b.betdaqid <> -2 AND pdt.LeagueGroupID > 0 THEN ISNULL(pdt.Sporttype,0) ELSE 0 END  sporttype, 
+									CASE WHEN b.betdaqid <> -2 AND pdt.Sporttype > 0 THEN ISNULL(pdt.LeagueGroupID,0) ELSE 0 END LeagueGroupID,
+									CASE WHEN b.betdaqid = -2 THEN 1 ELSE 0 END TicketType
+							) AS et
 				INNER JOIN cte_SportBettype s ON b.bettype = s.bettype 
 					AND (s.ProductID <> 1 OR (s.ProductID = 1 AND et.sporttype = s.SportType AND et.LeagueGroupID = s.LeagueGroupID AND et.TicketType = s.TicketType))
 			WHERE	b.winlostdate BETWEEN @FDate AND @Tdate
@@ -442,22 +428,22 @@ BEGIN
 		, ProductName VARCHAR(50)
 		, CurrencyID INT
 		, CurrencyName NVARCHAR(50)
-		, Turnover DECIMAL(19,8)
-		, TurnoverNoDraw DECIMAL(19,8)
-		, GrossComm DECIMAL(19,8)
-		, MemberWinLost DECIMAL(19,8)
-		, PlayerComm DECIMAL(19,8)
-		, MemberTotal DECIMAL(19,8)
-		, AgWinLost DECIMAL(19,8)
-		, AgComm DECIMAL(19,8)
-		, AgTotal DECIMAL(19,8)
-		, MAgWinLost DECIMAL(19,8)
-		, MAgComm DECIMAL(19,8)
-		, MAgTotal DECIMAL(19,8)
-		, SAgWinLost DECIMAL(19,8)
-		, SAgComm DECIMAL(19,8)
-		, SAgTotal DECIMAL(19,8)
-		, Company DECIMAL(19,8)
+		, Turnover DECIMAL(24,4)
+		, TurnoverNoDraw DECIMAL(24,4)
+		, GrossComm DECIMAL(24,4)
+		, MemberWinLost DECIMAL(24,4)
+		, PlayerComm DECIMAL(24,4)
+		, MemberTotal DECIMAL(24,4)
+		, AgWinLost DECIMAL(24,4)
+		, AgComm DECIMAL(24,4)
+		, AgTotal DECIMAL(24,4)
+		, MAgWinLost DECIMAL(24,4)
+		, MAgComm DECIMAL(24,4)
+		, MAgTotal DECIMAL(24,4)
+		, SAgWinLost DECIMAL(24,4)
+		, SAgComm DECIMAL(24,4)
+		, SAgTotal DECIMAL(24,4)
+		, Company DECIMAL(24,4)
 	)
 	INSERT INTO #tmp_result(
 		CustID 
@@ -509,8 +495,7 @@ BEGIN
 	INNER JOIN dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID
 	INNER JOIN #tmp_Oanda o ON o.CurrencyId = c.currency AND o.ExchangeDate = w.winlostdate
 	INNER JOIN dbo.Products p WITH(NOLOCK) ON w.ProductId = p.ProductID
-	WHERE c.currency IN (SELECT CurrencyId FROM #tmp_currencylist)
-	GROUP BY w.winlostdate,w.CustID,c.UserName,w.ProductID, p.ProductName,o.CurrencyId,o.CurrencyName
+	GROUP BY w.CustID,c.UserName,w.ProductID, p.ProductName,o.CurrencyId,o.CurrencyName
 	
 
 
@@ -546,7 +531,7 @@ BEGIN
 	ORDER BY Username
 
 	-- Total --
-	IF @BaseCurrency = 0
+	IF ISNULL(@BaseCurrency,'') = ''
 	BEGIN
 		SELECT 
 			'Total ' + CurrencyName AS Total
@@ -572,11 +557,7 @@ BEGIN
 	ELSE
 	BEGIN
 		SELECT 
-			'Grand Total in ' + CASE WHEN @BaseCurrency = 1 THEN 'MYR'
-									 WHEN @BaseCurrency = 2 THEN 'CNY'
-									 WHEN @BaseCurrency = 3 THEN 'THB'
-									 WHEN @BaseCurrency = 4 THEN 'IDR'
-									END AS Total
+			'Grand Total in ' + @BaseCurrency AS Total
 			, SUM(Turnover) Turnover
 			, SUM(TurnoverNoDraw) TurnoverNoDraw
 			, SUM(GrossComm) GrossComm
