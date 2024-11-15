@@ -4,7 +4,7 @@ ALTER PROCEDURE [dbo].[EAS_TotalBet_1378Sel]
 	@LeagueIds		VARCHAR(MAX) = NULL,
 	@MatchIds		VARCHAR(MAX) = NULL,
 	@ViewMode		TINYINT = 1,
-	@BaseCurrency	INT = 0 --MYR
+	@BaseCurrency	VARCHAR(5) = 'MYR' --MYR
 AS
 /*
 	Created by: Bobby@20221215
@@ -14,16 +14,18 @@ AS
 		- 20221215@Bobby: Initialize SPs
 		- 20231219@Lewis: Imlement Maylasia headline [RedmineID: #196959]
 		- 20240912@Bobby: Multiple leagues [RedmineID : #210635]
+		- 20241113@Lewis: Enhance:											[RedmineID: #203763]
+								+ New Currency ExchangeRate
 
 	Explanation:
 		- @ViewMode: TINYINT
 			+ 1 -> View by headline [actual_stake * epositiontaking|ExtraPT2]
 			+ 2 -> View by super [actual_stake * spositiontaking]
-		- @BaseCurrency:	0 unchecked
-							1 MYR
-							2 CNY
-							3 THB
-							4 IDR
+		- @BaseCurrency:  NULL - unchecked
+						 MYR
+						 CNY
+						 THB
+						 IDR
 
 */
 BEGIN
@@ -36,7 +38,6 @@ BEGIN
 		, @LeagueIds	= IIF(@LeagueIds = 'ALL', NULL, @LeagueIds)
 		, @MatchIds		= IIF(@MatchIds = 'ALL', NULL, @MatchIds)
 		, @winlostdate	= CAST(GETDATE() AS DATE)
-		, @BaseCurrency	= ISNULL(@BaseCurrency, 0)
 
 	-- filter league								
 	DECLARE @leagueList TABLE  (leagueid INT);								
@@ -133,7 +134,7 @@ BEGIN
 		FROM dbo.bettrans b WITH(NOLOCK, INDEX = IX_betrunning_srecommend)							
 		INNER JOIN #super super ON super.CustID = b.srecommend							
 		INNER JOIN #cteEvent e ON e.matchid = b.matchid							
-		LEFT JOIN dbo.EAS_f_GetExchangeRate(@winlostdate, @winlostdate,@GroupName, @BaseCurrency) o ON b.currency = o.CurrencyId
+		LEFT JOIN dbo.EAS_f_GetDailyExchangeRate(@winlostdate, @winlostdate,@GroupName, @BaseCurrency) o ON b.currency = o.CurrencyId
 		CROSS APPLY (							
 			SELECT b.actual_stake 
 								* IIF(@ViewMode = 1, ISNULL(super.ExtraPT2, b.epositiontaking), b.spositiontaking)
