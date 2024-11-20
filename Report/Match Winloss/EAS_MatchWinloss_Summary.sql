@@ -45,6 +45,7 @@ BEGIN
 	CREATE TABLE #tmpLeague(leagueid INT, SportType INT, LeagueGroupId INT, SabaGroupType INT, PRIMARY KEY (leagueid, SportType, LeagueGroupId));
 	CREATE TABLE #tmpReportData (
 		matchid INT 
+		,isParent BIT
 		,leagueid INT
 		,matchcode NVARCHAR(50)
 		,kickofftime DATETIME
@@ -151,6 +152,7 @@ BEGIN
 				WHEN rpt.bettype IN (10) THEN rpt.bettype
 				WHEN rpt.ChildMatchType = 200 THEN rpt.parentid
 				ELSE rpt.matchid END AS matchid
+			,IIF(rpt.parentid > 0, 0, 1) isParent
 			,rpt.leagueid
 			,IIF(rpt.bettype NOT IN (9,29,10), m.matchcode, rpt.matchcode) AS matchcode ---> admin can change matchcode any time
 			,ISNULL(DATEADD(HOUR, 12, m.kickofftime), 0) AS kickofftime ---> admin can change KO time any time
@@ -211,6 +213,7 @@ BEGIN
 				WHEN rpt.bettype IN (10) THEN rpt.bettype
 				WHEN rpt.ChildMatchType = 200 THEN rpt.parentid
 				ELSE rpt.matchid END
+			,IIF(rpt.parentid > 0, 0, 1)
 			, rpt.leagueid
 			, IIF(rpt.bettype NOT IN (9,29,10), m.matchcode, rpt.matchcode)
 			, ISNULL(DATEADD(HOUR, 12, m.kickofftime), 0), rpt.homeid, rpt.awayid, rpt.isNeutral;
@@ -229,6 +232,7 @@ BEGIN
 				WHEN rpt.bettype IN (10) THEN rpt.bettype
 				WHEN rpt.ChildMatchType = 200 THEN rpt.parentid
 				ELSE rpt.matchid END AS matchid
+			,IIF(rpt.parentid > 0, 0, 1) isParent
 			,rpt.leagueid
 			,rpt.matchcode, DATEADD(HOUR, 12, rpt.kickofftime) AS kickofftime, rpt.homeid, rpt.awayid, rpt.isNeutral
 			,SUM(rpt.betCount)	AS betCount
@@ -283,6 +287,7 @@ BEGIN
 				WHEN rpt.bettype IN (10) THEN rpt.bettype
 				WHEN rpt.ChildMatchType = 200 THEN rpt.parentid
 				ELSE rpt.matchid END
+			, IIF(rpt.parentid > 0, 0, 1)
 			, rpt.leagueid
 			, rpt.matchcode, DATEADD(HOUR, 12, rpt.kickofftime), rpt.homeid, rpt.awayid, rpt.isNeutral;
 	END
@@ -301,6 +306,7 @@ BEGIN
 				WHEN rpt.bettype IN (10) THEN rpt.bettype
 				WHEN rpt.ChildMatchType = 200 THEN rpt.parentid
 				ELSE rpt.matchid END AS matchid
+			,IIF(rpt.parentid > 0, 0, 1) isParent
 			,rpt.leagueid
 			,rpt.matchcode, DATEADD(HOUR, 12, rpt.kickofftime) AS kickofftime, rpt.homeid, rpt.awayid, rpt.isNeutral
 			,SUM(rpt.betCount)	AS betCount
@@ -355,8 +361,39 @@ BEGIN
 				WHEN rpt.bettype IN (10) THEN rpt.bettype
 				WHEN rpt.ChildMatchType = 200 THEN rpt.parentid
 				ELSE rpt.matchid END
+			, IIF(rpt.parentid > 0, 0, 1)
 			, rpt.leagueid
 			, rpt.matchcode, DATEADD(HOUR, 12, rpt.kickofftime), rpt.homeid, rpt.awayid, rpt.isNeutral;
+	END
+
+	--TODO: Check/Update parent/child info
+	IF EXISTS (
+		SELECT 1 FROM #tmpReportData 
+		GROUP BY matchid 
+		HAVING (COUNT(matchcode) > 1 OR COUNT(kickofftime) > 1)
+	)
+	BEGIN
+		WITH CTE_MatchDiff AS (
+			SELECT matchid
+			FROM #tmpReportData 
+			GROUP BY matchid 
+			HAVING (COUNT(matchcode) > 1 OR COUNT(kickofftime) > 1)
+		), 
+		CTE_MatchParent AS (
+			SELECT matchid, matchcode, kickofftime
+			FROM (
+				SELECT mi.matchid, matchcode, kickofftime
+					,ROW_NUMBER() OVER (PARTITION BY mi.matchid ORDER BY kickofftime) AS rIdx
+				FROM #tmpReportData rpt WITH(NOLOCK)
+				INNER JOIN CTE_MatchDiff mi ON mi.matchid = rpt.matchid
+				WHERE rpt.IsParent = 1
+			) AS m
+			WHERE m.rIdx = 1
+		)
+		UPDATE rpt
+		SET rpt.matchcode = mp.matchcode, rpt.kickofftime = mp.kickofftime
+		FROM #tmpReportData rpt
+		INNER JOIN CTE_MatchParent mp ON mp.matchid = rpt.matchid
 	END
 
 	-- TODO: Sorting all columns
