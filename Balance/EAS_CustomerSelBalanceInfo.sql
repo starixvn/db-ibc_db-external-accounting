@@ -1,4 +1,4 @@
-/*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBAGE-bodb02" executers="wsv_xnap" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[EAS_CustomerSelBalanceInfo]
 	@CustId	INT
 AS
@@ -16,6 +16,7 @@ AS
 		- 20211122@Danny: Split transfer tickets out of bettrans [Redmine: #164196]
 		- 20221128@Evan: Enhance performance get max transid [RedmineID: #180141]
 		- 20230227@Evan: Balance-Up support transfer 247 [Redmine: #173554]
+        - 20240918@Lewis: Rebate Retention - RewardReceivable RewardPayable [RedmineId: #208503]
 
 */
 
@@ -469,6 +470,16 @@ BEGIN
 		FROM #BalanceInfo
 	END
 
+	--Reward
+	DECLARE
+			@RewardPending MONEY = NULL ,
+			@RewardBalance MONEY = NULL ,  
+			@RewardCurrency VARCHAR(10) = NULL 
+	EXEC Acc_CustomerSelBalanceReward @CustId = @CustID
+									  ,@RewardPending  = @RewardPending OUTPUT   
+									  ,@RewardBalance  = @RewardBalance OUTPUT
+									  ,@RewardCurrency = @RewardCurrency OUTPUT
+
 	SELECT
 		@transdate 				AS LastTxn,
 		@Credit					AS Credit,
@@ -484,7 +495,11 @@ BEGIN
 		@YesterdayBalance		AS YesterdayBalance,
 		@DownlineOutstanding	AS DownlineOutstanding,
 		-----------------------------------------------
-		@PendingTransfer3rd		AS PendingTransfer3rd
+		@PendingTransfer3rd		AS PendingTransfer3rd,
+		--Reward
+		@RewardPending AS RewardPayable,
+		@RewardBalance AS RewardReceivable,
+		@RewardCurrency AS RewardCurrency
 
 	DROP TABLE #SportBettypeMatrix
 	DROP TABLE #BalanceInfo
