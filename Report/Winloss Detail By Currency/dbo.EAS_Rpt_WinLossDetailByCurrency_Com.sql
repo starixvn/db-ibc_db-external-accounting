@@ -23,6 +23,7 @@ AS
 		- 20240116@Lewis: Sort by Username [RedmineID: #196959]
 		- 20240306@Lewis: Add Virtual Ice Hockey [RedmineID: #201129]
 		- 20240515@Lewis: Add SABA Kabaddi [RedmineID: #203763]
+	    - 20240918@Lewis: Rebate Retention - Reward [RedmineId: #208503]
 	
 	Param's Explanation:
 		@BaseCurrency:  0 unchecked
@@ -84,6 +85,7 @@ BEGIN
 		PlayerComm MONEY, MemberTotal MONEY, AgWinLost MONEY, AgComm MONEY, AgTotal MONEY, 
 		MAgWinLost MONEY, MAgComm MONEY, MAgTotal MONEY, SAgWinLost MONEY, SAgComm MONEY, SAgTotal MONEY,
 		Company MONEY
+		, RewardAmount MONEY
 	)
 
 	CREATE TABLE #TmpCondSumWL (sporttype INT, bettype INT, LeagueGroupID SMALLINT, TicketType TINYINT)--, PRIMARY KEY NONCLUSTERED (Bettype ASC, sporttype ASC))
@@ -135,7 +137,8 @@ BEGIN
 
 	--Force optimizer to seek on IX_srecommend index
 	DECLARE @n BIGINT = 2147483647
-	
+
+
 	IF @Todate >= @BalanceUpDay
 	BEGIN 
 		IF @ToDate > @MoveBetsDay
@@ -144,7 +147,7 @@ BEGIN
 				SELECT @FDate = DATEADD(DD, 1, @MoveBetsDay) --DATEADD(dd, -1, @BalanceUpDay)
 
 			---- get extra PT from table setting
-			
+			DROP TABLE IF EXISTS #tmpSuperExtraPT;
 			CREATE TABLE #tmpSuperExtraPT(SuperId INT, winlostdate SMALLDATETIME, productId INT, sporttype INT, bettypePT INT,  ExtraPT MONEY, RefTable TINYINT, LeagueGroupID SMALLINT, TicketType TINYINT)
 			CREATE CLUSTERED INDEX CIX_tmpSuperExtraPT ON #tmpSuperExtraPT(SuperId, winlostdate, bettypePT)
 
@@ -190,7 +193,8 @@ BEGIN
 			) AS ept
 			OPTION (MAXRECURSION 0);
 			
-
+			
+			DROP TABLE IF EXISTS #ComWinLossDetails_bettrans;
 			CREATE TABLE #ComWinLossDetails_bettrans 
 			(
 				winlostdate		SMALLDATETIME,
@@ -478,6 +482,18 @@ BEGIN
 
 	END	
 
+	--TODO: SabaWalletTicket
+	SELECT @FDate = @FromDate, @TDate = @ToDate
+
+	INSERT INTO #ComWinLossDetails(winlostdate ,CustID, RewardAmount)
+	SELECT b.WinlostDate , b.Srecommend, SUM(b.Amount)
+	FROM SabaWalletTicket b WITH (NOLOCK)
+	INNER JOIN #tmpSuperList s 
+		ON b.Srecommend = s.custID
+	WHERE b.WinlostDate BETWEEN @FDate AND @TDate
+		AND b.WalletID = 2
+	GROUP BY b.WinlostDate , b.Srecommend
+
 	-- RESULT
 		CREATE TABLE #tmp_result(
 			CustID INT
@@ -500,6 +516,8 @@ BEGIN
 			, SAgComm DECIMAL(19,8)
 			, SAgTotal DECIMAL(19,8)
 			, Company DECIMAL(19,8)
+			, RewardAmount DECIMAL(19,8)
+			, RewardCurrency VARCHAR(12)
 		)
 		INSERT INTO #tmp_result(
 			CustID 
@@ -522,6 +540,8 @@ BEGIN
 			, SAgComm 
 			, SAgTotal 
 			, Company 
+			, RewardAmount
+			, RewardCurrency
 		)
 		SELECT
 			w.CustID, 
@@ -543,7 +563,9 @@ BEGIN
 			SUM(SAgWinlost * o.Rate) as SAgWinlost,
 			SUM(SAgComm * o.Rate) as SAgComm,
 			SUM(SAgTotal * o.Rate) as SAgTotal,
-			SUM(w.Company * o.Rate) AS Company
+			SUM(w.Company * o.Rate) AS Company,
+			SUM(w.RewardAmount * o.Rate) AS RewardAmount,
+			o.Code AS RewardCurrency
 		FROM #ComWinLossDetails w 
 			INNER JOIN bodb02.dbo.custinfo c WITH(NOLOCK) 
 				ON w.CustID = c.CustID
@@ -551,7 +573,7 @@ BEGIN
 				ON c.currency = o.CurrencyId
 				AND w.winlostdate = o.ExchangeDate
 		WHERE c.currency IN (SELECT CurrencyId FROM #tmp_currencylist)
-		GROUP BY w.winlostdate,w.CustID, c.UserName,c.currency,o.CurrencyName
+		GROUP BY w.winlostdate,w.CustID, c.UserName,c.currency,o.CurrencyName,o.Code
 		
 	
 	--Result--
@@ -575,11 +597,14 @@ BEGIN
 				, SUM(SAgComm) SAgComm
 				, SUM(SAgTotal) SAgTotal
 				, SUM(Company) Company
+				, SUM(RewardAmount) RewardAmount
+				, RewardCurrency
 		FROM #tmp_result
 		GROUP BY CustID 
 				, UserName 
 				, CurrencyID 
 				, CurrencyName
+				, RewardCurrency
 		ORDER BY Username
 
 	-- Total --
@@ -603,8 +628,10 @@ BEGIN
 					, SUM(SAgComm) SAgComm
 					, SUM(SAgTotal) SAgTotal
 					, SUM(Company) Company
+					, SUM(RewardAmount) RewardAmount
+					, RewardCurrency
 				FROM #tmp_result
-				GROUP BY CurrencyName
+				GROUP BY CurrencyName, RewardCurrency
 			END
 			ELSE
 			BEGIN
@@ -630,6 +657,8 @@ BEGIN
 					, SUM(SAgComm) SAgComm
 					, SUM(SAgTotal) SAgTotal
 					, SUM(Company) Company
+					, SUM(RewardAmount) RewardAmount
+					, '' AS RewardCurrency
 				FROM #tmp_result
 			END
 
@@ -639,8 +668,7 @@ BEGIN
 	DROP TABLE #ComWinLossDetails;
 	DROP TABLE #TmpCondSumWL;
 	DROP TABLE #SportBettype;
-	DROP TABLE #tmpSuperExtraPT;
-	DROP TABLE #ComWinLossDetails_bettrans;
+
 	DROP TABLE #tmp_result
 END
 GO

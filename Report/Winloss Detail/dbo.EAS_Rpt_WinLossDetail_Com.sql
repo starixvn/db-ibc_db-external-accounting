@@ -7,7 +7,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_Com]
 	@ProductIds		VARCHAR(MAX) = '',
 	@ProductDetails NVARCHAR(MAX) = 'All',
 	@MoveBetsDay	SMALLDATETIME,
-	@BalanceUpDay	SMALLDATETIME	
+	@BalanceUpDay	SMALLDATETIME
 AS
 /*
 	Created by: Dan
@@ -71,6 +71,7 @@ AS
 		- 20240515@Lewis: Add SABA Kabaddi [RedmineID: #203763]
 		- 20240617@Sophia: Bettrans_compact [redmine: 206610]
 		- 20240624@Lewis: cte_superBet => Bettrans_compact [redmine: 206610]
+	    - 20240918@Lewis: Rebate Retention - Reward [RedmineId: #208503]
 	
 	Param's Explanation:
 	 @ProductDetails:		
@@ -104,7 +105,7 @@ BEGIN
 	CREATE TABLE #tmpSuperList (custID INT PRIMARY KEY)
 
 	DECLARE @ExistingProductDetails TABLE (ProductId INT,Sporttype INT,Bettype INT, LeagueGroupID SMALLINT, TicketType TINYINT)
-	DECLARE @iDoc INT, @FDate SMALLDATETIME, @TDate SMALLDATETIME, @__ProductDetails XML;
+	DECLARE @FDate SMALLDATETIME, @TDate SMALLDATETIME, @__ProductDetails XML;
 
 	SELECT @FDate = @FromDate, @TDate = @ToDate
 
@@ -117,10 +118,11 @@ BEGIN
 	DROP TABLE IF EXISTS #ComWinLossDetails;
 	CREATE TABLE #ComWinLossDetails 
 	(
-		CustID int, Turnover money, TurnoverNoDraw MONEY, GrossComm money, MemberWinLost money, 
-		PlayerComm money, MemberTotal money, AgWinLost money, AgComm money, AgTotal money, 
-		MAgWinLost money, MAgComm money, MAgTotal money, SAgWinLost money, SAgComm money, SAgTotal MONEY,
+		CustID INT, Turnover MONEY, TurnoverNoDraw MONEY, GrossComm MONEY, MemberWinLost MONEY, 
+		PlayerComm MONEY, MemberTotal MONEY, AgWinLost MONEY, AgComm MONEY, AgTotal MONEY, 
+		MAgWinLost MONEY, MAgComm MONEY, MAgTotal MONEY, SAgWinLost MONEY, SAgComm MONEY, SAgTotal MONEY,
 		ExtraWinloss MONEY, ExtraComm MONEY, ExtraTotal MONEY, Company MONEY, CompanyAfterExtraPT MONEY
+		, RewardAmount MONEY
 	)
 
 	DROP TABLE IF EXISTS #TmpCondSumWL;
@@ -173,7 +175,8 @@ BEGIN
 
 	--Force optimizer to seek on IX_srecommend index
 	DECLARE @n BIGINT = 2147483647
-	
+
+	--TODO: bettrans_compact
 	IF @Todate >= @BalanceUpDay
 	BEGIN 
 		IF @ToDate > @MoveBetsDay
@@ -259,13 +262,13 @@ BEGIN
 					AgTotal, MAgWinLost, MAgComm, MAgTotal, SAgWinLost, SAgComm, SAgTotal,	ExtraWinloss, ExtraComm, ExtraTotal, Company, CompanyAfterExtraPT  
 				)
 			SELECT
-				b.CustID
-				,SUM(b.Turnover) AS Turnover
-				,SUM(TurnoverNoDraw) AS TurnoverNoDraw
-				,SUM(GrossComm) AS GrossComm
-				,SUM(winlost)
-				,SUM(playercomm)
-				,SUM(winlost+playercomm)
+				 b.CustID
+				 ,SUM(b.Turnover) AS Turnover
+				 ,SUM(TurnoverNoDraw) AS TurnoverNoDraw
+				 ,SUM(GrossComm) AS GrossComm
+				 ,SUM(winlost)
+				 ,SUM(playercomm)
+				 ,SUM(winlost+playercomm)
 				 ,SUM(awinlost)
 				 ,SUM(comm-playercomm)
 				 ,SUM(awinlost+comm-playercomm)
@@ -285,7 +288,7 @@ BEGIN
 				
 					) AS CompanyAfterExtraPT				
 			FROM bodb_AGE.dbo.bettrans_compact b WITH(NOLOCK)			
-			 INNER JOIN #tmpSuperExtraPT sl ON sl.SuperId = b.custid  
+			INNER JOIN #tmpSuperExtraPT sl ON sl.SuperId = b.custid  
 					AND sl.Winlostdate = b.winlostdate
 					AND sl.bettypePT = b.bettype
 					AND (sl.ProductID <> 1 OR (sl.ProductID = 1 AND b.sporttype = sl.SportType AND b.LeagueGroupID = sl.LeagueGroupID AND b.TicketType = sl.TicketType))
@@ -341,7 +344,8 @@ BEGIN
 		END
    
 		SELECT @FDate = @FromDate
-	
+
+	--TODO: sum_winloss
 		IF @BalanceUpDay > @FromDate
 			SELECT @FDate = @BalanceUpDay
 
@@ -350,29 +354,32 @@ BEGIN
 			IF @ToDate > @MoveBetsDay
 				SELECT @TDate = @MoveBetsDay
 
-			INSERT INTO #ComWinLossDetails
+			INSERT INTO #ComWinLossDetails(
+					CustID, Turnover, TurnoverNoDraw, GrossComm, MemberWinLost, PlayerComm, MemberTotal, AgWinLost, AgComm, 
+					AgTotal, MAgWinLost, MAgComm, MAgTotal, SAgWinLost, SAgComm, SAgTotal,	ExtraWinloss, ExtraComm, ExtraTotal, Company, CompanyAfterExtraPT  
+				)
 			SELECT
 				CustID,			
-				sum(TurnOver), -- TurnOver
+				SUM(TurnOver), -- TurnOver
 				SUM(TunroverNoDraw) as TurnoverNoDraw,
-				sum(grosscomm) as GrossComm,
-				sum(winlost), --MemberWinlost
-				sum(playercomm), -- PlayerComm
-				isnull(sum(winlost), 0) + isnull(sum(playercomm), 0), --MemberTotal
-				sum(awinlost), -- AgWinlost
-				isnull(sum(comm-playercomm),0), --AgComm
-				isnull(sum(awinlost+comm-playercomm), 0), --AgTotal		
-				sum(mwinlost), -- MAgWinlost
-				sum(acomm)-sum(comm), --MAgComm
-				isnull(sum(mwinlost), 0) + isnull(sum(acomm), 0)-sum(comm), --MAgTotal
-				sum(swinlost), -- SAgWinlost
-				isnull(sum(scomm),0) -isnull(sum(acomm),0), --SAgComm
-				isnull(sum(swinlost), 0) + isnull(sum(scomm), 0)-sum(acomm), --SAgTotal
+				SUM(grosscomm) as GrossComm,
+				SUM(winlost), --MemberWinlost
+				SUM(playercomm), -- PlayerComm
+				ISNULL(SUM(winlost), 0) + ISNULL(SUM(playercomm), 0), --MemberTotal
+				SUM(awinlost), -- AgWinlost
+				ISNULL(SUM(comm-playercomm),0), --AgComm
+				ISNULL(SUM(awinlost+comm-playercomm), 0), --AgTotal		
+				SUM(mwinlost), -- MAgWinlost
+				SUM(acomm)-SUM(comm), --MAgComm
+				ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(acomm), 0)-SUM(comm), --MAgTotal
+				SUM(swinlost), -- SAgWinlost
+				ISNULL(SUM(scomm),0) -ISNULL(SUM(acomm),0), --SAgComm
+				isnull(SUM(swinlost), 0) + ISNULL(SUM(scomm), 0)-SUM(acomm), --SAgTotal
 				ISNULL(SUM(b.ExtraWinloss), 0) AS ExtraWinloss,
 				ISNULL(SUM(b.ExtraComm), 0) AS ExtraComm,
 				ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0) AS ExtraTotal,
-				-(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost), 0)), --Company
-				-(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost), 0) + ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0)) --Company after extra pt					
+				-(ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(winlost), 0)), --Company
+				-(ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(winlost), 0) + ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0)) --Company after extra pt					
 			FROM
 				bodb02.dbo.sum_winloss b WITH (NOLOCK) INNER JOIN #TmpCondSumWL t ON b.sporttype = t.sporttype AND b.bettype = t.bettype AND ISNULL(b.leagueGroupID,0) = t.LeagueGroupID AND ISNULL(b.ticketType,0) = t.TicketType
 			WHERE
@@ -383,6 +390,7 @@ BEGIN
 		END
 	END
 
+	--TODO: Sum_WinLoss_Old
 	IF @FromDate < @BalanceUpDay 
 	BEGIN
 		SELECT @FDate = @FromDate
@@ -404,72 +412,93 @@ BEGIN
 		SELECT * FROM CTE_Winlostdate
 		OPTION (MAXRECURSION 0)
 
-		INSERT INTO #ComWinLossDetails
-			SELECT
-				CustID,			
-				sum(TurnOver), -- TurnOver
-				SUM(TunroverNoDraw) as TurnoverNoDraw,
-				sum(grosscomm) as GrossComm,
-				sum(winlost), --MemberWinlost
-				sum(playercomm), -- PlayerComm
-				isnull(sum(winlost), 0) + isnull(sum(playercomm), 0), --MemberTotal
-				sum(awinlost), -- AgWinlost
-				isnull(sum(comm-playercomm),0), --AgComm
-				isnull(sum(awinlost+comm-playercomm), 0), --AgTotal		
-				sum(mwinlost), -- MAgWinlost
-				sum(acomm)-sum(comm), --MAgComm
-				isnull(sum(mwinlost), 0) + isnull(sum(acomm), 0)-sum(comm), --MAgTotal
-				sum(swinlost), -- SAgWinlost
-				isnull(sum(scomm),0) -isnull(sum(acomm),0), --SAgComm
-				isnull(sum(swinlost), 0) + isnull(sum(scomm), 0)-sum(acomm), --SAgTotal
-				ISNULL(SUM(b.ExtraWinloss), 0) AS ExtraWinloss,
-				ISNULL(SUM(b.ExtraComm), 0) AS ExtraComm,
-				ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0) AS ExtraTotal,
-				-(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost), 0)), --Company
-				-(isnull(sum(swinlost), 0) + isnull(sum(awinlost), 0) + isnull(sum(mwinlost), 0) + isnull(sum(scomm), 0) + isnull(sum(winlost), 0) + ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0)) --Company after extra pt							
-			FROM
-			   bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK) 
-			   CROSS APPLY (
-					SELECT  t.winlostdate, u.SportType, u.BetType, u.LeagueGroupID, u.TicketType
-					FROM #TmpCondSumWL u
-					cross join @winlostdateTable t
-				) w
-			WHERE b.winlostdate = w.winlostdate  
-					AND b.custid IN (SELECT tmp.custID FROM #tmpSuperList tmp)
-					AND b.roleid = 4
-					AND b.sporttype = w.sporttype 
-					AND b.bettype = w.bettype
-					AND ISNULL(b.leagueGroupID,0) = w.LeagueGroupID
-					AND ISNULL(b.ticketType,0) = w.TicketType
-			GROUP BY b.CustID
-
+		INSERT INTO #ComWinLossDetails(
+					CustID, Turnover, TurnoverNoDraw, GrossComm, MemberWinLost, PlayerComm, MemberTotal, AgWinLost, AgComm, 
+					AgTotal, MAgWinLost, MAgComm, MAgTotal, SAgWinLost, SAgComm, SAgTotal,	ExtraWinloss, ExtraComm, ExtraTotal, Company, CompanyAfterExtraPT  
+				)
+		SELECT
+			CustID,			
+			SUM(TurnOver), -- TurnOver
+			SUM(TunroverNoDraw) as TurnoverNoDraw,
+			SUM(grosscomm) as GrossComm,
+			SUM(winlost), --MemberWinlost
+			SUM(playercomm), -- PlayerComm
+			ISNULL(SUM(winlost), 0) + ISNULL(SUM(playercomm), 0), --MemberTotal
+			SUM(awinlost), -- AgWinlost
+			ISNULL(SUM(comm-playercomm),0), --AgComm
+			ISNULL(SUM(awinlost+comm-playercomm), 0), --AgTotal		
+			SUM(mwinlost), -- MAgWinlost
+			SUM(acomm)-SUM(comm), --MAgComm
+			ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(acomm), 0)-SUM(comm), --MAgTotal
+			SUM(swinlost), -- SAgWinlost
+			ISNULL(SUM(scomm),0) -ISNULL(SUM(acomm),0), --SAgComm
+			ISNULL(SUM(swinlost), 0) + ISNULL(SUM(scomm), 0)-SUM(acomm), --SAgTotal
+			ISNULL(SUM(b.ExtraWinloss), 0) AS ExtraWinloss,
+			ISNULL(SUM(b.ExtraComm), 0) AS ExtraComm,
+			ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0) AS ExtraTotal,
+			-(ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(winlost), 0)), --Company
+			-(ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(winlost), 0) + ISNULL(SUM(b.ExtraWinloss + b.ExtraComm), 0)) --Company after extra pt							
+		FROM
+		   bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK) 
+		   CROSS APPLY (
+				SELECT  t.winlostdate, u.SportType, u.BetType, u.LeagueGroupID, u.TicketType
+				FROM #TmpCondSumWL u
+				cross join @winlostdateTable t
+			) w
+		WHERE b.winlostdate = w.winlostdate  
+				AND b.custid IN (SELECT tmp.custID FROM #tmpSuperList tmp)
+				AND b.roleid = 4
+				AND b.sporttype = w.sporttype 
+				AND b.bettype = w.bettype
+				AND ISNULL(b.leagueGroupID,0) = w.LeagueGroupID
+				AND ISNULL(b.ticketType,0) = w.TicketType
+		GROUP BY b.CustID
 	END	
 
+	--TODO: SabaWalletTicket
+	SELECT @FDate = @FromDate, @TDate = @ToDate
+
+	INSERT INTO #ComWinLossDetails(CustID, RewardAmount)
+	SELECT b.Srecommend, SUM(b.Amount)
+	FROM SabaWalletTicket b WITH (NOLOCK)
+	INNER JOIN #tmpSuperList s 
+		ON b.Srecommend = s.custID
+	WHERE b.WinlostDate BETWEEN @FDate AND @TDate
+		AND b.WalletID = 2
+	GROUP BY b.Srecommend
+
+	--TODO: Result
 	SELECT
 		c.CustID, 
 		c.UserName,  
-		sum(TurnOver) as Turnover,
+		SUM(TurnOver) as Turnover,
 		SUM(TurnoverNoDraw) as TurnoverNoDraw,
-		sum(GrossComm) as GrossComm,
-		sum(MemberWinLost) as MemberWinlost,
-		sum(PlayerComm) as PlayerComm,
-		sum(MemberTotal) as MemberTotal,
-		sum(AgWinlost) as AgWinlost,
-		sum(AgComm) as AgComm,
-		sum(AgTotal) as AgTotal,
-		sum(MAgWinlost) as MAgWinlost,
-		sum(MAgComm) as MAgComm,
-		sum(MAgTotal) as MAgTotal,
-		sum(SAgWinlost) as SAgWinlost,
-		sum(SAgComm) as SAgComm,
-		sum(SAgTotal) as SAgTotal,
+		SUM(GrossComm) as GrossComm,
+		SUM(MemberWinLost) as MemberWinlost,
+		SUM(PlayerComm) as PlayerComm,
+		SUM(MemberTotal) as MemberTotal,
+		SUM(AgWinlost) as AgWinlost,
+		SUM(AgComm) as AgComm,
+		SUM(AgTotal) as AgTotal,
+		SUM(MAgWinlost) as MAgWinlost,
+		SUM(MAgComm) as MAgComm,
+		SUM(MAgTotal) as MAgTotal,
+		SUM(SAgWinlost) as SAgWinlost,
+		SUM(SAgComm) as SAgComm,
+		SUM(SAgTotal) as SAgTotal,
 		SUM(w.ExtraWinloss) AS ExtraWinloss,
 		SUM(w.ExtraComm) AS ExtraComm,
 		SUM(w.ExtraTotal) AS ExtraTotal,
 		SUM(w.Company) AS Company,
-		SUM(w.CompanyAfterExtraPT) as CompanyAfterExtraPT	
-	FROM #ComWinLossDetails w LEFT JOIN bodb02.dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID 
-	GROUP BY c.CustID, c.UserName
+		SUM(w.CompanyAfterExtraPT) as CompanyAfterExtraPT,
+		ISNULL(SUM(w.RewardAmount),0) AS RewardAmount,
+		e.Code AS RewardCurrency
+	FROM #ComWinLossDetails w 
+	LEFT JOIN bodb02.dbo.custinfo c WITH(NOLOCK) 
+		ON w.CustID = c.CustID 
+	LEFT JOIN Exchange e WITH (NOLOCK)
+		ON c.currency = e.ExchangeId
+	GROUP BY c.CustID, c.UserName,e.Code
 	ORDER BY IIF(c.Username IS NULL,1,0),c.Username;
 
 END

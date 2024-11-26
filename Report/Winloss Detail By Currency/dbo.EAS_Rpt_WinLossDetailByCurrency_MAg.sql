@@ -22,6 +22,7 @@ AS
 		- 20240116@Lewis: Sort by Username [RedmineID: #196959]
 		- 20240306@Lewis: Add Virtual Ice Hockey [RedmineID: #201129]
 		- 20240515@Lewis: Add SABA Kabaddi [RedmineID: #203763]
+	    - 20240918@Lewis: Rebate Retention - Reward [RedmineId: #208503]
 	
 	Param's Explanation:
 		@BaseCurrency:  0 unchecked
@@ -66,10 +67,12 @@ BEGIN
 	DECLARE @ExistingProductDetails TABLE (ProductId INT,Sporttype INT,Bettype INT, LeagueGroupID SMALLINT, TicketType TINYINT)
 
 	DECLARE @MAgWinLossDetails TABLE(
-		winlostdate smalldatetime,
+		winlostdate SMALLDATETIME,
 		CustID INT, TurnOver MONEY, TurnoverNoDraw MONEY, GrossComm MONEY, MemberWinLost MONEY, 
 		PlayerComm MONEY, MemberTotal MONEY, AgWinLost MONEY, AgComm MONEY, AgTotal MONEY, 
-		MAgWinLost MONEY, MAgComm MONEY, MAgTotal MONEY, Company MONEY)
+		MAgWinLost MONEY, MAgComm MONEY, MAgTotal MONEY, Company MONEY
+		, RewardAmount MONEY
+		)
 
 	DECLARE @GrossComm TABLE (winlostdate SMALLDATETIME,CustId INT, TurnoverNoDraw MONEY, GrossComm MONEY)
 
@@ -117,6 +120,8 @@ BEGIN
 				)
 			)
 		)		
+
+
 	
 	IF @Todate >= @BalanceUpDay
 	BEGIN 
@@ -190,7 +195,12 @@ BEGIN
 						AND b.mrecommend = @custid
 					GROUP BY b.winlostdate,Recommend
 				)
-				INSERT INTO @MAgWinLossDetails
+				INSERT INTO @MAgWinLossDetails(
+												winlostdate,
+												CustID, TurnOver, TurnoverNoDraw, GrossComm, MemberWinLost, 
+												PlayerComm, MemberTotal, AgWinLost, AgComm, AgTotal, 
+												MAgWinLost, MAgComm, MAgTotal, Company
+												)
 				SELECT
 					b.winlostdate,
 					Recommend,			
@@ -360,7 +370,12 @@ BEGIN
 						AND b.recommend = @Agentid
 					GROUP BY b.winlostdate,Recommend
 				)
-				INSERT INTO @MAgWinLossDetails
+				INSERT INTO @MAgWinLossDetails(
+												winlostdate,
+												CustID, TurnOver, TurnoverNoDraw, GrossComm, MemberWinLost, 
+												PlayerComm, MemberTotal, AgWinLost, AgComm, AgTotal, 
+												MAgWinLost, MAgComm, MAgTotal, Company
+												)
 				SELECT
 					b.winlostdate,
 					Recommend,			
@@ -479,7 +494,12 @@ BEGIN
 
 			IF @Agentid IS NULL
 			BEGIN
-				INSERT INTO @MAgWinLossDetails
+				INSERT INTO @MAgWinLossDetails(
+												winlostdate,
+												CustID, TurnOver, TurnoverNoDraw, GrossComm, MemberWinLost, 
+												PlayerComm, MemberTotal, AgWinLost, AgComm, AgTotal, 
+												MAgWinLost, MAgComm, MAgTotal, Company
+												)
 				SELECT
 					b.winlostdate,
 					CustID,			
@@ -505,7 +525,12 @@ BEGIN
 			END
 			ELSE
 			BEGIN
-				INSERT INTO @MAgWinLossDetails
+				INSERT INTO @MAgWinLossDetails(
+												winlostdate,
+												CustID, TurnOver, TurnoverNoDraw, GrossComm, MemberWinLost, 
+												PlayerComm, MemberTotal, AgWinLost, AgComm, AgTotal, 
+												MAgWinLost, MAgComm, MAgTotal, Company
+												)
 				SELECT
 					b.winlostdate,
 					CustID,			
@@ -541,7 +566,12 @@ BEGIN
 		IF @ToDate >= DATEADD(dd, -1, @BalanceUpDay)
 			SELECT @TDate = DATEADD(dd, -1, @BalanceUpDay)
 		
-		INSERT INTO @MAgWinLossDetails
+		INSERT INTO @MAgWinLossDetails(
+										winlostdate,
+										CustID, TurnOver, TurnoverNoDraw, GrossComm, MemberWinLost, 
+										PlayerComm, MemberTotal, AgWinLost, AgComm, AgTotal, 
+										MAgWinLost, MAgComm, MAgTotal, Company
+										)
 		SELECT
 			b.winlostdate,
 			CustID,			
@@ -569,6 +599,19 @@ BEGIN
 
 	END	
 
+	--TODO: SabaWalletTicket
+	SELECT @FDate = @FromDate, @TDate = @ToDate
+
+	INSERT INTO @MAgWinLossDetails (winlostdate, CustID, RewardAmount)
+	SELECT b.WinlostDate,b.Recommend,SUM(b.Amount)
+	FROM SabaWalletTicket b WITH (NOLOCK)
+	WHERE b.WinlostDate BETWEEN @FDate AND @TDate
+		AND b.WalletID = 2
+		AND b.Mrecommend = @custid
+		AND (@Agentid IS NULL OR b.Recommend = @Agentid)
+	GROUP BY b.WinlostDate,b.Recommend
+	---------------------
+
 		-- RESULT
 		CREATE TABLE #tmp_result(
 			CustID INT
@@ -588,6 +631,8 @@ BEGIN
 			, MAgComm DECIMAL(19,8)
 			, MAgTotal DECIMAL(19,8)
 			, Company DECIMAL(19,8)
+			, RewardAmount DECIMAL (19,8)
+			, RewardCurrency VARCHAR(12)
 		)
 	    INSERT INTO #tmp_result(
 			CustID 
@@ -607,6 +652,8 @@ BEGIN
 			, MAgComm 
 			, MAgTotal
 			, Company 
+			, RewardAmount
+			, RewardCurrency
 		)
 		SELECT
 			w.CustID, 
@@ -625,14 +672,16 @@ BEGIN
 			SUM(MAgWinlost * o.Rate) as MAgWinlost,
 			SUM(MAgComm * o.Rate) as MAgComm,
 			SUM(MAgTotal * o.Rate) as MAgTotal,
-			SUM(Company * o.Rate) as Company	
+			SUM(Company * o.Rate) as Company,
+			SUM(w.RewardAmount * o.Rate) AS RewardAmount,
+			o.Code AS RewardCurrency
 		FROM @MAgWinLossDetails w 
 		INNER JOIN bodb02.dbo.Customer c WITH(NOLOCK) 
 			ON w.CustID = c.CustID 
 		INNER JOIN #tmp_Oanda o 
 			ON c.currency = o.CurrencyId
 			AND w.winlostdate = o.ExchangeDate
-		GROUP BY w.winlostdate,w.CustID, c.UserName,c.currency,o.CurrencyName
+		GROUP BY w.winlostdate,w.CustID, c.UserName,c.currency,o.CurrencyName,o.Code
 		
 	--Grid--
 		SELECT CustID 
@@ -652,11 +701,14 @@ BEGIN
 				, SUM(MAgComm) MAgComm
 				, SUM(MAgTotal) MAgTotal
 				, SUM(Company) Company
+				, SUM(RewardAmount) RewardAmount
+				, RewardCurrency
 		FROM #tmp_result
 		GROUP BY CustID 
 				, UserName 
 				, CurrencyID 
 				, CurrencyName
+				, RewardCurrency
 		ORDER BY Username
 
 	-- Total --
@@ -677,8 +729,10 @@ BEGIN
 					, SUM(MAgComm) MAgComm
 					, SUM(MAgTotal) MAgTotal
 					, SUM(Company) Company
+					, SUM(RewardAmount) RewardAmount
+					, RewardCurrency
 				FROM #tmp_result
-				GROUP BY CurrencyName
+				GROUP BY CurrencyName, RewardCurrency
 			END
 			ELSE
 			BEGIN
@@ -701,6 +755,8 @@ BEGIN
 					, SUM(MAgComm) MAgComm
 					, SUM(MAgTotal) MAgTotal
 					, SUM(Company) Company
+					, SUM(RewardAmount) RewardAmount
+					, '' AS RewardCurrency
 				FROM #tmp_result
 			END
 
