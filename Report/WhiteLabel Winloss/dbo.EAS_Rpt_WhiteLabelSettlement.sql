@@ -21,12 +21,10 @@ AS
 */
 BEGIN
 	SET NOCOUNT ON
-	DECLARE @FDate	SMALLDATETIME,
-			@TDate	SMALLDATETIME
+	DECLARE @FDate	SMALLDATETIME, @TDate SMALLDATETIME, @UserName_CustId INT, @UserName_RoleID TINYINT
 
 	SELECT	@FDate = DATEADD(DAY,1,EOMONTH(@FromDate,-1))
 	SELECT  @TDate = CASE WHEN  EOMONTH(@ToDate) >= EOMONTH(GETDATE()) THEN DATEADD(MONTH, DATEDIFF(MONTH, -1, GETDATE())-1, -1) ELSE EOMONTH(@ToDate) END
-
 
 	DROP TABLE IF EXISTS #tmpSuperList
 	CREATE TABLE #tmpSuperList (custID INT PRIMARY KEY)
@@ -35,8 +33,6 @@ BEGIN
 	SELECT custID 
 	FROM bodb02.dbo.Acc_CustGroup WITH(NOLOCK)
 	WHERE GroupName = @GroupName
-
-	DECLARE @UserName_CustId INT, @UserName_RoleID TINYINT
 
 	IF @Username <> ''
 	BEGIN
@@ -49,23 +45,10 @@ BEGIN
 	END
 
 	DROP TABLE IF EXISTS #WhiteLabelList
-	CREATE TABLE #WhiteLabelList (custID INT, WhiteLabel NVARCHAR(50), LaunchedDate SMALLDATETIME)
+	CREATE TABLE #WhiteLabelList (custID INT, WhiteLabel NVARCHAR(50), LaunchedDate SMALLDATETIME, Recommend INT, Mrecommend INT, Srecommend INT)
 
-	INSERT INTO #WhiteLabelList (custID, WhiteLabel, LaunchedDate)
-	SELECT wl.custID, wl.WhiteLabel, wl.LaunchedDate
-	FROM  WhiteLabelInfo wl WITH(NOLOCK)
-	INNER JOIN CustInfo ci WITH(NOLOCK) ON wl.CustID = ci.custid
-	INNER JOIN #tmpSuperList ts ON ci.srecommend = ts.custID
-	WHERE wl.CustID IN (SELECT CAST(value AS INT) FROM STRING_SPLIT (@WhiteLabelList,','))
-	AND ( @UserName_CustId = 0 
-				OR (  ci.SRecommend = @UserName_CustId AND  @UserName_RoleID = 4)
-				OR (  ci.MRecommend = @UserName_CustId AND  @UserName_RoleID = 3)
-				OR (  ci.Recommend = @UserName_CustId AND  @UserName_RoleID = 2)
-		)
-
-	/*GET earning setting*/
-	DROP TABLE IF EXISTS #tmpWhiteLabelSetting
-	CREATE TABLE #tmpWhiteLabelSetting (
+	DROP TABLE IF EXISTS #tmpWhiteLabelSettingByMonth
+	CREATE TABLE #tmpWhiteLabelSettingByMonth (
 		CustID			INT,
 		WhiteLabel		NVARCHAR(50),
 		Recommend		INT,
@@ -80,36 +63,87 @@ BEGIN
 		ToDate			DATETIME
 	)
 
-	INSERT INTO #tmpWhiteLabelSetting (
-		CustID,
-		WhiteLabel,
-		Recommend,
-		Mrecommend,
-		Srecommend,
-		LaunchedDate,
-		AgentRate,
-		MasterRate,
-		SuperRate,
-		HeadlineRate,
-		FromDate,
-		ToDate
+	INSERT INTO #WhiteLabelList (custID, WhiteLabel, LaunchedDate, Recommend, Mrecommend, Srecommend)
+	SELECT wl.custID, wl.WhiteLabel, wl.LaunchedDate, ci.recommend, ci.mrecommend, ci.srecommend
+	FROM  WhiteLabelInfo wl WITH(NOLOCK)
+	INNER JOIN CustInfo ci WITH(NOLOCK) ON wl.CustID = ci.custid
+	INNER JOIN #tmpSuperList ts ON ci.srecommend = ts.custID
+	WHERE wl.CustID IN (SELECT CAST(value AS INT) FROM STRING_SPLIT (@WhiteLabelList,','))
+	AND ( @UserName_CustId = 0 
+				OR (  ci.SRecommend = @UserName_CustId AND  @UserName_RoleID = 4)
+				OR (  ci.MRecommend = @UserName_CustId AND  @UserName_RoleID = 3)
+				OR (  ci.Recommend = @UserName_CustId AND  @UserName_RoleID = 2)
+		)
+
+	/*GET earning setting*/
+	;WITH cte AS (
+		SELECT @FDate as _start, EOMONTH (@FDate) as _end
+		UNION ALL
+		SELECT DATEADD(MONTH,1,_start), EOMONTH (DATEADD(MONTH,1,_start))
+		FROM cte
+		WHERE EOMONTH (DATEADD(MONTH,1,_start)) <= @TDate
+	), wls AS
+	(
+		SELECT	ws.CustID, 
+			ws.AgentRate /100. AgentRate, 
+			ws.MasterRate/ 100. MasterRate, 
+			ws.SuperRate/ 100. SuperRate, 
+			ws.HeadlineRate/ 100. HeadlineRate, 
+			CAST(ws.FromDate AS DATE) FromDate, 
+			CAST(ws.ToDate AS DATE) ToDate
+		FROM WhiteLabelSetting ws WITH(NOLOCK)
+		INNER JOIN #WhiteLabelList wl ON ws.CustID = wl.custID
+		WHERE ws.FromDate <= @TDate AND ws.ToDate >= @FDate
 	)
-	SELECT	ws.CustID, 
+	,t AS
+	(
+		SELECT  s.*,
+				CASE WHEN s.FromDate BETWEEN d._start AND d._end THEN s.FromDate
+					 WHEN d._start BETWEEN s.FromDate AND s.ToDate THEN d._start
+				END r_f_date,
+				CASE WHEN s.ToDate BETWEEN d._start AND d._end THEN s.ToDate
+					 WHEN d._end BETWEEN s.FromDate AND s.ToDate THEN d._end
+				END r_t_date
+		FROM		wls s
+		LEFT JOIN	cte d ON s.FromDate BETWEEN d._start AND d._end 
+						OR s.FromDate BETWEEN d._start AND d._end
+						OR d._start BETWEEN s.FromDate AND s.ToDate
+						OR d._end BETWEEN s.FromDate AND s.ToDate
+	), s AS
+	(
+		SELECT CustID, AgentRate, MasterRate, SuperRate, HeadlineRate, r_f_date FromDate, r_t_date ToDate,  
+		      CAST (DAY(EOMONTH(r_t_date)) AS MONEY) TotalDayOfMonth,  
+			  CAST ( datediff(day, r_f_date, r_t_date) + 1  AS MONEY) NumberAffectedDay,
+			  FORMAT(r_t_date,'MM/yyyy') Month_
+		FROM t
+	), d AS
+	(
+		SELECT CustID, 
+				SUM(AgentRate * (NumberAffectedDay / TotalDayOfMonth)) AgentRate, 
+				SUM(MasterRate * (NumberAffectedDay / TotalDayOfMonth)) MasterRate, 
+				SUM(SuperRate * (NumberAffectedDay / TotalDayOfMonth)) SuperRate,
+				SUM(HeadlineRate * (NumberAffectedDay / TotalDayOfMonth)) HeadlineRate,
+				Month_,
+				DATEADD(DAY,1,EOMONTH(FromDate,-1)) FromDate,
+				EOMONTH(ToDate) ToDate
+	    FROM s
+		GROUP BY CustID, Month_, DATEADD(DAY,1,EOMONTH(FromDate,-1)), EOMONTH(ToDate)
+	) INSERT INTO #tmpWhiteLabelSettingByMonth(CustID, WhiteLabel, Recommend, Mrecommend, Srecommend, LaunchedDate, AgentRate, MasterRate, SuperRate, HeadlineRate, FromDate, ToDate )
+		SELECT	ws.CustID, 
 			wl.WhiteLabel,
-			ci.Recommend,
-			ci.Mrecommend,
-			ci.srecommend,
-			wi.LaunchedDate, 
-			ws.AgentRate  /100., 
-			ws.MasterRate /100., 
-			ws.SuperRate /100., 
-			ws.HeadlineRate /100., 
-			ws.FromDate, 
+			wl.Recommend,
+			wl.Mrecommend,
+			wl.srecommend,
+			wl.LaunchedDate, 
+			ws.AgentRate, 
+			ws.MasterRate, 
+			ws.SuperRate, 
+			ws.HeadlineRate, 
+			ws.FromDate , 
 			ws.ToDate
-	FROM WhiteLabelSetting ws WITH(NOLOCK)
+	FROM d ws WITH(NOLOCK)
 	INNER JOIN #WhiteLabelList wl ON ws.CustID = wl.custID
-	INNER JOIN WhiteLabelInfo wi WITH(NOLOCK) ON ws.CustID = wi.CustID 
-	INNER JOIN custInfo ci WITH(NOLOCK) ON ws.CustID = ci.custid 
+	OPTION (MAXRECURSION 0)
 
 	/*GET reset carried forward setting*/
 
@@ -122,7 +156,7 @@ BEGIN
 
 	INSERT INTO #tmpWLList (CustID, LaunchedDate)
 	SELECT DISTINCT CustID, LaunchedDate
-	FROM #tmpWhiteLabelSetting
+	FROM #tmpWhiteLabelSettingByMonth
 
 	DROP TABLE IF EXISTS #tmpCustWLByMonth 
 	CREATE TABLE #tmpCustWLByMonth (
@@ -200,7 +234,7 @@ BEGIN
 		  CASE WHEN  t.LossCarryforward - t.MemberWL < 0 THEN 0 ELSE (t.LossCarryforward - t.MemberWL) * (1 - tls.AgentRate -tls.MasterRate -tls.SuperRate-  tls.HeadlineRate) END CompanyIncome
 
 	FROM #tmpCustWLByMonth t
-	INNER JOIN #tmpWhiteLabelSetting tls ON t.CustID = tls.CustID AND t.EndOfMonth BETWEEN tls.FromDate and tls.Todate
+	INNER JOIN #tmpWhiteLabelSettingByMonth tls ON t.CustID = tls.CustID AND t.EndOfMonth BETWEEN tls.FromDate and tls.Todate
 	LEFT JOIN bodb02.dbo.Customer cs WITH(NOLOCK) ON tls.SRecommend = cs.CustID
 	LEFT JOIN bodb02.dbo.Customer cm WITH(NOLOCK) ON tls.MRecommend = cm.CustID
 	LEFT JOIN bodb02.dbo.Customer cr WITH(NOLOCK) ON tls.Recommend = cr.CustID
