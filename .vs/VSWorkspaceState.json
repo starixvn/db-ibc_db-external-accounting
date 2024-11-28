@@ -1,0 +1,16 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\Report",
+    "\\Report\\Core",
+    "\\Report\\Oanda Exchange Rate",
+    "\\Report\\Winloss Detail",
+    "\\Report\\Winloss Detail By Currency",
+    "\\Report\\Winloss Detail By PT",
+    "\\Report\\Winloss Detail By PT Currency",
+    "\\Report\\Winloss Detail By Subgroup",
+    "\\TotalBet"
+  ],
+  "SelectedNode": "\\Report\\Core\\EAS_f_GetExchangeRate.sql",
+  "PreviewInSolutionExplorer": false
+}
