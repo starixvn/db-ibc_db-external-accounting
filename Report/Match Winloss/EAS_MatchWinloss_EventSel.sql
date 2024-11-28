@@ -3,7 +3,7 @@ ALTER PROCEDURE [dbo].[EAS_MatchWinloss_EventSel]
 	@GroupName	VARCHAR(50),
 	@FromDate	SMALLDATETIME,
 	@SportType	SMALLINT,
-	@LeagueIds	VARCHAR(1000)
+	@LeagueIds	VARCHAR(MAX)
 AS
 /*  
 	Created by: 20240718@Bobby

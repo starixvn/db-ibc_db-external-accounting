@@ -5,7 +5,7 @@ ALTER PROCEDURE [dbo].[EAS_MatchWinloss_Summary]
 	@ToDate			SMALLDATETIME,
 	@SportType		SMALLINT,
 	@LeagueIds		VARCHAR(MAX)	= '',
-	@Currencies		VARCHAR(1000)	= '',
+	@Currencies		VARCHAR(MAX)	= '',
 	@BaseCurrency	VARCHAR(5)		= '',
 	@SortBy			VARCHAR(30)		= 'kickofftime',
 	@SortType		TINYINT = 0,
