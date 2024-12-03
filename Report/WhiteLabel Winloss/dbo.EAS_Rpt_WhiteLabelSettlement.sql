@@ -89,10 +89,10 @@ BEGIN
 			ws.MasterRate/ 100. MasterRate, 
 			ws.SuperRate/ 100. SuperRate, 
 			ws.HeadlineRate/ 100. HeadlineRate, 
-			CAST(ws.FromDate AS DATE) FromDate, 
+			CASE WHEN ws.FromDate < wl.LaunchedDate THEN CAST(wl.LaunchedDate AS DATE)  ELSE  CAST(ws.FromDate AS DATE) END FromDate, 
 			CAST(ws.ToDate AS DATE) ToDate
 		FROM WhiteLabelSetting ws WITH(NOLOCK)
-		INNER JOIN #WhiteLabelList wl ON ws.CustID = wl.custID
+		INNER JOIN #WhiteLabelList wl ON ws.CustID = wl.custID AND ws.ToDate >= wl.LaunchedDate
 		WHERE ws.FromDate <= @TDate AND ws.ToDate >= @FDate
 	)
 	,t AS
@@ -112,21 +112,21 @@ BEGIN
 	), s AS
 	(
 		SELECT CustID, AgentRate, MasterRate, SuperRate, HeadlineRate, r_f_date FromDate, r_t_date ToDate,  
-		      CAST (DAY(EOMONTH(r_t_date)) AS MONEY) TotalDayOfMonth,  
 			  CAST ( datediff(day, r_f_date, r_t_date) + 1  AS MONEY) NumberAffectedDay,
 			  FORMAT(r_t_date,'MM/yyyy') Month_
 		FROM t
 	), d AS
 	(
 		SELECT CustID, 
-				SUM(AgentRate * (NumberAffectedDay / TotalDayOfMonth)) AgentRate, 
-				SUM(MasterRate * (NumberAffectedDay / TotalDayOfMonth)) MasterRate, 
-				SUM(SuperRate * (NumberAffectedDay / TotalDayOfMonth)) SuperRate,
-				SUM(HeadlineRate * (NumberAffectedDay / TotalDayOfMonth)) HeadlineRate,
+				SUM(AgentRate * (NumberAffectedDay / x.TotalDayOfMonth)) AgentRate, 
+				SUM(MasterRate * (NumberAffectedDay / x.TotalDayOfMonth)) MasterRate, 
+				SUM(SuperRate * (NumberAffectedDay / x.TotalDayOfMonth)) SuperRate,
+				SUM(HeadlineRate * (NumberAffectedDay / x.TotalDayOfMonth)) HeadlineRate,
 				Month_,
 				DATEADD(DAY,1,EOMONTH(FromDate,-1)) FromDate,
 				EOMONTH(ToDate) ToDate
 	    FROM s
+		CROSS APPLY (SELECT SUM(s1.NumberAffectedDay) AS TotalDayOfMonth FROM s s1  WHERE s1.Month_ = s.Month_ AND s1.CustID = s.CustID) x
 		GROUP BY CustID, Month_, DATEADD(DAY,1,EOMONTH(FromDate,-1)), EOMONTH(ToDate)
 	) INSERT INTO #tmpWhiteLabelSettingByMonth(CustID, WhiteLabel, Recommend, Mrecommend, Srecommend, LaunchedDate, AgentRate, MasterRate, SuperRate, HeadlineRate, FromDate, ToDate )
 		SELECT	ws.CustID, 
@@ -245,18 +245,22 @@ BEGIN
 			Agent,
 			Master,
 			Super,
-			LossCarryforward,
+			-- Member
 			MemberWL,
 			MemberPromotion,
+			-- White Label
+			LossCarryforward,
+			-MemberWL AS WhiteLabelWinloss,
 			WhiteLabelNetWinloss,
 			WhiteLabelFee,
-			- t.MemberWL + WhiteLabelFee AS WhiteLabelIncome,
-			WhiteLabelPromotionShare,
 			WhiteLabelPromotionSettlement,
+			WhiteLabelPromotionShare,
 			WhiteLabelFee + WhiteLabelPromotionSettlement AS WhiteLabelTotal,
+
 			MasterEarning,
 			SuperEarning,
 			HeadlineEarning,
+			-- Company
 			CompanyIncome,
 			-WhiteLabelPromotionSettlement AS CompanyPromotionShare,
 			CompanyIncome -WhiteLabelPromotionSettlement CompanyTotal
