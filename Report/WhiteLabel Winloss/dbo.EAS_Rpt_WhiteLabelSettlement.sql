@@ -85,10 +85,10 @@ BEGIN
 	), wls AS
 	(
 		SELECT	ws.CustID, 
-			ws.AgentRate /100. AgentRate, 
-			ws.MasterRate/ 100. MasterRate, 
-			ws.SuperRate/ 100. SuperRate, 
-			ws.HeadlineRate/ 100. HeadlineRate, 
+			ws.AgentRate  AgentRate, 
+			ws.MasterRate MasterRate, 
+			ws.SuperRate SuperRate, 
+			ws.HeadlineRate HeadlineRate, 
 			CASE WHEN ws.FromDate < wl.LaunchedDate THEN CAST(wl.LaunchedDate AS DATE)  ELSE  CAST(ws.FromDate AS DATE) END FromDate, 
 			CAST(ws.ToDate AS DATE) ToDate
 		FROM WhiteLabelSetting ws WITH(NOLOCK)
@@ -118,10 +118,10 @@ BEGIN
 	), d AS
 	(
 		SELECT CustID, 
-				SUM(AgentRate * (NumberAffectedDay / x.TotalDayOfMonth)) AgentRate, 
-				SUM(MasterRate * (NumberAffectedDay / x.TotalDayOfMonth)) MasterRate, 
-				SUM(SuperRate * (NumberAffectedDay / x.TotalDayOfMonth)) SuperRate,
-				SUM(HeadlineRate * (NumberAffectedDay / x.TotalDayOfMonth)) HeadlineRate,
+				SUM(AgentRate * NumberAffectedDay) / MAX(x.TotalDayOfMonth) / 100.   AgentRate, 
+				SUM(MasterRate * NumberAffectedDay) / MAX(x.TotalDayOfMonth) / 100. MasterRate, 
+				SUM(SuperRate * NumberAffectedDay) / MAX(x.TotalDayOfMonth) / 100. SuperRate,
+				SUM(HeadlineRate * NumberAffectedDay) / MAX(x.TotalDayOfMonth) /100. HeadlineRate,
 				Month_,
 				DATEADD(DAY,1,EOMONTH(FromDate,-1)) FromDate,
 				EOMONTH(ToDate) ToDate
@@ -162,10 +162,10 @@ BEGIN
 	CREATE TABLE #tmpCustWLByMonth (
 		CustID				INT,
 		EndOfMonth			SMALLDATETIME,
-		MemberWL			MONEY,
-		Promotion			MONEY,
-		PromotionShare		MONEY,
-		LossCarryforward	MONEY,
+		MemberWL			DECIMAL(20,6),
+		Promotion			DECIMAL(20,6),
+		PromotionShare		DECIMAL(20,6),
+		LossCarryforward	DECIMAL(20,6),
 		rn INT
 	)
 
@@ -195,14 +195,14 @@ BEGIN
 
 	; WITH u AS
 	(
-		SELECT t.CustID, t.EndOfMonth, t.MemberWL, t.Promotion, t.PromotionShare, ISNULL(t.LossCarryforward,0) LossCarryforward , t.rn from  #tmpCustWLByMonth t WHERE rn = 1
+		SELECT t.CustID, t.EndOfMonth, t.MemberWL, t.Promotion, t.PromotionShare, CAST(ISNULL(t.LossCarryforward,0) AS DECIMAL(20,6)) LossCarryforward , t.rn from  #tmpCustWLByMonth t WHERE rn = 1
 		UNION ALL
 		SELECT t.CustID, 
 			   t.EndOfMonth,
 			   t.MemberWL, 
 			   t.Promotion, 
 			   t.PromotionShare, 
-			   CASE WHEN  (u.LossCarryforward - u.MemberWL) > 0  OR x.CustID IS NOT NULL THEN 0 ELSE u.LossCarryforward - u.MemberWL END, t.rn  from #tmpCustWLByMonth t
+			   CASE WHEN  (u.LossCarryforward - u.MemberWL) > 0  OR x.CustID IS NOT NULL THEN CAST(0 AS DECIMAL(20,6)) ELSE CAST(u.LossCarryforward - u.MemberWL AS DECIMAL(20,6)) END, t.rn  from #tmpCustWLByMonth t
 		INNER JOIN u ON t.rn - 1  = u.rn AND u.CustID = t.CustID
 		OUTER APPLY ( SELECT wr.CustID FROM WhiteLabelResetLossCarryForward wr WITH(NOLOCK) WHERE t.CustID = wr.CustID AND t.EndOfMonth = EOMONTH(wr.YearMonth) AND wr.IsDisabled = 0 ) x
 	)	UPDATE t
@@ -223,15 +223,15 @@ BEGIN
 		  t.MemberWL,
 		  t.Promotion AS MemberPromotion,
 		  t.LossCarryforward - t.MemberWL AS WhiteLabelNetWinloss,
-		  - CASE WHEN  t.LossCarryforward - t.MemberWL < 0 THEN 0 ELSE  
+		  CAST(- CASE WHEN  t.LossCarryforward - t.MemberWL < 0 THEN 0 ELSE  
 			CASE WHEN tls.CustID = tls.Recommend THEN (t.LossCarryforward - t.MemberWL) * (1 - tls.AgentRate) END 
-		  END WhiteLabelFee,
+		  END AS DECIMAL(20,6)) WhiteLabelFee,
 		  t.PromotionShare AS WhiteLabelPromotionShare,
 		  t.Promotion +  t.PromotionShare AS WhiteLabelPromotionSettlement,
-		  CASE WHEN  t.LossCarryforward - t.MemberWL < 0 THEN 0 ELSE (t.LossCarryforward - t.MemberWL) * tls.MasterRate END MasterEarning,
-		  CASE WHEN  t.LossCarryforward - t.MemberWL < 0 THEN 0 ELSE (t.LossCarryforward - t.MemberWL) * tls.SuperRate END SuperEarning,
-		  CASE WHEN  t.LossCarryforward - t.MemberWL < 0 THEN 0 ELSE (t.LossCarryforward - t.MemberWL) * tls.HeadlineRate END HeadlineEarning,
-		  CASE WHEN  t.LossCarryforward - t.MemberWL < 0 THEN 0 ELSE (t.LossCarryforward - t.MemberWL) * (1 - tls.AgentRate -tls.MasterRate -tls.SuperRate-  tls.HeadlineRate) END CompanyIncome
+		  CAST(CASE WHEN  t.LossCarryforward - t.MemberWL < 0 THEN 0 ELSE (t.LossCarryforward - t.MemberWL) * tls.MasterRate END AS DECIMAL(20,6)) MasterEarning,
+		  CAST(CASE WHEN  t.LossCarryforward - t.MemberWL < 0 THEN 0 ELSE (t.LossCarryforward - t.MemberWL) * tls.SuperRate END AS DECIMAL(20,6)) SuperEarning,
+		  CAST(CASE WHEN  t.LossCarryforward - t.MemberWL < 0 THEN 0 ELSE (t.LossCarryforward - t.MemberWL) * tls.HeadlineRate END AS DECIMAL(20,6)) HeadlineEarning,
+		  CAST(CASE WHEN  t.LossCarryforward - t.MemberWL < 0 THEN 0 ELSE (t.LossCarryforward - t.MemberWL) * (1 - tls.AgentRate -tls.MasterRate -tls.SuperRate-  tls.HeadlineRate) END AS DECIMAL(20,6)) CompanyIncome
 
 	FROM #tmpCustWLByMonth t
 	INNER JOIN #tmpWhiteLabelSettingByMonth tls ON t.CustID = tls.CustID AND t.EndOfMonth BETWEEN tls.FromDate and tls.Todate
