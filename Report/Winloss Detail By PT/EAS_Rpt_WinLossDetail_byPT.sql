@@ -33,6 +33,7 @@ AS
 		- 20240125@Lewis: Show Archived User [RedmineID: #199410]
 		- 20240306@Lewis: Add Virtual Ice Hockey [RedmineID: #201129]
 		- 20240515@Lewis: Add SABA Kabaddi [RedmineID: #203763]
+		- 20241216@Bobby: Enhance MBU date range [RedmineID: #215182]
 
 	 @ProductDetails:		
 		N'<ROOT>
@@ -146,19 +147,15 @@ BEGIN
 
 	--Avoid Parameter Sniffing for bettrans and sum_winloss
 	DECLARE @FDate	SMALLDATETIME,
-			@TDate	SMALLDATETIME,
-			@CID	INT;
+			@TDate	SMALLDATETIME;
 	    
-	SELECT	@FDate = @FromDate,
-			@TDate = @ToDate
-
-	IF @ToDate >= @BalanceUpDay
+	--TODO: bettrans_compact
+	SELECT @FDate = FromDate , @TDate = ToDate
+	FROM dbo.f_MBU_RangeDate(@FromDate, @ToDate, @BalanceUpDay, @MoveBetsDay)
+	WHERE RangeType = 1
+	
+	IF @FDate IS NOT NULL
 	BEGIN
-		IF @FromDate <= @MoveBetsDay
-		BEGIN
-			SET @FDate = DATEADD(DD, 1, @MoveBetsDay);
-		END
-
 		-- SportBetype 
 		; WITH cte_SportBettype AS (
 			SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType, f.RefTable, ISNULL(e.LeagueGroupID,0) AS LeagueGroupID, ISNULL(e.TicketType,0) AS TicketType, ISNULL(SportType,0) AS SportType
@@ -341,21 +338,15 @@ BEGIN
 					SELECT CustId, ProductId, SUM(GrossComm) AS GrossComm, SUM(TurnoverNoDraw) AS TurnoverNoDraw FROM #GrossComm GROUP BY CustId, ProductId
 				) c ON t.CustId = c.CustId AND t.ProductId = c.ProductId
 		END
+	END
 		
-		IF @BalanceUpDay < @FromDate
-		BEGIN
-			SET @FDate = @FromDate;
-		END
-		ELSE
-		BEGIN
-			SET @FDate = @BalanceUpDay;
-		END
-		
-		IF @ToDate > @MoveBetsDay
-		BEGIN
-			SET @TDate = @MoveBetsDay;
-		END
-
+	--TODO: sum_winloss
+	SELECT @FDate = FromDate , @TDate = ToDate
+	FROM dbo.f_MBU_RangeDate(@FromDate, @ToDate, @BalanceUpDay, @MoveBetsDay)
+	WHERE RangeType = 2
+	
+	IF @FDate IS NOT NULL
+	BEGIN
 		INSERT INTO #ComWinLossDetails(CustID, ProductID,Turnover,TurnoverNoDraw,GrossComm, MemberWinLost,PlayerComm,MemberTotal,AgWinLost,AgComm,AgTotal,MAgWinLost,MAgComm,MAgTotal,SAgWinLost, SAgComm, SAgTotal, Company)
 		SELECT b.CustID,
 			   t.ProductID,
@@ -384,16 +375,13 @@ BEGIN
 		GROUP BY b.CustID, ProductID;
 	END
 
-	SELECT	@FDate = @FromDate,
-			@TDate = @ToDate;
+	--TODO: sum_winloss_old
+	SELECT @FDate = FromDate , @TDate = ToDate
+	FROM dbo.f_MBU_RangeDate(@FromDate, @ToDate, @BalanceUpDay, @MoveBetsDay)
+	WHERE RangeType = 3
 	
-	IF @FromDate < @BalanceUpDay
+	IF @FDate IS NOT NULL
 	BEGIN
-		IF @ToDate >= DATEADD(dd, -1, @BalanceUpDay)
-		BEGIN
-			SELECT @TDate = DATEADD(dd, -1, @BalanceUpDay);
-		END
-
 		DECLARE @winlostdateTable TABLE (winlostdate smalldatetime)
 
 		;WITH CTE_Winlostdate (winlostdate ) AS
@@ -405,7 +393,7 @@ BEGIN
 			WHERE winlostdate < @TDate
 		)
 		INSERT INTO @winlostdateTable(winlostdate)
-		select * from CTE_Winlostdate
+		SELECT * FROM CTE_Winlostdate
 		OPTION (MAXRECURSION 0)
 
 		-- using cte to remove predicate when seek on sum_winloss_old

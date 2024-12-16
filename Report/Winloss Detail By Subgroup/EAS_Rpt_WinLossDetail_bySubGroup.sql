@@ -167,15 +167,13 @@ BEGIN
 	DECLARE @FDate	SMALLDATETIME,
 			@TDate	SMALLDATETIME;
 	    
-	SELECT	@FDate = @FromDate,
-			@TDate = @ToDate
-
-	IF @ToDate >= @BalanceUpDay
+	--TODO: bettrans
+	SELECT @FDate = FromDate , @TDate = ToDate
+	FROM dbo.f_MBU_RangeDate(@FromDate, @ToDate, @BalanceUpDay, @MoveBetsDay)
+	WHERE RangeType = 1
+	
+	IF @FDate IS NOT NULL
 	BEGIN
-		IF @FromDate <= @MoveBetsDay
-		BEGIN
-			SET @FDate = DATEADD(DD, 1, @MoveBetsDay);
-		END
 
 		;WITH cte_SportBettype AS (
 			SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType, f.RefTable, ISNULL(e.LeagueGroupID,0) AS LeagueGroupID, ISNULL(e.TicketType,0) AS TicketType, ISNULL(SportType,0) AS SportType
@@ -361,20 +359,16 @@ BEGIN
 				) c ON t.CustId = c.CustId 
 		END
 		
-		IF @BalanceUpDay < @FromDate
-		BEGIN
-			SET @FDate = @FromDate;
-		END
-		ELSE
-		BEGIN
-			SET @FDate = @BalanceUpDay;
-		END
-		
-		IF @ToDate > @MoveBetsDay
-		BEGIN
-			SET @TDate = @MoveBetsDay;
-		END
+	END
 
+	--TODO: sum_winloss
+	SELECT @FDate = FromDate , @TDate = ToDate
+	FROM dbo.f_MBU_RangeDate(@FromDate, @ToDate, @BalanceUpDay, @MoveBetsDay)
+	WHERE RangeType = 2
+	
+	IF @FDate IS NOT NULL
+	BEGIN
+			
 		INSERT INTO #ComWinLossDetails(CustID, Turnover,TurnoverNoDraw,GrossComm, MemberWinLost,PlayerComm,MemberTotal,AgWinLost,AgComm,AgTotal,MAgWinLost,MAgComm,MAgTotal,SAgWinLost, SAgComm, SAgTotal, Company)
 		SELECT b.CustID,
 			   SUM(Turnover),
@@ -400,17 +394,15 @@ BEGIN
 			AND RoleID = 4
 		GROUP BY b.CustID;
 	END
-
-	SELECT	@FDate = @FromDate,
-			@TDate = @ToDate;
+		
+	--TODO: sum_winloss_old
+	SELECT @FDate = FromDate , @TDate = ToDate
+	FROM dbo.f_MBU_RangeDate(@FromDate, @ToDate, @BalanceUpDay, @MoveBetsDay)
+	WHERE RangeType = 3
 	
-	IF @FromDate < @BalanceUpDay
+	IF @FDate IS NOT NULL
 	BEGIN
-		IF @ToDate >= DATEADD(dd, -1, @BalanceUpDay)
-		BEGIN
-			SELECT @TDate = DATEADD(dd, -1, @BalanceUpDay);
-		END
-
+		
 		DECLARE @winlostdateTable TABLE (winlostdate smalldatetime)
 
 		;WITH CTE_Winlostdate (winlostdate) AS
