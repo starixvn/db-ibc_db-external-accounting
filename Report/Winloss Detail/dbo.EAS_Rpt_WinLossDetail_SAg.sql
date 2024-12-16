@@ -11,7 +11,6 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_SAg]
 	@PageSize		INT = 0,
 	@PageIndex		INT = 0,
 	@TotalRows		INT = 0 OUTPUT
-WITH RECOMPILE
 AS
 
 /*
@@ -63,6 +62,7 @@ Revisions:
 	- 20240515@Lewis: Add SABA Kabaddi [RedmineID: #203763]
 	- 20240617@Lewis: Use bettrans_compact [RedmineID: #206610]
     - 20240918@Lewis: Rebate Retention - Reward [RedmineId: #208503]
+	- 20241216@Bobby: Enhance MBU & Base Currency [RedmineID: #213507]
 	
 	Param's Explanation:
 	  @ProductDetails:		
@@ -91,7 +91,7 @@ Revisions:
 BEGIN
 	SET NOCOUNT ON
 
-	DECLARE @RowStart INT, @RowEnd INT, @FDate SMALLDATETIME, @TDate SMALLDATETIME, @__ProductDetails XML;
+	DECLARE @RowStart INT, @RowEnd INT, @FDate SMALLDATETIME, @TDate SMALLDATETIME, @__ProductDetails XML, @RangeType TINYINT;
 
 	SELECT @FDate = @FromDate, @TDate = @ToDate
 
@@ -99,13 +99,24 @@ BEGIN
 
 	DECLARE @ExistingProductDetails TABLE (ProductId INT,Sporttype INT,Bettype INT, LeagueGroupID SMALLINT, TicketType TINYINT)
 
-	DECLARE @SAgWinLossDetails TABLE(CustID INT, TurnOver MONEY, TurnoverNoDraw MONEY, GrossComm money, MemberWinLost MONEY, 
-		PlayerComm MONEY, MemberTotal MONEY, AgWinLost MONEY, AgComm MONEY, AgTotal MONEY, 
-		MAgWinLost MONEY, MAgComm MONEY, MAgTotal MONEY, SAgWinLost MONEY, SAgComm MONEY, SAgTotal money, Company MONEY
-		, RewardAmount MONEY
-		)
-
-	DECLARE @GrossComm TABLE (CustId INT, TurnoverNoDraw MONEY, GrossComm MONEY)
+	DECLARE @SAgWinLossDetails TABLE(
+		CustID			INT, 
+		TurnOver		DECIMAL(24,4), 
+		TurnoverNoDraw	DECIMAL(24,4), 
+		GrossComm		DECIMAL(24,4), 
+		MemberWinLost	DECIMAL(24,4), 
+		PlayerComm		DECIMAL(24,4), 
+		AgWinLost		DECIMAL(24,4), 
+		AgComm			DECIMAL(24,4), 
+		MAgWinLost		DECIMAL(24,4), 
+		MAgComm			DECIMAL(24,4), 
+		SAgWinLost		DECIMAL(24,4), 
+		SAgComm			DECIMAL(24,4), 
+		SComm			DECIMAL(24,4),
+		RewardAmount	DECIMAL(24,4)
+		INDEX CIX_CustID CLUSTERED (CustID)
+	);
+	DECLARE @GrossComm TABLE (CustId INT, TurnoverNoDraw DECIMAL(24,4), GrossComm DECIMAL(24,4));
 
 	SELECT @ProductIds = bodb02.dbo.f_AddRelatedProducts(@ProductIds)
 	SELECT @__ProductDetails = CONVERT(XML, @ProductDetails)
@@ -153,384 +164,290 @@ BEGIN
 			)
 		)
 
-	--TODO: bettrans_compact
-	IF @Todate >= @BalanceUpDay
-	BEGIN 
-		IF @ToDate > @MoveBetsDay
-		BEGIN
-			IF @MoveBetsDay > @FromDate
-				SELECT @FDate = DATEADD(DD, 1, @MoveBetsDay)
+	--TODO: Get all downlines
+	DECLARE @downlineList TABLE(custid INT PRIMARY KEY, mrecommend INT, recommend INT, UserName VARCHAR(30), roleid TINYINT, CurrencyId INT, CurrencyName NVARCHAR(15), CurrencyCode NVARCHAR(5));
 
-			IF @masterID IS NULL
-			BEGIN
-				; WITH cte_Master AS (
-					SELECT custid
-					FROM dbo.Customer WITH (NOLOCK)
-					WHERE srecommend = @custid
-						AND roleid = 3
-				)
-				INSERT @SAgWinLossDetails (CustID , TurnOver , TurnoverNoDraw , GrossComm , MemberWinLost , 
-											PlayerComm , MemberTotal , AgWinLost , AgComm , AgTotal , 
-											MAgWinLost , MAgComm , MAgTotal , SAgWinLost , SAgComm , SAgTotal , Company )
-				SELECT b.custid
-					,SUM(b.turnover)
-					,SUM(b.TurnoverNoDraw)
-					,SUM(b.GrossComm)
-					,SUM(b.winlost)
-					,SUM(b.playercomm)
-					,SUM(b.winlost+b.playercomm)
-					,SUM(b.awinlost)
-					,SUM(b.comm-b.playercomm)
-					,SUM(b.awinlost+b.comm-b.playercomm)
-					,SUM(b.mwinlost)
-					,SUM(b.acomm-b.comm)
-					,SUM(b.mwinlost+b.acomm-b.comm)
-					,SUM(b.swinlost)
-					,SUM(b.scomm-b.acomm)
-					,SUM(b.swinlost+b.scomm-b.acomm)
-					,-(ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(winlost), 0)) --Company
-				FROM bodb_AGE.dbo.bettrans_compact b WITH(NOLOCK)
-					INNER JOIN cte_Master c ON c.custid = b.custid
-					INNER JOIN #tmpSportBettype s ON b.bettype = s.bettype 
-						AND (s.ProductID <> 1 OR (s.ProductID = 1 AND b.sporttype = s.SportType AND b.LeagueGroupID = s.LeagueGroupID AND b.TicketType = s.TicketType))
-				WHERE b.winlostdate between @FDate and @TDate 
-				GROUP BY b.custid
+	IF @masterid IS NULL
+	BEGIN
+		;WITH CTE_Downline AS(
+			SELECT ci.custid
+			FROM dbo.custinfo ci WITH(NOLOCK)
+			WHERE ci.srecommend = @CustID
+				AND ci.RoleId = 3
 
-				-- bettransRnG
-				INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
-				SELECT b.mrecommend AS CustId
-					,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.BetStake ELSE 0 END) AS TurnoverNoDraw
-					,SUM(b.BetStake * b.sdiscount) AS GrossComm
-				FROM dbo.bettransRnG b WITH(NOLOCK)
-					INNER JOIN (
-									SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
-									FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
-										LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
-										LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
-									WHERE EXISTS(SELECT 1
-												 WHERE e.ProductId IS NULL 
-													OR 
-														(
-															e.Bettype = f.BetType 
-																	OR (
-																	e.Bettype = 0  AND  (e.ProductId = 1 OR  f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g WHERE g.ProductId <> 1) )
-																	)
-														)
-												)
-										AND f.RefTable = 1
-									) s ON b.gameID = s.Bettype
-					OUTER APPLY 
-					(
-						SELECT f.Bettype AS ContributionBettype
-						FROM dbo.f_BettypePrizeGroup() f
-						WHERE f.BettypeGroup = 'Contribution'
-							AND f.Bettype = b.gameID
-					) cont
-				WHERE winlostdate BETWEEN @FDate AND @TDate
-					AND statusID IN (111, 112, 113) 
-					AND srecommend = @custid
-				GROUP BY b.mrecommend
-				
-				-- bettransLC
-				INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
-				SELECT b.mrecommend AS CustId
-					,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.NetStake ELSE 0 END) AS TurnoverNoDraw
-					,SUM(b.NetStake * b.sdiscount) AS GrossComm
-				FROM dbo.bettransLC b WITH(NOLOCK)
-					INNER JOIN (
-									SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
-									FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
-										LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
-										LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
-									WHERE EXISTS(SELECT 1
-												 WHERE e.ProductId IS NULL 
-													OR 
-														(
-															e.Bettype = f.BetType 
-																  OR (
-																		e.Bettype = 0  AND  (e.ProductId = 1 OR  f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g WHERE g.ProductId <> 1) )
-																	)
-														)
-												)
-										AND f.RefTable = 2
-									) s ON b.gameID = s.Bettype
-					OUTER APPLY 
-					(
-						SELECT f.Bettype AS ContributionBettype
-						FROM dbo.f_BettypePrizeGroup() f
-						WHERE f.BettypeGroup = 'Contribution'
-							AND f.Bettype = b.gameID
-					) cont
-				WHERE winlostdate BETWEEN @FDate AND @TDate
-					AND statusID IN (111, 112, 113) 
-					AND srecommend = @custid
-				GROUP BY b.mrecommend
-				
-				IF EXISTS (SELECT 1 FROM @GrossComm)
-				BEGIN
-					UPDATE t
-					SET t.TurnoverNoDraw = ISNULL(t.TurnoverNoDraw, 0) + ISNULL(c.TurnoverNoDraw, 0)
-						,t.GrossComm = ISNULL(t.GrossComm, 0) + ISNULL(c.GrossComm, 0)
-					FROM @SAgWinLossDetails t
-						INNER JOIN (
-							SELECT CustId, SUM(GrossComm) AS GrossComm, SUM(TurnoverNoDraw) AS TurnoverNoDraw FROM @GrossComm GROUP BY CustId
-						) c ON t.CustId = c.CustId
-				END
-			END
-			ELSE
-			BEGIN
-				INSERT @SAgWinLossDetails (CustID , TurnOver , TurnoverNoDraw , GrossComm , MemberWinLost , 
-											PlayerComm , MemberTotal , AgWinLost , AgComm , AgTotal , 
-											MAgWinLost , MAgComm , MAgTotal , SAgWinLost , SAgComm , SAgTotal , Company )
-				SELECT b.custid
-					,SUM(b.turnover)
-					,SUM(b.TurnoverNoDraw)
-					,SUM(b.GrossComm)
-					,SUM(b.winlost)
-					,SUM(b.playercomm)
-					,SUM(b.winlost+b.playercomm)
-					,SUM(b.awinlost)
-					,SUM(b.comm-b.playercomm)
-					,SUM(b.awinlost+b.comm-b.playercomm)
-					,SUM(b.mwinlost)
-					,SUM(b.acomm-b.comm)
-					,SUM(b.mwinlost+b.acomm-b.comm)
-					,SUM(b.swinlost)
-					,SUM(b.scomm-b.acomm)
-					,SUM(b.swinlost+b.scomm-b.acomm)
-					,-(ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(winlost), 0)) --Company
-				FROM bodb_AGE.dbo.bettrans_compact b WITH(NOLOCK)
-					INNER JOIN #tmpSportBettype s ON b.bettype = s.bettype 
-						AND (s.ProductID <> 1 OR (s.ProductID = 1 AND b.sporttype = s.SportType AND b.LeagueGroupID = s.LeagueGroupID AND b.TicketType = s.TicketType))
-				WHERE b.winlostdate between @FDate and @TDate 
-					AND b.custid = @masterid
-				GROUP BY b.custid
-
-				-- bettransRnG
-				INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
-				SELECT b.mrecommend AS CustId
-					,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.BetStake ELSE 0 END) AS TurnoverNoDraw
-					,SUM(b.BetStake * b.sdiscount) AS GrossComm
-				FROM dbo.bettransRnG b WITH(NOLOCK)
-					INNER JOIN (
-									SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
-									FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
-										LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
-										LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
-									WHERE EXISTS(SELECT 1
-												 WHERE e.ProductId IS NULL 
-													OR 
-														(
-															e.Bettype = f.BetType 
-																   OR (
-																		e.Bettype = 0  AND  (e.ProductId = 1 OR  f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g WHERE g.ProductId <> 1) )
-																	)
-														)
-												)
-										AND f.RefTable = 1
-									) s ON b.gameID = s.Bettype
-					OUTER APPLY 
-					(
-						SELECT f.Bettype AS ContributionBettype
-						FROM dbo.f_BettypePrizeGroup() f
-						WHERE f.BettypeGroup = 'Contribution'
-							AND f.Bettype = b.gameID
-					) cont
-				WHERE winlostdate BETWEEN @FDate AND @TDate
-					AND statusID IN (111, 112, 113) 
-					AND mrecommend = @masterID
-				GROUP BY b.mrecommend
-				
-				-- bettransLC
-				INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
-				SELECT b.mrecommend AS CustId
-					,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.NetStake ELSE 0 END) AS TurnoverNoDraw
-					,SUM(b.NetStake * b.sdiscount) AS GrossComm
-				FROM dbo.bettransLC b WITH(NOLOCK)
-					INNER JOIN (
-									SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
-									FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
-										LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
-										LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
-									WHERE EXISTS(SELECT 1
-												 WHERE e.ProductId IS NULL 
-													OR 
-														(
-															e.Bettype = f.BetType 
-																   OR (
-																		e.Bettype = 0  AND  (e.ProductId = 1 OR  f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g WHERE g.ProductId <> 1) )
-																	)
-														)
-												)
-										AND f.RefTable = 2
-									) s ON b.gameID = s.Bettype
-					OUTER APPLY 
-					(
-						SELECT f.Bettype AS ContributionBettype
-						FROM dbo.f_BettypePrizeGroup() f
-						WHERE f.BettypeGroup = 'Contribution'
-							AND f.Bettype = b.gameID
-					) cont
-				WHERE winlostdate BETWEEN @FDate AND @TDate
-					AND statusID IN (111, 112, 113) 
-					AND mrecommend = @masterID
-				GROUP BY b.mrecommend
-				
-				IF EXISTS (SELECT 1 FROM @GrossComm)
-				BEGIN
-					UPDATE t
-					SET t.TurnoverNoDraw = ISNULL(t.TurnoverNoDraw, 0) + ISNULL(c.TurnoverNoDraw, 0)
-						,t.GrossComm = ISNULL(t.GrossComm, 0) + ISNULL(c.GrossComm, 0)
-					FROM @SAgWinLossDetails t
-						INNER JOIN (
-							SELECT CustId, SUM(GrossComm) AS GrossComm, SUM(TurnoverNoDraw) AS TurnoverNoDraw FROM @GrossComm GROUP BY CustId
-						) c ON t.CustId = c.CustId
-				END
-			END
-		END
-		
-		SELECT @FDate = @FromDate
-
-		--TODO: sum_winloss
-		IF @BalanceUpDay > @FromDate
-			SELECT @FDate = @BalanceUpDay
-		
-		IF @FromDate <= @MoveBetsDay
-		BEGIN
-			IF @ToDate > @MoveBetsDay
-				SELECT @TDate = @MoveBetsDay
-
-			IF @masterID IS NULL
-			BEGIN
-				INSERT INTO @SAgWinLossDetails (CustID , TurnOver , TurnoverNoDraw , GrossComm , MemberWinLost , 
-											PlayerComm , MemberTotal , AgWinLost , AgComm , AgTotal , 
-											MAgWinLost , MAgComm , MAgTotal , SAgWinLost , SAgComm , SAgTotal , Company )
-				SELECT
-					CustID,			
-					SUM(ABS(TurnOver)) as TurnOver,
-					SUM(ABS(TunroverNoDraw)) as TurnoverNoDraw,
-					SUM(grosscomm) as GrossComm,
-					SUM(winlost), --MemberWinlost
-					SUM(playercomm), -- PlayerComm
-					ISNULL(SUM(winlost), 0) + ISNULL(SUM(playercomm), 0), --MemberTotal
-					SUM(awinlost), -- AgWinlost
-					ISNULL(SUM(comm-playercomm),0), --AgComm
-					ISNULL(SUM(awinlost+comm-playercomm), 0), --AgTotal		
-					SUM(mwinlost), -- MAgWinlost
-					SUM(acomm)-SUM(comm), --MAgComm
-					ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(acomm), 0)-SUM(comm), --MAgTotal
-					SUM(swinlost), -- SAgWinlost
-					ISNULL(SUM(scomm),0) -ISNULL(SUM(acomm),0), --SAgComm
-					ISNULL(SUM(swinlost), 0) + ISNULL(SUM(scomm), 0)-SUM(acomm), --SAgTotal
-					-(ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(winlost), 0)) --Company					
-				FROM bodb02.dbo.sum_winloss b WITH (NOLOCK) 
-				INNER JOIN @TmpCondSumWL t 
-					ON b.sporttype = t.sporttype 
-					AND b.bettype = t.bettype 
-					AND ISNULL(b.leagueGroupID,0) = t.LeagueGroupID 
-					AND ISNULL(b.ticketType,0) = t.TicketType
-				WHERE winlostdate BETWEEN @FDate AND @TDate			
-					AND SRecommend = @custid
-					AND RoleID = 3
-				GROUP BY CustID
-			
-			END
-			ELSE
-			BEGIN
-				INSERT INTO @SAgWinLossDetails (CustID , TurnOver , TurnoverNoDraw , GrossComm , MemberWinLost , 
-											PlayerComm , MemberTotal , AgWinLost , AgComm , AgTotal , 
-											MAgWinLost , MAgComm , MAgTotal , SAgWinLost , SAgComm , SAgTotal , Company )
-				SELECT
-					CustID,			
-					SUM(ABS(TurnOver)) as TurnOver,
-					SUM(ABS(TunroverNoDraw)) as TurnoverNoDraw,
-					SUM(grosscomm) as GrossComm,
-					SUM(winlost), --MemberWinlost
-					SUM(playercomm), -- PlayerComm
-					ISNULL(SUM(winlost), 0) + ISNULL(SUM(playercomm), 0), --MemberTotal
-					SUM(awinlost), -- AgWinlost
-					ISNULL(SUM(comm-playercomm),0), --AgComm
-					ISNULL(SUM(awinlost+comm-playercomm), 0), --AgTotal		
-					SUM(mwinlost), -- MAgWinlost
-					SUM(acomm)-SUM(comm), --MAgComm
-					ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(acomm), 0)-SUM(comm), --MAgTotal
-					SUM(swinlost), -- SAgWinlost
-					ISNULL(SUM(scomm),0) -ISNULL(SUM(acomm),0), --SAgComm
-					ISNULL(SUM(swinlost), 0) + ISNULL(SUM(scomm), 0)-SUM(acomm), --SAgTotal
-					-(ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(winlost), 0)) --Company					
-				FROM bodb02.dbo.sum_winloss b WITH (NOLOCK) 
-				INNER JOIN @TmpCondSumWL t 
-					ON b.sporttype = t.sporttype 
-					AND b.bettype = t.bettype 
-					AND ISNULL(b.leagueGroupID,0) = t.LeagueGroupID 
-					AND ISNULL(b.ticketType,0) = t.TicketType
-				WHERE winlostdate BETWEEN @FDate AND @TDate			
-					AND b.mrecommend = @masterID
-					AND RoleID = 3
-				GROUP BY CustID
-			END
-		END
-		
+		)
+		INSERT INTO @downlineList(custid, mrecommend, recommend, UserName, CurrencyId, RoleId, CurrencyName, CurrencyCode)
+		SELECT ci.custid, ci.mrecommend, ci.recommend, ci.UserName, ci.Currency, ci.roleid, ex.Currency, ex.Code
+		FROM dbo.custinfo ci WITH(NOLOCK)
+			INNER JOIN CTE_Downline dl ON dl.custid = ci.custid
+			INNER JOIN dbo.Exchange ex WITH(NOLOCK) ON ex.ExchangeId = ci.Currency
+	END
+	ELSE 
+	BEGIN
+		INSERT INTO @downlineList(custid, mrecommend, recommend, UserName, RoleId, CurrencyId, CurrencyName, CurrencyCode)
+		SELECT ci.custid, ci.mrecommend, ci.recommend, ci.UserName, ci.RoleId, ci.Currency, ex.Currency, ex.Code
+		FROM dbo.custinfo ci WITH(NOLOCK)
+		INNER JOIN dbo.Exchange ex WITH(NOLOCK) ON ex.ExchangeId = ci.Currency
+		WHERE ci.srecommend = @CustID
+			AND ci.RoleId = 3
+			AND ci.custid = @masterid
 	END
 
-	--TODO: Sum_WinLoss_Old
-	IF @FromDate < @BalanceUpDay 
-	BEGIN
-		SELECT @FDate = @FromDate
+	--TODO: Compile downlines vs time range -- build btree index for sum_winloss_xxx
+	DROP TABLE IF EXISTS #tmpDownline;
+	CREATE TABLE #tmpDownline(RangeType TINYINT, winlostdate SMALLDATETIME, srecommend INT,  mrecommend INT, recommend INT, roleid TINYINT, custid INT
+		PRIMARY KEY (RangeType, custid, winlostdate)
+	);
 
-		IF @ToDate >= DATEADD(dd, -1, @BalanceUpDay)
-			SELECT @TDate = DATEADD(dd, -1, @BalanceUpDay)
-			
-		SELECT custid,  mrecommend, turnover,TunroverNoDraw as  TurnoverNoDraw, winlost, awinlost, mwinlost, swinlost, playercomm, comm, acomm, scomm, grosscomm, sporttype, bettype , ISNULL(leagueGroupID,0) leagueGroupID, ISNULL(ticketType,0) ticketType
-			INTO #Sum_WinLoss_Old
-		FROM bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK)
-		WHERE winlostdate BETWEEN @FDate AND @TDate		
-			AND SRecommend = @custid
-			AND RoleID = 3 
-			AND (@masterID is null or b.mrecommend = @masterID)
+	--TODO: bettrans_compact
+	SET @RangeType = 1;
+	SELECT @FDate = FromDate, @TDate = ToDate
+	FROM (VALUES(@FromDate)) AS t (CheckDate)
+	OUTER APPLY (
+		SELECT * FROM dbo.f_MBU_RangeDate(CheckDate, @ToDate, @BalanceUpDay, @MoveBetsDay)
+		WHERE RangeType = @RangeType
+	) AS fc
+
+	IF @FDate IS NOT NULL
+	BEGIN 
+		INSERT @SAgWinLossDetails (
+			CustID, TurnOver, TurnoverNoDraw, GrossComm, MemberWinLost, 
+			PlayerComm, AgWinLost, AgComm,  
+			MAgWinLost, MAgComm, SAgWinLost, SAgComm, SComm
+		)
+		SELECT b.custid
+			,SUM(b.turnover)
+			,SUM(b.TurnoverNoDraw)
+			,SUM(b.GrossComm)
+			,SUM(b.winlost)
+			,SUM(b.playercomm)
+			,SUM(b.awinlost)
+			,SUM(b.comm-b.playercomm)
+			,SUM(b.mwinlost)
+			,SUM(b.acomm-b.comm)
+			,SUM(b.swinlost)
+			,SUM(b.scomm-b.acomm)
+			,SUM(b.scomm)
+		FROM bodb_AGE.dbo.bettrans_compact b WITH(NOLOCK)
+			INNER JOIN @downlineList dl 
+				ON dl.custid = b.custid
+			INNER JOIN #tmpSportBettype s ON b.bettype = s.bettype 
+				AND (s.ProductID <> 1 OR (s.ProductID = 1 AND b.sporttype = s.SportType AND b.LeagueGroupID = s.LeagueGroupID AND b.TicketType = s.TicketType))
+		WHERE b.winlostdate BETWEEN @FDate AND @TDate
+		GROUP BY b.custid
+
+		-- bettransRnG
+		INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
+		SELECT dl.CustId
+			,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.BetStake ELSE 0 END) AS TurnoverNoDraw
+			,SUM(b.BetStake * b.sdiscount) AS GrossComm
+		FROM dbo.bettransRnG b WITH(NOLOCK)
+			INNER JOIN @downlineList dl ON dl.custid = IIF(b.mrecommend=-4, b.custid, b.mrecommend)
+			INNER JOIN (
+							SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
+							FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
+								LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
+								LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
+							WHERE EXISTS(SELECT 1
+											WHERE e.ProductId IS NULL 
+											OR 
+												(
+													e.Bettype = f.BetType 
+															OR (
+															e.Bettype = 0  AND  (e.ProductId = 1 OR  f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g WHERE g.ProductId <> 1) )
+															)
+												)
+										)
+								AND f.RefTable = 1
+							) s ON b.gameID = s.Bettype
+			OUTER APPLY 
+			(
+				SELECT f.Bettype AS ContributionBettype
+				FROM dbo.f_BettypePrizeGroup() f
+				WHERE f.BettypeGroup = 'Contribution'
+					AND f.Bettype = b.gameID
+			) cont
+		WHERE winlostdate BETWEEN @FDate AND @TDate
+			AND statusID IN (111, 112, 113) 
+			AND srecommend = @custid
+		GROUP BY dl.custid
 				
-		INSERT INTO @SAgWinLossDetails (CustID , TurnOver , TurnoverNoDraw , GrossComm , MemberWinLost , 
-											PlayerComm , MemberTotal , AgWinLost , AgComm , AgTotal , 
-											MAgWinLost , MAgComm , MAgTotal , SAgWinLost , SAgComm , SAgTotal , Company )
+		-- bettransLC
+		INSERT INTO @GrossComm (CustId, TurnoverNoDraw, GrossComm)
+		SELECT dl.CustId
+			,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.NetStake ELSE 0 END) AS TurnoverNoDraw
+			,SUM(b.NetStake * b.sdiscount) AS GrossComm
+		FROM dbo.bettransLC b WITH(NOLOCK)
+			INNER JOIN @downlineList dl ON dl.custid = IIF(b.mrecommend=-4, b.custid, b.mrecommend)
+			INNER JOIN (
+							SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
+							FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
+								LEFT JOIN dbo.f_GroupProduct() p ON f.ProductID = p.ProductId
+								LEFT JOIN @ExistingProductDetails e ON e.ProductId = f.ProductID 
+							WHERE EXISTS(SELECT 1
+											WHERE e.ProductId IS NULL 
+											OR 
+												(
+													e.Bettype = f.BetType 
+															OR (
+																e.Bettype = 0  AND  (e.ProductId = 1 OR  f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g WHERE g.ProductId <> 1) )
+															)
+												)
+										)
+								AND f.RefTable = 2
+							) s ON b.gameID = s.Bettype
+			OUTER APPLY 
+			(
+				SELECT f.Bettype AS ContributionBettype
+				FROM dbo.f_BettypePrizeGroup() f
+				WHERE f.BettypeGroup = 'Contribution'
+					AND f.Bettype = b.gameID
+			) cont
+		WHERE winlostdate BETWEEN @FDate AND @TDate
+			AND statusID IN (111, 112, 113) 
+			AND srecommend = @custid
+		GROUP BY dl.custid
+				
+		IF EXISTS (SELECT 1 FROM @GrossComm)
+		BEGIN
+			UPDATE t
+			SET t.TurnoverNoDraw = ISNULL(t.TurnoverNoDraw, 0) + ISNULL(c.TurnoverNoDraw, 0)
+				,t.GrossComm = ISNULL(t.GrossComm, 0) + ISNULL(c.GrossComm, 0)
+			FROM @SAgWinLossDetails t
+				INNER JOIN (
+					SELECT CustId, SUM(GrossComm) AS GrossComm, SUM(TurnoverNoDraw) AS TurnoverNoDraw FROM @GrossComm GROUP BY CustId
+				) c ON t.CustId = c.CustId
+		END
+	END
+
+	--TODO: sum_winloss
+	SET @RangeType = 2;
+	SELECT @FDate = FromDate, @TDate = ToDate
+	FROM (VALUES(@FromDate)) AS t (CheckDate)
+	OUTER APPLY (
+		SELECT * FROM dbo.f_MBU_RangeDate(CheckDate, @ToDate, @BalanceUpDay, @MoveBetsDay)
+		WHERE RangeType = @RangeType
+	) AS fc
+	
+	IF @FDate IS NOT NULL
+	BEGIN 
+		WITH CTW_Winlostdate AS (
+			SELECT @FDate AS Winlostdate
+			UNION ALL
+			SELECT DATEADD(DAY, 1, Winlostdate)
+			FROM CTW_Winlostdate
+			WHERE Winlostdate < @TDate
+		)
+		INSERT INTO #tmpDownline
+		SELECT @RangeType, wld.winlostdate, @custid AS srecommend,  dl.mrecommend, dl.recommend, dl.roleid, dl.custid
+		FROM CTW_Winlostdate wld
+		CROSS JOIN @downlineList dl;
+
+		INSERT INTO @SAgWinLossDetails (
+			CustID, TurnOver, TurnoverNoDraw, GrossComm, MemberWinLost, 
+			PlayerComm, AgWinLost, AgComm,  
+			MAgWinLost, MAgComm, SAgWinLost, SAgComm, SComm
+		)
 		SELECT
-			CustID,			
+			dl.CustID,			
 			SUM(ABS(TurnOver)) as TurnOver,
-			SUM(ABS(TurnoverNoDraw)) as TurnoverNoDraw,
+			SUM(ABS(TunroverNoDraw)) as TurnoverNoDraw,
 			SUM(grosscomm) as GrossComm,
 			SUM(winlost), --MemberWinlost
 			SUM(playercomm), -- PlayerComm
-			ISNULL(SUM(winlost), 0) + ISNULL(SUM(playercomm), 0), --MemberTotal
 			SUM(awinlost), -- AgWinlost
-			ISNULL(SUM(comm-playercomm),0), --AgComm
-			ISNULL(SUM(awinlost+comm-playercomm), 0), --AgTotal		
+			SUM(ISNULL(comm,0)-ISNULL(playercomm,0)), --AgComm
 			SUM(mwinlost), -- MAgWinlost
-			SUM(acomm)-SUM(comm), --MAgComm
-			ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(acomm), 0)-SUM(comm), --MAgTotal
+			SUM(ISNULL(acomm,0)-ISNULL(comm,0)), --MAgComm
 			SUM(swinlost), -- SAgWinlost
-			ISNULL(SUM(scomm),0) -ISNULL(SUM(acomm),0), --SAgComm
-			ISNULL(SUM(swinlost), 0) + ISNULL(SUM(scomm), 0)-SUM(acomm), --SAgTotal
-			-(ISNULL(SUM(swinlost), 0) + ISNULL(SUM(awinlost), 0) + ISNULL(SUM(mwinlost), 0) + ISNULL(SUM(scomm), 0) + ISNULL(SUM(winlost), 0)) --Company								
-		FROM #Sum_WinLoss_Old b WITH(NOLOCK) 
-		INNER JOIN @TmpCondSumWL t 
-			ON b.sporttype = t.sporttype 
-			AND b.bettype = t.bettype 
-			AND b.leagueGroupID = t.LeagueGroupID 
-			AND b.ticketType = t.TicketType
-		GROUP BY CustID
-	END	
+			SUM(ISNULL(scomm,0)-ISNULL(acomm,0)), --SAgComm
+			SUM(scomm)
+		FROM dbo.sum_winloss b WITH (NOLOCK) 
+			INNER JOIN #tmpDownline dl ON b.winlostdate = dl.winlostdate
+				AND dl.srecommend = b.srecommend 
+				AND dl.mrecommend = b.mrecommend 
+				AND dl.recommend = b.recommend 
+				AND dl.roleid = b.roleid 
+				AND dl.custid = b.custid
+			INNER JOIN @TmpCondSumWL t 	ON b.sporttype = t.sporttype 
+				AND b.bettype = t.bettype 
+				AND b.leagueGroupID = t.LeagueGroupID 
+				AND b.ticketType = t.TicketType
+		WHERE dl.RangeType = @RangeType
+		GROUP BY dl.CustID
+	END
 
+	--TODO: sum_winloss_old
+	SET @RangeType = 3;
+	SELECT @FDate = FromDate, @TDate = ToDate
+	FROM (VALUES(@FromDate)) AS t (CheckDate)
+	OUTER APPLY (
+		SELECT * FROM dbo.f_MBU_RangeDate(CheckDate, @ToDate, @BalanceUpDay, @MoveBetsDay)
+		WHERE RangeType = @RangeType
+	) AS fc
+
+	IF @FDate IS NOT NULL
+	BEGIN 
+
+		WITH CTW_Winlostdate AS (
+			SELECT @FDate AS Winlostdate
+			UNION ALL
+			SELECT DATEADD(DAY, 1, Winlostdate)
+			FROM CTW_Winlostdate
+			WHERE Winlostdate < @TDate
+		)
+		INSERT INTO #tmpDownline
+		SELECT @RangeType, wld.winlostdate, @custid AS srecommend,  dl.mrecommend, dl.recommend, dl.roleid, dl.custid
+		FROM CTW_Winlostdate wld
+		CROSS JOIN @downlineList dl
+		OPTION (MAXRECURSION 0);
+
+		INSERT INTO @SAgWinLossDetails (
+			CustID, TurnOver, TurnoverNoDraw, GrossComm, MemberWinLost, 
+			PlayerComm, AgWinLost, AgComm,  
+			MAgWinLost, MAgComm, SAgWinLost, SAgComm, SComm
+		)
+		SELECT
+			dl.CustID,			
+			SUM(ABS(TurnOver)) as TurnOver,
+			SUM(ABS(TunroverNoDraw)) as TurnoverNoDraw,
+			SUM(grosscomm) as GrossComm,
+			SUM(winlost), --MemberWinlost
+			SUM(playercomm), -- PlayerComm
+			SUM(awinlost), -- AgWinlost
+			SUM(ISNULL(comm,0)-ISNULL(playercomm,0)), --AgComm
+			SUM(mwinlost), -- MAgWinlost
+			SUM(ISNULL(acomm,0)-ISNULL(comm,0)), --MAgComm
+			SUM(swinlost), -- SAgWinlost
+			SUM(ISNULL(scomm,0)-ISNULL(acomm,0)), --SAgComm
+			SUM(scomm)							
+		FROM bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK)
+			INNER JOIN #tmpDownline AS dl
+				ON b.winlostdate = dl.winlostdate
+				AND dl.srecommend = b.srecommend 
+				AND dl.mrecommend = b.mrecommend 
+				AND dl.recommend = b.recommend 
+				AND dl.roleid = b.roleid 
+				AND dl.custid = b.custid
+			INNER JOIN @TmpCondSumWL t 
+				ON b.sporttype = t.sporttype 
+				AND b.bettype = t.bettype 
+				AND b.leagueGroupID = t.LeagueGroupID 
+				AND b.ticketType = t.TicketType
+		WHERE dl.RangeType = @RangeType
+		GROUP BY dl.CustID
+	END	
 
 	--TODO: SabaWalletTicket	
 	SELECT @FDate = @FromDate, @TDate = @ToDate
 
 	INSERT INTO @SAgWinLossDetails(CustID,RewardAmount)
-	SELECT  b.Mrecommend, SUM(b.Amount)
-	FROM SabaWalletTicket b WITH (NOLOCK)
+	SELECT  dl.custid, SUM(b.Amount)
+	FROM dbo.SabaWalletTicket b WITH (NOLOCK)
+	INNER JOIN @downlineList dl ON  dl.custid = b.Mrecommend AND dl.roleid = 3
 	WHERE b.WinlostDate BETWEEN @FDate AND @TDate
 		AND b.WalletID = 2
-		AND b.Srecommend = @custid
-		AND (@masterid IS NULL OR b.Mrecommend = @masterid)
-	GROUP BY b.Mrecommend
+	GROUP BY dl.custid
 	
 
 	--TODO: Result
@@ -538,33 +455,30 @@ BEGIN
 	BEGIN
 	    
 		SELECT
-			c.CustID, 
-			c.UserName, 
+			w.CustID, 
+			dl.UserName, 
 			SUM(TurnOver) AS TurnOver,
 			SUM(TurnoverNoDraw) AS TurnoverNoDraw,
 			SUM(GrossComm) AS GrossComm,
 			SUM(MemberWinLost) AS MemberWinlost,
 			SUM(PlayerComm) AS PlayerComm,
-			SUM(MemberTotal) AS MemberTotal,
+			SUM(MemberWinLost+PlayerComm) AS MemberTotal,
 			SUM(AgWinlost) AS AgWinlost,
 			SUM(AgComm) AS AgComm,
-			SUM(AgTotal) AS AgTotal,
+			SUM(AgWinlost+AgComm) AS AgTotal,
 			SUM(MAgWinlost) AS MAgWinlost,
 			SUM(MAgComm) AS MAgComm,
-			SUM(MAgTotal) AS MAgTotal,
+			SUM(MAgWinlost+MAgComm) AS MAgTotal,
 			SUM(SAgWinlost) AS SAgWinlost,
 			SUM(SAgComm) AS SAgComm,
-			SUM(SAgTotal) AS SAgTotal,
-			SUM(Company) AS Company,
+			SUM(SAgWinlost+SAgComm) AS SAgTotal,
+			-SUM(SAgWinlost+MAgWinLost+AgWinLost+SComm+MemberWinLost) AS Company,
 			SUM(w.RewardAmount) AS RewardAmount,
-			e.Code AS RewardCurrency
+			dl.CurrencyCode AS RewardCurrency
 		FROM @SAgWinLossDetails w 
-		LEFT JOIN bodb02.dbo.custinfo c WITH(NOLOCK)
-			ON w.CustID = c.CustID
-		LEFT JOIN Exchange e WITH (NOLOCK)
-			ON c.currency = e.ExchangeId
-		GROUP BY c.CustID, c.UserName, e.Code
-		ORDER BY IIF(c.Username IS NULL,1,0),c.Username;
+			LEFT JOIN @downlineList dl ON w.CustID = dl.CustID
+		GROUP BY w.CustID, dl.UserName, dl.CurrencyCode
+		ORDER BY IIF(dl.Username IS NULL,1,0),dl.Username;
 		
 		RETURN
 	END
@@ -572,47 +486,38 @@ BEGIN
 
 	IF @TotalRows = 0  
 	BEGIN  
-		SELECT @TotalRows = COUNT(tmp.CustID)
-		FROM 
-		(
-			SELECT CustID
-			FROM @SAgWinLossDetails
-			GROUP BY CustID
-		) tmp
-	 
+		SELECT @TotalRows = COUNT(DISTINCT CustID) 
+		FROM @SAgWinLossDetails
 	END
 
 	SELECT wl.*
 	FROM
 		(
 		SELECT
-			c.CustID, 
-			c.UserName, 
+			w.CustID, 
+			dl.UserName, 
 			SUM(TurnOver) AS TurnOver,
 			SUM(TurnoverNoDraw) AS TurnoverNoDraw,
 			SUM(GrossComm) AS GrossComm,
 			SUM(MemberWinLost) AS MemberWinlost,
 			SUM(PlayerComm) AS PlayerComm,
-			SUM(MemberTotal) AS MemberTotal,
+			SUM(MemberWinLost+PlayerComm) AS MemberTotal,
 			SUM(AgWinlost) AS AgWinlost,
 			SUM(AgComm) AS AgComm,
-			SUM(AgTotal) AS AgTotal,
+			SUM(AgWinlost+AgComm) AS AgTotal,
 			SUM(MAgWinlost) AS MAgWinlost,
 			SUM(MAgComm) AS MAgComm,
-			SUM(MAgTotal) AS MAgTotal,
+			SUM(MAgWinlost+MAgComm) AS MAgTotal,
 			SUM(SAgWinlost) AS SAgWinlost,
 			SUM(SAgComm) AS SAgComm,
-			SUM(SAgTotal) AS SAgTotal,
-			SUM(Company) AS Company,
+			SUM(SAgWinlost+SAgComm) AS SAgTotal,
+			-SUM(SAgWinlost+MAgWinLost+AgWinLost+SComm+MemberWinLost) AS Company,
 			SUM(w.RewardAmount) AS RewardAmount,
-			e.Code AS RewardCurrency,
-			ROW_NUMBER() OVER(ORDER BY IIF(c.Username IS NULL,1,0),c.UserName) AS RowNum	    
+			dl.CurrencyCode AS RewardCurrency,
+			ROW_NUMBER() OVER(ORDER BY IIF(dl.Username IS NULL,1,0), dl.UserName) AS RowNum	    
 		FROM @SAgWinLossDetails w 
-		LEFT JOIN bodb02.dbo.custinfo c WITH(NOLOCK) 
-			ON w.CustID = c.CustID 
-		LEFT JOIN Exchange e WITH (NOLOCK)
-			ON c.currency = e.ExchangeId
-		GROUP BY c.CustID, c.UserName, e.Code
+			LEFT JOIN @downlineList dl ON w.CustID = dl.CustID
+		GROUP BY w.CustID, dl.UserName, dl.CurrencyCode
 	) wl
 	WHERE wl.RowNum between @RowStart and @RowEnd;
 END	
