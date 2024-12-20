@@ -22,7 +22,7 @@ BEGIN
 
 	INSERT INTO #tmpSuperList(CustID)
 	SELECT custID 
-	FROM bodb02.dbo.Acc_CustGroup WITH(NOLOCK)
+	FROM dbo.Acc_CustGroup WITH(NOLOCK)
 	WHERE GroupName = @GroupName
 
 	SELECT wl.CustID, WhiteLabel

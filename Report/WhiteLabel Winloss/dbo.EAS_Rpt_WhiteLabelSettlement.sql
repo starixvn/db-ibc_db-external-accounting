@@ -3,7 +3,7 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WhiteLabelSettlement]
 	@GroupName		VARCHAR(50) = 'ACCTHAI',
 	@FromDate		SMALLDATETIME,
 	@ToDate			SMALLDATETIME,
-	@UserName		NVARCHAR(50) = '',
+	@UserName		VARCHAR(30) = '',
 	@WhiteLabelList VARCHAR(MAX) = ''
 AS
 /*
@@ -31,13 +31,13 @@ BEGIN
 
 	INSERT INTO #tmpSuperList(CustID)
 	SELECT custID 
-	FROM bodb02.dbo.Acc_CustGroup WITH(NOLOCK)
+	FROM dbo.Acc_CustGroup WITH(NOLOCK)
 	WHERE GroupName = @GroupName
 
 	IF @Username <> ''
 	BEGIN
 		SELECT @UserName_CustId = ISNULL(Custid, -1), @UserName_RoleID = RoleID
-		FROM  bodb02.dbo.Customer WITH (NOLOCK) WHERE username = @UserName
+		FROM  dbo.Customer WITH (NOLOCK) WHERE username = @UserName
 	END
 	ELSE				
 	BEGIN
@@ -177,7 +177,7 @@ BEGIN
 				SUM(CASE WHEN w.TypeId IN (2,3,4,5,6) THEN Winloss ELSE 0 END ) Promotion,
 				SUM(CASE WHEN w.TypeId = 1 THEN Winloss 
 						 WHEN w.TypeID = 5 THEN -Winloss * 0.3 ELSE 0 END ) PromotionShare
-		FROM	WhiteLabelWinloss w WITH(NOLOCK)
+		FROM	bodb_WhiteLabel.dbo.WhiteLabelWinloss w WITH(NOLOCK)
 		INNER JOIN #tmpWLList tw ON w.CustID = tw.CustID 
 		WHERE w.WinlostDate <= @TDate AND w.WinlostDate >= tw.LaunchedDate
 		GROUP BY tw.CustID, EOMONTH (w.WinlostDate)
@@ -235,9 +235,9 @@ BEGIN
 
 	FROM #tmpCustWLByMonth t
 	INNER JOIN #tmpWhiteLabelSettingByMonth tls ON t.CustID = tls.CustID AND t.EndOfMonth BETWEEN tls.FromDate and tls.Todate
-	LEFT JOIN bodb02.dbo.Customer cs WITH(NOLOCK) ON tls.SRecommend = cs.CustID
-	LEFT JOIN bodb02.dbo.Customer cm WITH(NOLOCK) ON tls.MRecommend = cm.CustID
-	LEFT JOIN bodb02.dbo.Customer cr WITH(NOLOCK) ON tls.Recommend = cr.CustID
+	LEFT JOIN dbo.Customer cs WITH(NOLOCK) ON tls.SRecommend = cs.CustID
+	LEFT JOIN dbo.Customer cm WITH(NOLOCK) ON tls.MRecommend = cm.CustID
+	LEFT JOIN dbo.Customer cr WITH(NOLOCK) ON tls.Recommend = cr.CustID
 	WHERE t.EndOfMonth BETWEEN @FDate AND @TDate
 	)
 	SELECT  "Month",
