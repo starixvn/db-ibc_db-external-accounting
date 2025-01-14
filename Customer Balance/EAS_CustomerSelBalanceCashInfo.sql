@@ -233,8 +233,9 @@ BEGIN
     BEGIN
 	    SELECT @UsedCredit = SUM(credit)  
 	    FROM DBCUST.CustDB.dbo.custinfo WITH(NOLOCK) 
-	    WHERE roleid=2 
-		    AND mrecommend = @custid
+	    WHERE mrecommend = @custid
+			AND 1 = CASE WHEN roleid = 2 THEN 1
+						WHEN roleid = 1 AND recommend = -3 THEN 1 ELSE 0 END
 		
 		-- bettransRNG
 		INSERT INTO #BalanceInfo (masterCash, yesterday_masterCash, masterOutstanding, agentCash, yesterday_agentCash, memberCash, yesterday_memberCash, memberOutstanding)
@@ -377,8 +378,9 @@ BEGIN
     BEGIN
 	    SELECT @UsedCredit = SUM(credit) 
 	    FROM DBCUST.CustDB.dbo.custinfo WITH(NOLOCK)
-	    WHERE roleid=3
-		     AND srecommend = @custid 	    	
+	    WHERE srecommend = @custid 
+			AND 1 = CASE WHEN roleid = 3 THEN 1
+						WHEN roleid = 1 AND recommend = -4 THEN 1 ELSE 0 END
 
 		-- bettransRNG
 		INSERT INTO #BalanceInfo (superCash, yesterday_superCash, superOutstanding, masterCash, yesterday_masterCash, agentCash, yesterday_agentCash, memberCash, yesterday_memberCash, memberOutstanding)
