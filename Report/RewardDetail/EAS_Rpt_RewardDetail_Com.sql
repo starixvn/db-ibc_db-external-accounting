@@ -18,7 +18,7 @@ AS
   
     Revisions:  
         - 20240918@Lewis: Initialize SP [RedmineId: #208503]
-		- 20241224@Max: EOffer Direct Member for Super/Master [Redmine: #211969]
+		- 20241224@Max: Offer Direct Member for Super/Master [Redmine: #211969]
   
     Param's Explanation:  
 		- @Username: '': ALL | <>'': MemberUsername  
