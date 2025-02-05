@@ -226,7 +226,7 @@ BEGIN
 			,rr.SuperPaymentDate
 
 			--IsDirectMember
-			,IIF(rr.Recommend < 0, 1, 0) AS IsDirectMember
+			,CONVERT(BIT, IIF(rr.Recommend < 0, 1, 0)) AS IsDirectMember
 		FROM #RewardReport rr
 		INNER JOIN Customer mem WITH (NOLOCK) ON mem.custid = rr.CustID
 		LEFT JOIN Customer a WITH (NOLOCK) ON a.custid = rr.Recommend
@@ -293,7 +293,7 @@ BEGIN
 					,rr.SuperPaymentStatus
 					,rr.SuperPaymentDate
 					--IsDirectMember
-					,IIF(rr.Recommend < 0, 1, 0) AS IsDirectMember
+					,CONVERT(BIT, IIF(rr.Recommend < 0, 1, 0)) AS IsDirectMember
 					,ROW_NUMBER() OVER (ORDER BY CreatedDate DESC) AS Rownum
 				FROM #RewardReport rr
 				INNER JOIN Customer mem WITH (NOLOCK) ON mem.custid = rr.CustID
