@@ -11,6 +11,7 @@ AS
   
 	Revisions:
 		- 20240624@Bobby: Initialize SP [Redmine: #206055]
+		- 20250326@Bobby: 3rdProduct-Integration [RedmineID: #221188]
 */
 
 BEGIN
@@ -26,9 +27,13 @@ BEGIN
 		,[Type] TINYINT
 	);
 
+	----Check testing environment
+	DECLARE @isTest BIT = 0
+	SELECT  @isTest = dbo.f_CheckSPVersion(@@PROCID);
+
 	-- TODO: Call Age_GetOfferedProductBySiteCurrency
 	INSERT INTO #ProductList
-	EXEC [dbo].[Age_GetOfferedProductBySiteCurrency] @Site = @SiteName,	@Currency = @Currency;
+	EXEC [dbo].[Age_GetOfferedProductBySiteCurrency] @Site = @SiteName,	@Currency = @Currency, @SettingStatus = @isTest;
 
 
 	--TODO: Merge product code & check IsHidden
