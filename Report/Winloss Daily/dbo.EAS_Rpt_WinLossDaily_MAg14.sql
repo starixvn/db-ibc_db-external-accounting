@@ -1,9 +1,10 @@
-/*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBAGE-bodb02" executers="wsv_xnap" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDaily_MAg14]
 	@winlostdate		SMALLDATETIME,
 	@custID				INT,
 	@agentID			INT = NULL,
-	@ExcludeProductIds	VARCHAR(MAX) = '46'
+	@ExcludeProductIds	VARCHAR(MAX) = '46',
+	@MemberId			INT = NULL
 AS
 /*
 	Created by: Dan
@@ -19,6 +20,7 @@ AS
 		- 20190418@Kan: DB053/bodb02 Migration, Move sp from DBEAS/bodb_EAS to DB053/bodb02 [Redmine: #111865]
 		- 20190826@Percy: Remove inactive products [RedmineID: #118699]
 		- 20200629@Malcolm : exclude ProductId = 46 [RedmineID : #135593]
+		- 20241226@Bobby: Super/Master Direct Members [RedmineID: #211969]
 		
 	Param's Explanation:		
 		@custID: Master ID 
@@ -44,8 +46,8 @@ BEGIN
 
 	IF @agentID IS NULL
 	BEGIN
-		SELECT	b.Recommend CustID,
-				ci.username,
+		SELECT	IIF(b.Recommend=-3, b.custid, b.Recommend) AS CustID,
+				ci.username, ci.RoleId,
 				SUM(ABS(b.stake)) totalTO,
 				SUM(ABS(b.stake) * (1 - b.tpositiontaking)) ComTO,
 				SUM(ABS(b.stake) * b.spositiontaking) SAgTO,
@@ -58,20 +60,25 @@ BEGIN
 				SUM(b.awinlost + b.comm - b.playercomm) AgWinlost
 
 		FROM	bodb02.dbo.Bettrans14 b WITH (NOLOCK)
-				INNER JOIN bodb02.dbo.custinfo ci WITH (NOLOCK) ON b.Recommend = ci.custID 
+				INNER JOIN bodb02.dbo.custinfo ci WITH (NOLOCK) ON ci.custID = IIF(b.Recommend=-3, b.custid, b.Recommend)
 		WHERE	b.winlostdate = @winlostdate
 				AND b.MRecommend = @CustID 
 				AND b.ruben = 1
 				AND b.bettype < 19999
 				AND b.statusID NOT IN (101,102,103,121)
 				AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.bettype)
-		GROUP BY b.Recommend, ci.username 
+				AND (
+						@memberId IS NULL OR 
+						@memberId = b.custid --> search Direct Member
+					)
+
+		GROUP BY IIF(b.Recommend=-3, b.custid, b.Recommend), ci.username, ci.RoleId
 		ORDER BY ci.username
 	END
 	ELSE
 	BEGIN
-		SELECT	b.Recommend CustID,
-				@username_tmp AS username,
+		SELECT	b.Recommend AS CustID,
+				@username_tmp AS username, 2 AS RoleId,
 				SUM(ABS(b.stake)) totalTO,
 				SUM(ABS(b.stake) * (1 - b.tpositiontaking)) ComTO,
 				SUM(ABS(b.stake) * b.spositiontaking) SAgTO,

@@ -9,7 +9,8 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetailByCurrency_SAg]
 	@MoveBetsDay	SMALLDATETIME,
 	@BalanceUpDay	SMALLDATETIME,
 	@BaseCurrency	VARCHAR(5) = '',
-	@GroupName		VARCHAR(50)
+	@GroupName		VARCHAR(50),
+	@MemberId		INT = NULL
 AS
 
 /*
@@ -25,6 +26,7 @@ AS
 		- 20240515@Lewis: Add SABA Kabaddi [RedmineID: #203763]
 	    - 20240918@Lewis: Rebate Retention - Reward [RedmineId: #208503]
 		- 20241216@Bobby: Enhance MBU & Base Currency [RedmineID: #213507]
+		- 20241226@Bobby: Super/Master Direct Members [RedmineID: #211969]
 
 	Param's Explanation:
 		- @BaseCurrency:  MYR|CNY|THB|IDR
@@ -68,13 +70,24 @@ BEGIN
 			FROM dbo.custinfo ci WITH(NOLOCK)
 			WHERE ci.srecommend = @CustID
 				AND ci.RoleId = 3
+
+			UNION ALL
+			SELECT ci.custid
+			FROM dbo.custinfo ci WITH(NOLOCK)
+			WHERE ci.srecommend = @CustID
+				AND ci.RoleId = 1
+				AND ci.recommend = -4
 		)
 		INSERT INTO @downlineList(custid, mrecommend, recommend, UserName, CurrencyId, RoleId, CurrencyName, CurrencyCode)
 		SELECT ci.custid, ci.mrecommend, ci.recommend, ci.UserName, ci.Currency, ci.roleid, ex.Currency, ex.Code
 		FROM dbo.custinfo ci WITH(NOLOCK)
 		INNER JOIN CTE_Downline dl ON dl.custid = ci.custid
 		INNER JOIN dbo.Exchange ex WITH(NOLOCK) ON ex.ExchangeId = ci.Currency
-				
+		WHERE (
+			@memberId IS NULL OR 
+			@memberId = ci.custid --> search Direct Member
+		)
+		
 	END
 	ELSE 
 	BEGIN
@@ -175,6 +188,7 @@ BEGIN
 
 	IF @FDate IS NOT NULL
 	BEGIN		
+			
 		INSERT INTO @SAgWinLossDetails(
 			CustID, TurnOver, TurnoverNoDraw, GrossComm, 
 			MemberWinLost, PlayerComm, 
@@ -198,9 +212,11 @@ BEGIN
 			SUM(scomm*ex.Rate) --SComm
 		FROM bodb_Age.dbo.bettrans_compact b WITH(NOLOCK)
 			INNER JOIN @downlineList dl ON dl.custid = b.custid 
-			INNER JOIN #tmp_Oanda ex ON ex.CurrencyId = dl.CurrencyId AND ex.ExchangeDate = b.winlostdate
+			INNER JOIN #tmp_Oanda ex ON ex.CurrencyId = dl.CurrencyId 
+				AND ex.ExchangeDate = b.winlostdate
 			INNER JOIN #tmpSportBettype s ON b.bettype = s.bettype 
 				AND (s.ProductID <> 1 OR (s.ProductID = 1 AND b.sporttype = s.SportType AND b.LeagueGroupID = s.LeagueGroupID AND b.TicketType = s.TicketType))
+		
 		WHERE b.winlostdate BETWEEN @FDate AND @TDate
 		GROUP BY b.custid
 
@@ -211,7 +227,7 @@ BEGIN
 			,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.BetStake ELSE 0 END*ex.Rate) AS TurnoverNoDraw
 			,SUM(b.BetStake * b.sdiscount*ex.Rate) AS GrossComm
 		FROM dbo.bettransRnG b WITH(NOLOCK)
-			INNER JOIN @downlineList dl ON dl.custid = b.mrecommend
+			INNER JOIN @downlineList dl ON dl.custid = IIF(b.mrecommend=-4, b.custid, b.mrecommend)
 			INNER JOIN #tmp_Oanda ex ON ex.CurrencyId = dl.CurrencyId AND ex.ExchangeDate = b.winlostdate
 			INNER JOIN (
 							SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
@@ -249,7 +265,7 @@ BEGIN
 			,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.NetStake ELSE 0 END*ex.Rate) AS TurnoverNoDraw
 			,SUM(b.NetStake * b.sdiscount*ex.Rate) AS GrossComm
 		FROM dbo.bettransLC b WITH(NOLOCK)
-			INNER JOIN @downlineList dl ON dl.custid = b.mrecommend
+			INNER JOIN @downlineList dl ON dl.custid = IIF(b.mrecommend=-4, b.custid, b.mrecommend)
 			INNER JOIN #tmp_Oanda ex ON ex.CurrencyId = dl.CurrencyId AND ex.ExchangeDate = b.winlostdate
 			INNER JOIN (
 							SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
@@ -351,6 +367,7 @@ BEGIN
 				AND b.bettype = t.bettype 
 				AND b.leagueGroupID = t.LeagueGroupID 
 				AND b.ticketType = t.TicketType
+
 		WHERE dl.RangeType = @RangeType
 		GROUP BY dl.CustID
 		
@@ -425,7 +442,15 @@ BEGIN
 	INSERT INTO @SAgWinLossDetails(CustID,RewardAmount)
 	SELECT dl.custid, SUM(b.Amount*ex.Rate)
 	FROM dbo.SabaWalletTicket b WITH (NOLOCK)
-		INNER JOIN @downlineList dl ON dl.custid = b.mrecommend AND dl.roleid = 3
+		INNER JOIN @downlineList dl ON dl.custid = b.mRecommend AND dl.roleid = 3
+		INNER JOIN #tmp_Oanda ex ON ex.CurrencyId = dl.CurrencyId AND ex.ExchangeDate = b.winlostdate
+	WHERE b.WinlostDate BETWEEN @FDate AND @TDate
+		AND b.WalletID = 2
+	GROUP BY dl.custid
+	UNION ALL
+	SELECT dl.custid, SUM(b.Amount*ex.Rate)
+	FROM dbo.SabaWalletTicket b WITH (NOLOCK)
+		INNER JOIN @downlineList dl ON dl.custid = b.CustID AND dl.roleid = 1
 		INNER JOIN #tmp_Oanda ex ON ex.CurrencyId = dl.CurrencyId AND ex.ExchangeDate = b.winlostdate
 	WHERE b.WinlostDate BETWEEN @FDate AND @TDate
 		AND b.WalletID = 2
@@ -437,6 +462,7 @@ BEGIN
 			, dl.UserName
 			, dl.CurrencyID 
 			, dl.CurrencyName
+			, dl.RoleId
 			, SUM(Turnover) Turnover
 			, SUM(TurnoverNoDraw) TurnoverNoDraw
 			, SUM(GrossComm) GrossComm
@@ -462,6 +488,7 @@ BEGIN
 			, dl.CurrencyID 
 			, dl.CurrencyName
 			, dl.CurrencyCode
+			, dl.RoleId
 	ORDER BY dl.Username
 
 	-- Total --

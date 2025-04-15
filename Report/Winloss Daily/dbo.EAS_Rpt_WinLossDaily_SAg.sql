@@ -1,9 +1,10 @@
-/*<info serverAlias="DBAGE-bodb02" executers="bodbExtAccNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBAGE-bodb02" executers="wsv_xnap" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDaily_SAg]
 	@winlostdate		SMALLDATETIME,
 	@custID				INT,
 	@masterID			INT = NULL,
-	@ExcludeProductIds	VARCHAR(MAX) = '46'
+	@ExcludeProductIds	VARCHAR(MAX) = '46',
+	@MemberId			INT = NULL
 AS
 /*
 	Created by: Dan
@@ -25,6 +26,7 @@ AS
 		- 20190418@Kan: DB053/bodb02 Migration, Move sp from DBEAS/bodb_EAS to DB053/bodb02 [Redmine: #111865]
 		- 20190826@Percy: Remove inactive products [RedmineID: #118699]
 		- 20200629@Malcolm : exclude ProductId = 46 [RedmineID : #135593]
+		- 20241226@Bobby: Super/Master Direct Members [RedmineID: #211969]
 		
 	Param's Explanation:		
 		@custID: Super ID 
@@ -53,7 +55,7 @@ BEGIN
 		IF @masterID IS NULL
 		BEGIN
 			SELECT	d.CustID,
-					ci.username,
+					ci.username,ci.RoleId,
 					d.totalTO,
 					d.ComTO,
 					d.SAgTO,
@@ -64,7 +66,8 @@ BEGIN
 					d.MAgWinlost,
 					d.AgWinlost
 			FROM (
-					SELECT	b.MRecommend CustID,
+					SELECT	
+						IIF(b.MRecommend=-4, b.custid, b.MRecommend) AS CustID,
 						SUM(ABS(b.stake)) totalTO,
 						SUM(ABS(b.stake) * (1 - b.tpositiontaking)) ComTO,
 						SUM(ABS(b.stake) * b.spositiontaking) SAgTO,
@@ -82,15 +85,19 @@ BEGIN
 							AND b.srecommend = @CustID 
 							AND b.statusID IN (111,112,113)
 							AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.bettype)
-					GROUP BY b.MRecommend
+					GROUP BY IIF(b.MRecommend=-4, b.custid, b.MRecommend)
 				) d
 				INNER JOIN bodb02.dbo.custinfo ci WITH (NOLOCK) ON d.CustID = ci.custID
+				WHERE (
+						@memberId IS NULL OR 
+						@memberId = d.custid --> search Direct Member
+					)
 			ORDER BY ci.username
 		END
 		ELSE
 		BEGIN
 			SELECT	b.MRecommend CustID,
-				@username_tmp AS username,
+				@username_tmp AS username, 3 AS RoleId,
 				SUM(ABS(b.stake)) totalTO,
 				SUM(ABS(b.stake) * (1 - b.tpositiontaking)) ComTO,
 				SUM(ABS(b.stake) * b.spositiontaking) SAgTO,
@@ -127,7 +134,7 @@ BEGIN
 		
 		IF @masterID IS NULL
 		BEGIN
-			SELECT  a.CustID, username,
+			SELECT  a.CustID, ci.username, ci.RoleId,
 				SUM(totalTO) AS totalTO,
 				SUM(ComTO) AS ComTO,
 				SUM(SAgTO) AS SAgTO,
@@ -138,7 +145,7 @@ BEGIN
 				SUM(MAgWinlost) AS MAgWinlost,
 				SUM(AgWinlost) AS AgWinlost
 			FROM (
-				SELECT	b.MRecommend CustID,
+				SELECT	IIF(b.MRecommend=-4, b.custid, b.MRecommend) AS CustID,
 						SUM(ABS(b.stake)) totalTO,
 						SUM(ABS(b.stake) * (1 - b.tpositiontaking)) ComTO,
 						SUM(ABS(b.stake) * b.spositiontaking) SAgTO,
@@ -155,11 +162,11 @@ BEGIN
 						AND b.srecommend = @CustID 
 						AND b.statusID IN (111,112,113)
 						AND NOT EXISTS (SELECT 1 FROM @SportBettype s WHERE s.Bettype = b.bettype)
-				GROUP BY b.MRecommend
+				GROUP BY IIF(b.MRecommend=-4, b.custid, b.MRecommend)
 				
 				UNION ALL -- bettransRNG
 				
-				SELECT	b.MRecommend CustID,
+				SELECT	IIF(b.MRecommend=-4, b.custid, b.MRecommend) AS CustID,
 						SUM(ABS(b.stake)) totalTO,
 						SUM(ABS(b.stake)*(1 - b.tpositiontaking)) ComTO,
 						SUM(ABS(b.stake)*b.spositiontaking) SAgTO,
@@ -176,11 +183,11 @@ BEGIN
 						AND b.srecommend = @CustID 
 						AND b.statusID IN (111,112,113)
 						AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.gameId)
-				GROUP BY b.MRecommend
+				GROUP BY IIF(b.MRecommend=-4, b.custid, b.MRecommend)
 				
 				UNION ALL -- bettransLC
 				
-				SELECT	b.MRecommend CustID,
+				SELECT	IIF(b.MRecommend=-4, b.custid, b.MRecommend) AS CustID,
 						SUM(ABS(b.stake)) totalTO,
 						SUM(ABS(b.stake)*(1 - b.tpositiontaking)) ComTO,
 						SUM(ABS(b.stake)*b.spositiontaking) SAgTO,
@@ -197,16 +204,20 @@ BEGIN
 						AND b.srecommend = @CustID 
 						AND b.statusID IN (111,112,113)
 						AND NOT EXISTS (SELECT 1 FROM @ExcludeBettype s WHERE s.Bettype = b.gameId)
-				GROUP BY b.MRecommend
+				GROUP BY IIF(b.MRecommend=-4, b.custid, b.MRecommend)
 			) AS A
 			INNER JOIN bodb02.dbo.custinfo ci WITH (NOLOCK) ON a.CustID = ci.custID
-			GROUP BY a.CustID, username
-			ORDER BY username
+			WHERE (
+						@memberId IS NULL OR 
+						@memberId = A.custid --> search Direct Member
+					)
+			GROUP BY a.CustID, ci.username, ci.roleid
+			ORDER BY ci.username
 			
 		END
 		ELSE
 		BEGIN
-			SELECT  CustID, username,
+			SELECT  CustID, username, 3 AS RoleId,
 				SUM(totalTO) AS totalTO,
 				SUM(ComTO) AS ComTO,
 				SUM(SAgTO) AS SAgTO,

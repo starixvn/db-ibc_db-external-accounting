@@ -10,7 +10,8 @@ ALTER PROCEDURE [dbo].[EAS_Rpt_WinLossDetail_MAg]
 	@BalanceUpDay	SMALLDATETIME,
 	@PageSize		INT = 0,
 	@PageIndex		INT = 0,
-	@TotalRows		INT = 0 OUTPUT
+	@TotalRows		INT = 0 OUTPUT,
+	@MemberId		INT = NULL
 AS
 /*
 Created by: Scott
@@ -62,6 +63,7 @@ Revisions:
 	- 20240617@Lewis: Use bettrans_compact [RedmineID: #206610]
     - 20240918@Lewis: Rebate Retention - Reward [RedmineId: #208503]
 	- 20241216@Bobby: Enhance MBU & Base Currency [RedmineID: #213507]
+	- 20241226@Bobby: Super/Master Direct Members [RedmineID: #211969]
 	
 	Param's Explanation:
 			N'<ROOT>
@@ -176,11 +178,22 @@ BEGIN
 		SELECT ci.custid
 		FROM dbo.custinfo ci WITH(NOLOCK)
 		WHERE ci.mrecommend = @CustID
+			AND ci.RoleId = 1
+			AND ci.recommend = -3
+			AND t.Agentid IS NULL
+		UNION ALL
+		SELECT ci.custid
+		FROM dbo.custinfo ci WITH(NOLOCK)
+		WHERE ci.mrecommend = @CustID
 			AND ci.RoleId = 2
 			AND ci.custid = t.AgentId
 	) AS dl
 	INNER JOIN dbo.Customer ci WITH(NOLOCK) ON ci.custid = dl.custid
 	INNER JOIN dbo.Exchange ex WITH(NOLOCK) ON ex.ExchangeId = ci.Currency
+	WHERE (
+			@memberId IS NULL OR 
+			@memberId = dl.custid --> search Direct Member
+		)
 		
 	--TODO: Compile downline vs range time
 	DROP TABLE IF EXISTS #tmpDownline;
@@ -217,6 +230,7 @@ BEGIN
 			INNER JOIN @downlineList dl ON dl.custid = b.custid
 			INNER JOIN #tmpSportBettype s ON b.bettype = s.bettype 
 				AND (s.ProductID <> 1 OR (s.ProductID = 1 AND b.sporttype = s.SportType AND b.LeagueGroupID = s.LeagueGroupID AND b.TicketType = s.TicketType))
+		
 		WHERE b.winlostdate BETWEEN @FDate AND @TDate
 		GROUP BY b.custid
 
@@ -226,7 +240,7 @@ BEGIN
 			,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.BetStake ELSE 0 END) AS TurnoverNoDraw
 			,SUM(b.BetStake * b.adiscount) AS GrossComm
 		FROM dbo.bettransRnG b WITH(NOLOCK)
-			INNER JOIN @downlineList dl ON dl.custid = b.recommend
+			INNER JOIN @downlineList dl ON dl.custid = IIF(b.recommend=-3, b.custid, b.recommend)
 			INNER JOIN (
 							SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
 							FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
@@ -262,7 +276,7 @@ BEGIN
 			,SUM(CASE WHEN cont.ContributionBettype IS NULL THEN b.NetStake ELSE 0 END) AS TurnoverNoDraw
 			,SUM(b.NetStake * b.adiscount) AS GrossComm
 		FROM dbo.bettransLC b WITH(NOLOCK)
-			INNER JOIN @downlineList dl ON dl.custid = b.recommend
+			INNER JOIN @downlineList dl ON dl.custid = IIF(b.recommend=-3, b.custid, b.recommend)
 			INNER JOIN (
 							SELECT	ISNULL(p.GroupProductId, f.ProductID) AS ProductID, f.BetType
 							FROM dbo.f_SportBettypeMatrixByProduct_Sel(@ProductIds, @IsTest) f
@@ -425,12 +439,21 @@ BEGIN
 		AND b.Mrecommend = @custid
 	GROUP BY dl.custid
 
+	UNION ALL
+	SELECT dl.custid,SUM(b.Amount)
+	FROM dbo.SabaWalletTicket b WITH (NOLOCK)
+		INNER JOIN @downlineList dl ON dl.custid = b.custid AND dl.roleid = 1
+	WHERE b.WinlostDate BETWEEN @FDate AND @TDate
+		AND b.WalletID = 2
+		AND b.Mrecommend = @custid
+	GROUP BY dl.custid
+
 	--TODO: Result
 	IF ((@PageSize <= 0) AND (@PageIndex <= 0))
 	BEGIN
 		SELECT
 			c.CustID, 
-			c.UserName,  
+			c.UserName, c.RoleId,
 			SUM(TurnOver) as TurnOver,
 			SUM(TurnoverNoDraw) as TurnoverNoDraw,
 			SUM(GrossComm) as GrossComm,
@@ -445,13 +468,11 @@ BEGIN
 			SUM(MAgWinlost+MAgComm) as MAgTotal,
 			-SUM(MAgWinLost+AgWinLost+Acomm+MemberWinLost) as Company,
 			SUM(RewardAmount) AS RewardAmount,
-			e.Code AS RewardCurrency
+			c.CurrencyCode AS RewardCurrency
 		FROM @MAgWinLossDetails w 
-			LEFT JOIN dbo.Customer c WITH (NOLOCK) 
+			LEFT JOIN @downlineList c 
 				ON w.CustID = c.CustID 
-			LEFT JOIN dbo.Exchange e WITH (NOLOCK)
-				ON c.currency = e.ExchangeId
-		GROUP BY c.CustID, c.UserName, e.Code 
+		GROUP BY c.CustID, c.UserName, c.CurrencyCode, c.RoleId
 		ORDER BY IIF(c.Username IS NULL,1,0),c.Username;
 
 		RETURN
@@ -468,7 +489,7 @@ BEGIN
 		(
 			SELECT
 				c.CustID, 
-				c.UserName,  
+				c.UserName, c.RoleId, 
 				SUM(TurnOver) AS TurnOver,
 				SUM(GrossComm) AS GrossComm,
 				SUM(MemberWinLost) AS MemberWinlost,
@@ -482,14 +503,12 @@ BEGIN
 				SUM(MAgWinlost+MAgComm) as MAgTotal,
 				-SUM(MAgWinLost+AgWinLost+Acomm+MemberWinLost) as Company,
 				SUM(RewardAmount) AS RewardAmount,
-				e.Code AS RewardCurrency,
+				c.CurrencyCode AS RewardCurrency,
 				ROW_NUMBER() OVER (ORDER BY IIF(c.Username IS NULL,1,0),c.UserName) AS RowNum
 			FROM @MAgWinLossDetails w 
-				LEFT JOIN dbo.Customer c WITH(NOLOCK) 
+				LEFT JOIN @downlineList c 
 					ON w.CustID = c.CustID 
-				LEFT JOIN dbo.Exchange e WITH (NOLOCK)
-					ON c.currency = e.ExchangeId
-			GROUP BY c.CustID, c.UserName, e.Code 
+			GROUP BY c.CustID, c.UserName, c.CurrencyCode, c.RoleId
 		) wl	    
 	WHERE wl.RowNum BETWEEN @RowStart AND @RowEnd;
 END	
