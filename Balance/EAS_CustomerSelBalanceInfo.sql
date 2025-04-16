@@ -17,6 +17,7 @@ AS
 		- 20221128@Evan: Enhance performance get max transid [RedmineID: #180141]
 		- 20230227@Evan: Balance-Up support transfer 247 [Redmine: #173554]
         - 20240918@Lewis: Rebate Retention - RewardReceivable RewardPayable [RedmineId: #208503]
+		- 20241224@Max: Offer Direct Member for Super/Master [Redmine: #211969]
 
 */
 
@@ -88,7 +89,11 @@ BEGIN
 		) x
 		
 		-- Credit
-		SELECT @UsedCredit = SUM(ISNULL(credit, 0)) FROM DBCUST.CustDB.dbo.custInfo WITH (NOLOCK) WHERE srecommend = @CustId AND roleId = 3
+		SELECT @UsedCredit = SUM(ISNULL(credit, 0)) 
+		FROM DBCUST.CustDB.dbo.custInfo WITH (NOLOCK) 
+		WHERE srecommend = @CustId 
+			AND 1 = CASE WHEN roleId = 3 THEN 1
+						WHEN roleid = 1 AND recommend = -4 THEN 1 ELSE 0 END
 
 		-- bettrans
 		INSERT INTO #BalanceInfo (winlostdate, bettype, statusId, roleId, winlost, actual_stake, swinlost, mwinlost, awinlost, scomm, acomm, actual_stakePT)
@@ -194,7 +199,11 @@ BEGIN
 		) x
 		
 		-- Credit
-		SELECT @UsedCredit = SUM(ISNULL(credit, 0)) FROM DBCUST.CustDB.dbo.custInfo WITH (NOLOCK) WHERE mrecommend = @CustId AND roleId = 2
+		SELECT @UsedCredit = SUM(ISNULL(credit, 0)) 
+		FROM DBCUST.CustDB.dbo.custInfo WITH (NOLOCK) 
+		WHERE mrecommend = @CustId 
+			AND 1 = CASE WHEN roleId = 2 THEN 1
+						WHEN roleid = 1 AND recommend = -3 THEN 1 ELSE 0 END
 
 		-- bettrans
 		INSERT INTO #BalanceInfo (winlostdate, bettype, statusId, roleId, winlost, actual_stake, mwinlost, awinlost, acomm, comm, actual_stakePT)

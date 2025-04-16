@@ -18,6 +18,7 @@ AS
   
     Revisions:  
         - 20240918@Lewis: Initialize SP [RedmineId: #208503]
+		- 20241224@Max: Offer Direct Member for Super/Master [Redmine: #211969]
   
     Param's Explanation:  
 		- @Username: '': ALL | <>'': MemberUsername  
@@ -189,8 +190,8 @@ BEGIN
 		SELECT @TotalRecords = COUNT(1)
 		FROM #RewardReport rr
 		INNER JOIN Customer mem WITH (NOLOCK) ON mem.custid = rr.CustID
-		INNER JOIN Customer a WITH (NOLOCK) ON a.custid = rr.Recommend
-		INNER JOIN Customer m WITH (NOLOCK) ON m.custid = rr.Mrecommend
+		LEFT JOIN Customer a WITH (NOLOCK) ON a.custid = rr.Recommend
+		LEFT JOIN Customer m WITH (NOLOCK) ON m.custid = rr.Mrecommend
 		INNER JOIN Customer s WITH (NOLOCK) ON s.custid = rr.Srecommend
 		INNER JOIN Exchange e WITH (NOLOCK) ON rr.CurrencyId = e.ExchangeId
 	END
@@ -223,10 +224,13 @@ BEGIN
 			,s.username AS SuperUserName 
 			,rr.SuperPaymentStatus
 			,rr.SuperPaymentDate
+
+			--IsDirectMember
+			,CONVERT(BIT, IIF(rr.Recommend < 0, 1, 0)) AS IsDirectMember
 		FROM #RewardReport rr
 		INNER JOIN Customer mem WITH (NOLOCK) ON mem.custid = rr.CustID
-		INNER JOIN Customer a WITH (NOLOCK) ON a.custid = rr.Recommend
-		INNER JOIN Customer m WITH (NOLOCK) ON m.custid = rr.Mrecommend
+		LEFT JOIN Customer a WITH (NOLOCK) ON a.custid = rr.Recommend
+		LEFT JOIN Customer m WITH (NOLOCK) ON m.custid = rr.Mrecommend
 		INNER JOIN Customer s WITH (NOLOCK) ON s.custid = rr.Srecommend
 		INNER JOIN Exchange e WITH (NOLOCK) ON rr.CurrencyId = e.ExchangeId
 		ORDER BY CreatedDate DESC
@@ -259,6 +263,8 @@ BEGIN
 			,A.SuperUserName 
 			,A.SuperPaymentStatus
 			,A.SuperPaymentDate
+			--IsDirectMember
+			,A.IsDirectMember
 		FROM (
 				SELECT 
 					rr.CreatedDate
@@ -286,11 +292,13 @@ BEGIN
 					,s.username AS SuperUserName 
 					,rr.SuperPaymentStatus
 					,rr.SuperPaymentDate
+					--IsDirectMember
+					,CONVERT(BIT, IIF(rr.Recommend < 0, 1, 0)) AS IsDirectMember
 					,ROW_NUMBER() OVER (ORDER BY CreatedDate DESC) AS Rownum
 				FROM #RewardReport rr
 				INNER JOIN Customer mem WITH (NOLOCK) ON mem.custid = rr.CustID
-				INNER JOIN Customer a WITH (NOLOCK) ON a.custid = rr.Recommend
-				INNER JOIN Customer m WITH (NOLOCK) ON m.custid = rr.Mrecommend
+				LEFT JOIN Customer a WITH (NOLOCK) ON a.custid = rr.Recommend
+				LEFT JOIN Customer m WITH (NOLOCK) ON m.custid = rr.Mrecommend
 				INNER JOIN Customer s WITH (NOLOCK) ON s.custid = rr.Srecommend
 				INNER JOIN Exchange e WITH (NOLOCK) ON rr.CurrencyId = e.ExchangeId
 			) A
