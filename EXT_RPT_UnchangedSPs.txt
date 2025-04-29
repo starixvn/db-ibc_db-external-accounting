@@ -1,4 +1,5 @@
 Report/Core/EAS_GetProductList.sql
+Report/Core/EAS_API_GetProductList.sql
 Report/Winloss Detail By Currency/dbo.EAS_Rpt_WinLossDetailByCurrency_Ag.sql
 Report/Winloss Detail By Currency/dbo.EAS_Rpt_WinLossDetailByCurrency_Com.sql
 Report/Winloss Detail By Currency/dbo.EAS_Rpt_WinLossDetailByCurrency_MAg.sql
