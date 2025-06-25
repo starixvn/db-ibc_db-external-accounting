@@ -28,6 +28,7 @@ AS
 		- 20240515@Lewis: Add SABA Kabaddi [RedmineID: #203763]
 		- 20240729@Lewis: Scale Out DBCust - Remove Linked Server [Redmine : #206895]
 		- 20241216@Bobby: Enhance MBU date range [RedmineID: #215182]
+		- 20250528@Dave: Add RewardAmount column [RedmineID: #228292]
 
 	Param's Explanation:  
 		@FromDate, @ToDate: date range  
@@ -152,7 +153,8 @@ BEGIN
 		SAgWinLost		DECIMAL(24,4), 
 		SAgComm			DECIMAL(24,4), 
 		SAgTotal		DECIMAL(24,4), 
-		Company			DECIMAL(24,4)
+		Company			DECIMAL(24,4),
+		RewardAmount    MONEY DEFAULT(0)
 	);
 
 	DROP TABLE IF EXISTS #ComWinLossDetailsSubGroupList;
@@ -393,7 +395,8 @@ BEGIN
 		INSERT INTO @winlostdateTable(winlostdate, custid)
 		SELECT cte.winlostdate, ts.custid
 		FROM CTE_Winlostdate cte
-		CROSS JOIN #tmpSuperList ts;
+		CROSS JOIN #tmpSuperList ts
+        OPTION (MAXRECURSION 0);
 		
 		-- using cte to remove predicate when seek on sum_winloss_old
 		INSERT INTO #ComWinLossDetails(CustID, Turnover,TurnoverNoDraw,GrossComm, MemberWinLost,PlayerComm,MemberTotal,AgWinLost,AgComm,AgTotal,MAgWinLost,MAgComm,MAgTotal,SAgWinLost, SAgComm, SAgTotal, Company)
@@ -429,6 +432,39 @@ BEGIN
 
 	END
 
+	/*Reward processing*/
+	SELECT @FDate = @FromDate, @TDate = @ToDate;
+	WITH CTE_RewardProcessing AS (
+		SELECT 
+			a.custid,
+			SUM(swt.Amount) as TotalAmount
+		FROM #tmpSuperList a
+		INNER JOIN SabaWalletTicket swt WITH (NOLOCK) ON 
+			swt.WinlostDate BETWEEN @FDate AND @Tdate
+			AND swt.WalletID = 2
+			AND swt.srecommend = a.custid
+		GROUP BY a.custid
+	)
+	INSERT #ComWinLossDetails (
+		CustID, Turnover, TurnoverNoDraw, GrossComm, MemberWinLost, PlayerComm, MemberTotal,
+		AgWinLost, AgComm, AgTotal, MAgWinLost, MAgComm, MAgTotal, SAgWinLost, SAgComm, SAgTotal, Company, RewardAmount
+	)
+	SELECT 
+		custid,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,   /*All columns except RewardAmount set to 0*/
+		TotalAmount
+	FROM CTE_RewardProcessing
+	WHERE TotalAmount > 0;
+
+	DECLARE @CurrencyCode VARCHAR(12);
+
+	SELECT TOP(1) @CurrencyCode = e.Code
+	FROM #tmpSuperList w WITH(NOLOCK)
+	INNER JOIN dbo.CustInfo c WITH(NOLOCK)
+		ON w.CustID = c.custid
+	INNER JOIN dbo.Exchange e WITH (NOLOCK)
+		ON c.currency = e.ExchangeId;
+
 	--TODO: Export excel
 	IF ((@PageSize <= 0) AND (@PageIndex <= 0))
 	BEGIN
@@ -451,7 +487,9 @@ BEGIN
 				SUM(SAgWinLost) SAgWinLost, 
 				SUM(SAgComm) SAgComm	, 
 				SUM(SAgTotal) SAgTotal, 
-				SUM(Company) Company
+				SUM(Company) Company,
+				SUM(RewardAmount) RewardAmount,
+				@CurrencyCode RewardCurrency
 		FROM #ComWinLossDetails w
 		INNER JOIN dbo.custinfo c WITH(NOLOCK) ON w.CustID = c.CustID
 		OUTER APPLY (	SELECT GroupName 
@@ -477,7 +515,9 @@ BEGIN
 				SUM(SAgWinLost) SAgWinLost, 
 				SUM(SAgComm) SAgComm	, 
 				SUM(SAgTotal) SAgTotal, 
-				SUM(Company) Company
+				SUM(Company) Company,
+				SUM(RewardAmount) RewardAmount,
+				@CurrencyCode RewardCurrency
 		FROM	#ComWinLossDetails;
 
 		RETURN
@@ -533,7 +573,9 @@ BEGIN
 		 SUM(SAgWinLost) SAgWinLost,   
 		 SUM(SAgComm) SAgComm ,   
 		 SUM(SAgTotal) SAgTotal,   
-		 SUM(Company) Company
+		 SUM(Company) Company,
+		 SUM(RewardAmount) RewardAmount,
+		 @CurrencyCode RewardCurrency
    FROM #ComWinLossDetails w  
 		INNER JOIN CTE_Filter f ON f.CustID = w.CustID
    GROUP BY w.CustID, f.SubGroup, f.username
@@ -556,7 +598,9 @@ BEGIN
 			SUM(SAgWinLost) SAgWinLost, 
 			SUM(SAgComm) SAgComm	, 
 			SUM(SAgTotal) SAgTotal, 
-			SUM(Company) Company
+			SUM(Company) Company,
+			SUM(RewardAmount) RewardAmount,
+			@CurrencyCode RewardCurrency
 	FROM	#ComWinLossDetails;
 
 END
