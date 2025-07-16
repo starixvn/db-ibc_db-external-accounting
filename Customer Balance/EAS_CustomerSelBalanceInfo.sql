@@ -19,6 +19,7 @@ AS
         - 20240918@Lewis: Rebate Retention - RewardReceivable RewardPayable [RedmineId: #208503]
 		- 20241224@Max: Offer Direct Member for Super/Master [Redmine: #211969]
 		- 20250626@Dave: Add AccumCredit of AllCashMember to AgentUsedCredit [Redmine: #232372]
+		- 20250707@Bobby: Transfer changes for Cash Service [Redmine: #232421]
 
 */
 
@@ -45,7 +46,9 @@ BEGIN
 	SELECT  @Currency = currency FROM dbo.Exchange WITH (NOLOCK) WHERE exchangeId = @CurrencyId
 
 	-- Credit: get data real time on DBCUST
-	SELECT  @Credit = ISNULL(credit, 0) FROM DBCUST.CustDB.dbo.custInfo WITH (NOLOCK) WHERE custid = @CustId
+	SELECT  @Credit = ISNULL(credit, 0) 
+	FROM DBCUST.CustDB.dbo.custInfo WITH (NOLOCK) 
+	WHERE custid = @CustId
 
 	-- Balance Info
 	DECLARE @today SMALLDATETIME, @yesterday SMALLDATETIME
@@ -117,6 +120,7 @@ BEGIN
 			AND 1 = CASE WHEN bettype = 19999 AND winlostdate > @moveBetsDay THEN 0 --> new sum 
 						WHEN bettype = 20000 AND winlostdate > @balanceUpDay THEN 0 --> new bal
 						WHEN winlostdate < @balanceUpDay THEN 0 --> old data
+						WHEN winlostdate > @yesterday AND bettype >= 31000 THEN 0 --> Cash service today transfers
 					ELSE 1 END
 		GROUP BY winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 4 ELSE 0 END
 
@@ -228,6 +232,7 @@ BEGIN
 			AND 1 = CASE WHEN bettype = 19999 AND winlostdate > @moveBetsDay THEN 0 --> new sum 
 						WHEN bettype = 20000 AND winlostdate > @balanceUpDay THEN 0 --> new bal
 						WHEN winlostdate < @balanceUpDay THEN 0 --> old data
+						WHEN winlostdate > @yesterday AND bettype >= 31000 THEN 0 --> Cash service today transfers
 					ELSE 1 END
 		GROUP BY winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 3 ELSE 0 END
 
@@ -292,6 +297,7 @@ BEGIN
 	END
 	ELSE IF @RoleId = 2
 	BEGIN
+			
 		--last txn 
 		SELECT @transid = MAX(transid) FROM bettrans WITH (NOLOCK) 
 		WHERE recommend = @custid
@@ -310,8 +316,9 @@ BEGIN
 		) x
 		
 		-- Credit
-		SELECT @UsedCredit = SUM(ISNULL(credit, 0)) FROM DBCUST.CustDB.dbo.custInfo WITH (NOLOCK) WHERE recommend = @CustId AND roleId = 1
-
+		SELECT @UsedCredit = SUM(ISNULL(credit, 0)) 
+		FROM DBCUST.CustDB.dbo.custInfo WITH (NOLOCK) 
+		WHERE recommend = @CustId AND roleId = 1;
 		SELECT @UsedCredit = ISNULL(SUM(AccumCreditReturn),0) + @UsedCredit
 		FROM dbo.CashAccumCredit WITH (NOLOCK) 
 		WHERE Recommend = @CustId 
@@ -337,6 +344,7 @@ BEGIN
 			AND 1 = CASE WHEN bettype = 19999 AND winlostdate > @moveBetsDay THEN 0 --> new sum 
 						WHEN bettype = 20000 AND winlostdate > @balanceUpDay THEN 0 --> new bal
 						WHEN winlostdate < @balanceUpDay THEN 0 --> old data
+						WHEN winlostdate > @yesterday AND bettype >= 31000 THEN 0 --> Cash service today transfers
 					ELSE 1 END
 		GROUP BY winlostdate, bettype, statusID, CASE WHEN custId = @CustId THEN 2 ELSE 0 END
 
@@ -443,6 +451,7 @@ BEGIN
 			AND 1 = CASE WHEN bettype = 19999 AND winlostdate > @moveBetsDay THEN 0 --> new sum
 						WHEN bettype = 20000 AND winlostdate > @balanceUpDay THEN 0 --> new bal
 						WHEN winlostdate < @balanceUpDay THEN 0 --> old data
+						WHEN winlostdate > @yesterday AND bettype >= 31000 THEN 0 --> Cash service today transfers
 					ELSE 1 END
 		GROUP BY winlostdate, bettype, statusID
 
