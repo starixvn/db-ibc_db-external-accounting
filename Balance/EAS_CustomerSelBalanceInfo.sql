@@ -18,6 +18,7 @@ AS
 		- 20230227@Evan: Balance-Up support transfer 247 [Redmine: #173554]
         - 20240918@Lewis: Rebate Retention - RewardReceivable RewardPayable [RedmineId: #208503]
 		- 20241224@Max: Offer Direct Member for Super/Master [Redmine: #211969]
+		- 20250626@Dave: Add AccumCredit of AllCashMember to AgentUsedCredit [Redmine: #232372]
 
 */
 
@@ -311,6 +312,10 @@ BEGIN
 		-- Credit
 		SELECT @UsedCredit = SUM(ISNULL(credit, 0)) FROM DBCUST.CustDB.dbo.custInfo WITH (NOLOCK) WHERE recommend = @CustId AND roleId = 1
 
+		SELECT @UsedCredit = ISNULL(SUM(AccumCreditReturn),0) + @UsedCredit
+		FROM dbo.CashAccumCredit WITH (NOLOCK) 
+		WHERE Recommend = @CustId 
+			AND AccumCreditReturn > 0;
 		-- bettrans
 		INSERT INTO #BalanceInfo (winlostdate, bettype, statusId, roleId, winlost, actual_stake, awinlost, comm, playercomm, actual_stakePT)
 		SELECT 
