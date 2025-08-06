@@ -61,6 +61,7 @@ Revisions:
 	- 20240617@Lewis: Use bettrans_compact [RedmineID: #206610]
     - 20240918@Lewis: Rebate Retention - Reward [RedmineId: #208503]
 	- 20241216@Bobby: Enhance MBU date range [RedmineID: #213507]
+	- 20250716@Virgil: Apply Agency Cash Service - Report changes [RedmineID: #232418]
 	
 	Param's Explanation:
 	 @ProductDetails:		
@@ -165,7 +166,8 @@ BEGIN
 		)		
 
 	DECLARE @srecommend INT,
-		@mrecommend INT
+			@mrecommend INT,
+			@CurrencyCode VARCHAR(12);
 
 	DROP TABLE IF EXISTS #downlineList;
 	CREATE TABLE #downlineList(custid INT PRIMARY KEY, srecommend INT, mrecommend INT, UserName VARCHAR(30), CurrencyId INT, CurrencyName NVARCHAR(15), CurrencyCode NVARCHAR(5));
@@ -193,6 +195,7 @@ BEGIN
 	SELECT TOP(1)
 		@srecommend = srecommend
 		,@mrecommend = mrecommend
+		,@CurrencyCode = CurrencyCode
 	FROM #downlineList;
 
 	--TODO: bettrans_compact
@@ -348,6 +351,39 @@ BEGIN
 			
 	END
 
+	-- Cash Service Billing 
+	IF ',' + @ProductIDs + ',' LIKE '%,111,%' AND @memberID IS NULL
+	BEGIN
+		SELECT @FDate = fc.FromDate, @TDate = fc.ToDate
+		FROM (VALUES(@FromDate)) AS t (CheckDate)
+		OUTER APPLY (
+			SELECT 
+				MIN(FromDate) AS FromDate,
+				MAX(ToDate) AS ToDate
+			FROM dbo.f_MBU_RangeDate(CheckDate, @ToDate, @BalanceUpDay, @MoveBetsDay)
+			WHERE RangeType IN (1,2)
+		) AS fc
+		
+		INSERT @AgWinLossDetails (CustID , TurnOver , TurnoverNoDraw , GrossComm , MemberWinLost , 
+									PlayerComm , AgWinLost , AgComm , Comm)
+		SELECT tr.custid
+			,0 AS TurnOver
+			,0 AS TurnoverNoDraw
+			,0 AS GrossComm
+			,0 AS MemberWinLost
+			,0 AS PlayerComm
+			,SUM(WinLost-Actual_Stake) AS AgWinLost
+			,0 AS AgComm
+			,0 AS Comm
+		FROM dbo.Transfer tr (NOLOCK)
+		INNER JOIN #tmpSportBettype s 
+			ON tr.bettype = s.bettype 
+			AND s.Bettype IN (31003,31004,31005)
+		WHERE tr.winlostdate BETWEEN @FDate AND @TDate
+				AND tr.CustId = @CustID
+		GROUP BY tr.CustId;
+	END
+
 	--TODO: Sum_WinLoss_Old
 	SELECT @FDate = FromDate, @TDate = ToDate
 	FROM (VALUES(@FromDate)) AS t (CheckDate)
@@ -385,9 +421,35 @@ BEGIN
 			AND b.recommend=@CustID
 			AND b.RoleID=1
 			AND (@memberID IS NULL OR (@memberID > 0 AND dl.custid > 0)) -- Archived members
-		GROUP BY dl.CustID
-	END
+		GROUP BY dl.CustID;
 
+		-- Cash Service Billing 
+		IF ',' + @ProductIDs + ',' LIKE '%,111,%' AND @memberID IS NULL
+		BEGIN
+			INSERT @AgWinLossDetails (CustID , TurnOver , TurnoverNoDraw , GrossComm , MemberWinLost , 
+												PlayerComm , AgWinLost , AgComm , Comm)
+			SELECT b.custid
+				,0 AS TurnOver
+				,0 AS TurnoverNoDraw
+				,0 AS GrossComm
+				,0 AS MemberWinLost
+				,0 AS PlayerComm
+				,SUM(WinLost) AS AgWinLost
+				,0 AS AgComm
+				,0 AS Comm
+			FROM bodb_Summary.dbo.Sum_WinLoss_Old b WITH(NOLOCK)
+			INNER JOIN #tmpSportBettype s 
+				ON b.Bettype = s.BetType
+				AND b.SportType = s.SportType
+				AND s.Bettype IN (31003,31004,31005)
+			WHERE b.winlostdate BETWEEN @FDate AND @TDate
+				AND srecommend = @srecommend
+				AND mrecommend = @mrecommend
+				AND recommend = @custid
+				AND RoleID = 2
+			GROUP BY b.CustID
+		END
+	END
 
 	--TODO: SabaWalletTicket
 	SELECT @FDate = @FromDate, @TDate = @ToDate
@@ -405,8 +467,8 @@ BEGIN
 	BEGIN
 
 		SELECT
-			c.CustID, 
-			c.UserName,  
+			w.CustID, 
+			CASE WHEN w.CustID = @CustID THEN 'CASH SERVICE BILLING' ELSE c.UserName END AS UserName, 
 			SUM(TurnOver) AS TurnOver,
 			SUM(TurnoverNoDraw) AS TurnoverNoDraw,
 			SUM(GrossComm) AS GrossComm,
@@ -418,10 +480,10 @@ BEGIN
 			SUM(AgWinlost+AgComm) AS AgTotal,
 			-SUM(AgWinlost+Comm+MemberWinLost) AS Company,
 			SUM(RewardAmount) AS RewardAmount,
-			c.CurrencyCode AS RewardCurrency
+			@CurrencyCode AS RewardCurrency
 		FROM @AgWinLossDetails w 
 		LEFT JOIN #downlineList c ON w.CustID = c.CustID 
-		GROUP BY c.CustID, c.UserName, c.CurrencyCode
+		GROUP BY w.CustID, c.UserName, c.CurrencyCode
 		ORDER BY IIF(c.Username IS NULL,1,0),c.Username;
 
 		RETURN
@@ -438,8 +500,8 @@ BEGIN
 	FROM
 		(
 		SELECT
-			c.CustID, 
-			c.UserName,  
+			w.CustID, 
+			CASE WHEN w.CustID = @CustID THEN 'CASH SERVICE BILLING' ELSE c.UserName END AS UserName,
 			SUM(TurnOver) AS TurnOver,
 			SUM(TurnoverNoDraw) AS TurnoverNoDraw,
 			SUM(GrossComm) AS GrossComm,
@@ -451,11 +513,11 @@ BEGIN
 			SUM(AgWinlost+AgComm) AS AgTotal,
 			-SUM(AgWinlost+Comm+MemberWinLost) AS Company,
 			SUM(RewardAmount) AS RewardAmount,
-			c.CurrencyCode AS RewardCurrency,
+			@CurrencyCode AS RewardCurrency,
 			ROW_NUMBER() OVER (ORDER BY IIF(c.Username IS NULL,1,0),c.UserName) as RowNum	
 		FROM @AgWinLossDetails w 
 			LEFT JOIN #downlineList c ON w.CustID = c.CustID 
-		GROUP BY c.CustID, c.UserName, c.CurrencyCode
+		GROUP BY w.CustID, c.UserName, c.CurrencyCode
 		) wl
 	WHERE wl.RowNum between @RowStart and @RowEnd;
 
