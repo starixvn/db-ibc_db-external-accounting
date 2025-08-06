@@ -73,6 +73,7 @@ AS
 		- 20240624@Lewis: cte_superBet => Bettrans_compact [redmine: 206610]
 	    - 20240918@Lewis: Rebate Retention - Reward [RedmineId: #208503]
 		- 20241216@Bobby: Enhance MBU & Base Currency [RedmineID: #213507]
+		- 20250718@Virgil: Apply Agency Cash Service - Report changes [RedmineID: #232418]
 	
 	Param's Explanation:
 	 @ProductDetails:		
@@ -137,7 +138,7 @@ BEGIN
 	)
 
 	DROP TABLE IF EXISTS #TmpCondSumWL;
-	CREATE TABLE #TmpCondSumWL (sporttype INT, bettype INT, LeagueGroupID SMALLINT, TicketType TINYINT)--, PRIMARY KEY NONCLUSTERED (Bettype ASC, sporttype ASC))
+	CREATE TABLE #TmpCondSumWL (ProductID TINYINT, sporttype INT, bettype INT, LeagueGroupID SMALLINT, TicketType TINYINT)--, PRIMARY KEY NONCLUSTERED (Bettype ASC, sporttype ASC))
 
 	SELECT @ProductIds = bodb02.dbo.f_AddRelatedProducts(@ProductIds)
 	SELECT @__ProductDetails = CONVERT(XML, @ProductDetails)
@@ -161,8 +162,8 @@ BEGIN
 
 	IF @FromDate <= @MoveBetsDay
 	BEGIN
-		INSERT INTO #TmpCondSumWL(SportType, BetType, LeagueGroupID, TicketType) 
-		SELECT f.SportType, f.BetType, f.LeagueGroupID, f.TicketType
+		INSERT INTO #TmpCondSumWL(ProductID, SportType, BetType, LeagueGroupID, TicketType) 
+		SELECT f.ProductID, f.SportType, f.BetType, f.LeagueGroupID, f.TicketType
 		FROM dbo.f_SumWinloss_ConditionSel(@ProductIds) f
 			LEFT JOIN @ExistingProductDetails e ON f.ProductID = e.ProductId 
 		WHERE e.ProductId IS NULL OR (e.Bettype = f.BetType AND e.Sporttype = f.SportType AND e.TicketType = f.TicketType AND e.LeagueGroupID = f.LeagueGroupID AND e.ProductID = f.ProductId)
@@ -339,6 +340,49 @@ BEGIN
 		GROUP BY ts.CustID
 	END
 
+	-- Cash Service Billing 
+	IF ',' + @ProductIDs + ',' LIKE '%,111,%'
+	BEGIN
+		SELECT @FDate = fc.FromDate, @TDate = fc.ToDate
+		FROM (VALUES(@FromDate)) AS t (CheckDate)
+		OUTER APPLY (
+			SELECT 
+				MIN(FromDate) AS FromDate,
+				MAX(ToDate) AS ToDate
+			FROM dbo.f_MBU_RangeDate(CheckDate, @ToDate, @BalanceUpDay, @MoveBetsDay)
+			WHERE RangeType IN (1,2)
+		) AS fc
+		
+		INSERT INTO #ComWinLossDetails(
+				CustID, Turnover, TurnoverNoDraw, GrossComm, MemberWinLost, PlayerComm, AgWinLost, AgComm, 
+				MAgWinLost, MAgComm, SAgWinLost, SAgComm, ExtraWinloss, ExtraComm, SComm
+			)
+		SELECT sl.CustID,			
+				0 AS Turnover,
+				0 AS TurnoverNoDraw,
+				0 AS GrossComm,
+				0 AS MemberWinLost,
+				0 AS PlayerComm,
+				SUM(WinLost-Actual_Stake) AS AgWinlost,
+				0 AS AgComm,
+				0 AS MAgWinLost,
+				0 AS MAgComm,
+				0 AS SAgWinLost,
+				0 AS SAgComm,
+				0 AS ExtraWinloss,
+				0 AS ExtraComm,
+				0 AS SComm
+		FROM dbo.Transfer tr (NOLOCK)
+			INNER JOIN #tmpSuperList sl 
+				ON tr.srecommend = sl.custid
+			INNER JOIN #SportBettype s 
+				ON tr.bettype = s.bettype 
+				AND s.Bettype IN (31003,31004,31005)
+		WHERE tr.winlostdate BETWEEN @FDate AND @TDate
+			AND tr.CustId = tr.Recommend
+		GROUP BY sl.CustId;
+	END
+
 	--TODO: sum_winloss_old
 	SELECT @FDate = FromDate, @TDate = ToDate
 	FROM (VALUES(@FromDate)) AS t (CheckDate)
@@ -393,10 +437,45 @@ BEGIN
 				AND b.bettype = t.bettype 
 				AND b.leagueGroupID = t.LeagueGroupID 
 				AND b.ticketType = t.TicketType
+				AND t.ProductID <> 111
 		WHERE b.mrecommend = 0
 			AND b.recommend = 0
 			AND b.roleid = 4
-		GROUP BY ts.CustID
+		GROUP BY ts.CustID;
+
+		---- Cash Service Billing 
+		IF ',' + @ProductIDs + ',' LIKE '%,111,%'
+		BEGIN
+			INSERT INTO #ComWinLossDetails(
+				CustID, Turnover, TurnoverNoDraw, GrossComm, MemberWinLost, PlayerComm, AgWinLost, AgComm, 
+				MAgWinLost, MAgComm, SAgWinLost, SAgComm, ExtraWinloss, ExtraComm, SComm
+			)
+			SELECT sl.CustID,			
+					0 AS Turnover,
+					0 AS TurnoverNoDraw,
+					0 AS GrossComm,
+					0 AS MemberWinLost,
+					0 AS PlayerComm,
+					SUM(WinLost) AS AgWinlost,
+					0 AS AgComm,
+					0 AS MAgWinLost,
+					0 AS MAgComm,
+					0 AS SAgWinLost,
+					0 AS SAgComm,
+					0 AS ExtraWinloss,
+					0 AS ExtraComm,
+					0 AS SComm
+			FROM bodb_Summary.dbo.Sum_WinLoss_Old b (NOLOCK)
+				INNER JOIN #tmpSuperList sl 
+					ON b.srecommend = sl.custid
+				INNER JOIN #TmpCondSumWL bt 
+					ON b.sporttype = bt.sporttype
+					AND b.bettype = bt.bettype
+					AND bt.ProductID = 111
+			WHERE b.winlostdate BETWEEN @FDate AND @TDate
+				AND b.custid = b.recommend
+			GROUP BY sl.CustID;
+		END
 	END	
 
 	--TODO: SabaWalletTicket
