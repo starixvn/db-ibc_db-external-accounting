@@ -12,6 +12,7 @@ AS
 	Revisions:
 		- 20240624@Bobby: Initialize SP [Redmine: #206055]
 		- 20250326@Bobby: 3rdProduct-Integration [RedmineID: #221188]
+		- 20250814@Virgil: Cash Service Billing - Update API reports [RedmineId: #235256]
 */
 
 BEGIN
@@ -37,13 +38,19 @@ BEGIN
 
 
 	--TODO: Merge product code & check IsHidden
-	SELECT t.ProductID
-		   ,t.ProductName
-		   ,p.ProductPrefix AS ProductCode
-	FROM #ProductList t	
-	INNER JOIN dbo.Products p WITH (NOLOCK) ON p.ProductID = t.ProductID
-	WHERE t.IsHidden = 0
-	ORDER BY t.OrderNo ASC
+	SELECT ProductID, ProductName, ProductCode
+	FROM (
+		SELECT t.ProductID, t.ProductName, p.ProductPrefix AS ProductCode, t.OrderNo
+		FROM #ProductList t
+		INNER JOIN dbo.Products p WITH (NOLOCK) ON p.ProductID = t.ProductID
+		WHERE t.IsHidden = 0
+		UNION
+		-- Cash Service Billing
+		SELECT t.ProductID, t.ProductName, t.ProductPrefix AS ProductCode, (SELECT MAX(OrderNo)+1 FROM #ProductList) AS OrderNo
+		FROM dbo.Products t WITH (NOLOCK)
+		WHERE ProductID = 111
+	) x
+	ORDER BY x.OrderNo ASC
 	
 END
 GO

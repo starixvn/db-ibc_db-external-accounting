@@ -62,6 +62,7 @@ Revisions:
     - 20240918@Lewis: Rebate Retention - Reward [RedmineId: #208503]
 	- 20241216@Bobby: Enhance MBU date range [RedmineID: #213507]
 	- 20250716@Virgil: Apply Agency Cash Service - Report changes [RedmineID: #232418]
+	- 20250807@Virgil: Fix bug Reward column not show [RedmineID: #235473]
 	
 	Param's Explanation:
 	 @ProductDetails:		
@@ -192,11 +193,13 @@ BEGIN
 			AND ci.custid = @memberID
 	END
 
-	SELECT TOP(1)
-		@srecommend = srecommend
-		,@mrecommend = mrecommend
-		,@CurrencyCode = CurrencyCode
-	FROM #downlineList;
+	SELECT @srecommend = c.Srecommend,
+		   @mrecommend = c.mrecommend,
+		   @CurrencyCode = e.Code
+	FROM dbo.CustInfo c WITH(NOLOCK)
+	INNER JOIN dbo.Exchange e WITH (NOLOCK)
+		ON c.currency = e.ExchangeId
+	WHERE c.CustID = @CustID;
 
 	--TODO: bettrans_compact
 	SELECT @FDate = FromDate, @TDate = ToDate
