@@ -22,6 +22,7 @@ AS
 		- 20240306@Lewis: Add Virtual Ice Hockey [RedmineID: #201129]
 		- 20240515@Lewis: Add SABA Kabaddi [RedmineID: #203763]
 		- 20241216@Bobby: Enhance MBU date range [RedmineID: #215182]
+		- 20251028@Bobby: Changes impact on core func f_GetProductDetail [RedmineID: #235369]
 
 	Param's Explanation:
 		- @BaseCurrency:  MYR|CNY|THB|IDR
@@ -152,7 +153,7 @@ BEGIN
 				WHERE e.ProductId IS NULL 
 				OR (e.Bettype = f.BetType 
 					OR (
-						e.Bettype = 0  AND  (e.ProductId = 1 OR  f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g WHERE g.ProductId <> 1))
+						e.Bettype = 0  AND  (e.ProductId = 1 OR  f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail_Old() g WHERE g.ProductId <> 1))
 					)
 				)
 			)		
@@ -206,7 +207,7 @@ BEGIN
 												(
 													e.Bettype = f.BetType 
 													 OR (
-																e.Bettype = 0  AND  (e.ProductId = 1 OR  f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g WHERE g.ProductId <> 1) )
+																e.Bettype = 0  AND  (e.ProductId = 1 OR  f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail_Old() g WHERE g.ProductId <> 1) )
 														)
 												)
 										)
@@ -242,7 +243,7 @@ BEGIN
 												(
 													e.Bettype = f.BetType 
 														 OR (
-																e.Bettype = 0  AND  (e.ProductId = 1 OR  f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g WHERE g.ProductId <> 1) )
+																e.Bettype = 0  AND  (e.ProductId = 1 OR  f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail_Old() g WHERE g.ProductId <> 1) )
 														)
 												)
 										)

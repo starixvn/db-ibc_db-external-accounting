@@ -59,10 +59,11 @@ Revisions:
 	- 20240306@Lewis: Add Virtual Ice Hockey [RedmineID: #201129]
 	- 20240515@Lewis: Add SABA Kabaddi [RedmineID: #203763]
 	- 20240617@Lewis: Use bettrans_compact [RedmineID: #206610]
-    - 20240918@Lewis: Rebate Retention - Reward [RedmineId: #208503]
+	- 20240918@Lewis: Rebate Retention - Reward [RedmineId: #208503]
 	- 20241216@Bobby: Enhance MBU date range [RedmineID: #213507]
 	- 20250716@Virgil: Apply Agency Cash Service - Report changes [RedmineID: #232418]
 	- 20250807@Virgil: Fix bug Reward column not show [RedmineID: #235473]
+	- 20251028@Bobby: Changes impact on core func f_GetProductDetail [RedmineID: #235369]
 	
 	Param's Explanation:
 	 @ProductDetails:		
@@ -161,7 +162,7 @@ BEGIN
 		WHERE e.ProductId IS NULL 
 			OR (e.Bettype = f.BetType 
 				OR (
-					e.Bettype = 0  AND  (e.ProductId = 1 OR  f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g WHERE g.ProductId <> 1) )
+					e.Bettype = 0  AND  (e.ProductId = 1 OR  f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail_Old() g WHERE g.ProductId <> 1) )
 				)
 			)
 		)		
@@ -248,7 +249,7 @@ BEGIN
 												(
 													e.Bettype = f.BetType 
 															OR (
-														e.Bettype = 0  AND  (e.ProductId = 1 OR  f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g WHERE g.ProductId <> 1) )
+														e.Bettype = 0  AND  (e.ProductId = 1 OR  f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail_Old() g WHERE g.ProductId <> 1) )
 														)
 												)
 										)
@@ -284,7 +285,7 @@ BEGIN
 												(
 													e.Bettype = f.BetType 
 																OR (
-															e.Bettype = 0  AND  (e.ProductId = 1 OR  f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail() g WHERE g.ProductId <> 1) )
+															e.Bettype = 0  AND  (e.ProductId = 1 OR  f.BetType NOT IN (SELECT g.Bettype FROM f_GetProductDetail_Old() g WHERE g.ProductId <> 1) )
 														)
 												)
 										)

@@ -13,6 +13,7 @@ AS
 		- 20240624@Bobby: Initialize SP [Redmine: #206055]
 		- 20250326@Bobby: 3rdProduct-Integration [RedmineID: #221188]
 		- 20250814@Virgil: Cash Service Billing - Update API reports [RedmineId: #235256]
+		- 20250807@Virgil: Fix bug Reward column not show [RedmineID: #235473]
 */
 
 BEGIN
