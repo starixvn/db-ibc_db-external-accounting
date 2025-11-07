@@ -9,13 +9,13 @@ AS
 	Revisions:
 		- 20221215@Bobby: Initialize SPs
 		- 20240912@Bobby: Multiple leagues [RedmineID : #210635]
-
+		- 20251016@Helios: Upgrade datatype of sporttype from TINYINT to SMALLINT [Redmine: #241501]
 */
 BEGIN
 	SET NOCOUNT ON;
 
 	--- SB only
-	DECLARE @sporttype TINYINT = 1;
+	DECLARE @sporttype SMALLINT = 1;
 
 	-- filter league								
 	DECLARE @leagueList TABLE  (leagueid INT PRIMARY KEY);								

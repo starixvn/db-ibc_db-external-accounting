@@ -1,4 +1,4 @@
-/*<info serverAlias="DBBOF-bodb02" executers="bodbExtAccNet" isFunction="0" isNested="0"></info>*/
+/*<info serverAlias="DBBOF-bodb02" executers="wsv_xnap" isFunction="0" isNested="0"></info>*/
 ALTER PROCEDURE [dbo].[EAS_TotalBet_LeagueSel] 	
 	@IsTest BIT = NULL
 AS
@@ -8,12 +8,13 @@ AS
 	DB: DBBOF/bodb02
 	Revisions:
 		- 20221215@Bobby: Initialize SPs
+		- 20251016@Helios: Upgrade datatype of sporttype from TINYINT to SMALLINT [Redmine: #241501]
 */
 BEGIN
 	SET NOCOUNT ON;
 
 	--- SB only
-	DECLARE @sporttype	TINYINT = 1,
+	DECLARE @sporttype	SMALLINT = 1,
 		@ckIsTest		BIT;
 
 	SELECT @ckIsTest = ISNULL(@IsTest, 0);
